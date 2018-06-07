@@ -1,6 +1,20 @@
 
 __all__ = ["find_embedding"]
 
+def _global_placement():
+
+    return global_loc
+
+def _scale():
+
+    return scale_loc
+
+def _migrate():
+    return node_loc
+
+def _route():
+
+    return chains
 
 def find_embedding(S, T, **params):
     """
@@ -24,7 +38,7 @@ def find_embedding(S, T, **params):
 
     """
 
-    
+
 
 
     return embedding

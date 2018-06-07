@@ -5,16 +5,21 @@ A dimod composite_ that maps unstructured problems to a structured_ sampler.
 A structured_ sampler can only solve problems that map to a specific graph.
 
 .. _composite: http://dimod.readthedocs.io/en/latest/reference/samplers.html
+.. _minorminer: https://github.com/dwavesystems/minorminer
 .. _structured: http://dimod.readthedocs.io/en/latest/reference/samplers.html#module-dimod.core.structured
 .. _Chimera: http://dwave-system.readthedocs.io/en/latest/reference/intro.html#chimera
 
 """
 import dimod
 
-# Embedding methods
-import dense
+# External methods
 import minorminer
-import topological
+
+# Internal embedding methods
+import embedding_methods.dense as dense
+import embedding_methods.topological as topological
+
+
 
 __all__ = ['MinorEmbeddingComposite']
 
@@ -35,6 +40,8 @@ class MinorEmbeddingComposite(dimod.ComposedSampler):
     def __init__(self, child_sampler):
         if not isinstance(child_sampler, dimod.Structured):
             raise dimod.InvalidComposition("MinorEmbeddingComposite should only be applied to a Structured sampler")
+
+        self._embedding_methods = {'minorminer': minorminer, 'dense': dense, 'topological': topological}
         self._children = [child_sampler]
 
     @property
@@ -116,7 +123,10 @@ class MinorEmbeddingComposite(dimod.ComposedSampler):
         """
         return {'child_properties': self.child.properties.copy()}
 
-    def sample(self, bqm, chain_strength=1.0, embed_method='minorminer', topology=None, **parameters):
+    def get_methods():
+        return list(self._embedding_methods.keys())
+
+    def sample(self, bqm, chain_strength=1.0, embed_method='minorminer', **parameters):
         """Sample from the provided binary quadratic model.
 
         Args:
@@ -164,6 +174,7 @@ class MinorEmbeddingComposite(dimod.ComposedSampler):
 
         # solve the problem on the child system
         child = self.child
+        embedder = self._embedding_methods[embed_method]
 
         # apply the embedding to the given problem to map it to the child sampler
         __, target_edgelist, target_adjacency = child.structure
