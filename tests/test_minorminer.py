@@ -14,6 +14,7 @@ import dwave_networkx as dnx
 import dwavebinarycsp as dcsp
 import matplotlib.pyplot as plt
 import dwavebinarycsp.factories.constraint.gates as gates
+from embedding_methods.composites.minorminer import MinorMinerEmbeddingComposite
 from dimod.reference.samplers.exact_solver import ExactSolver
 from dimod.reference.samplers.random_sampler import RandomSampler
 from dimod.reference.composites.structure import StructureComposite
@@ -30,14 +31,14 @@ csp.add_constraint(gates.and_gate(['and3', 'or4', 'and5']))  # add AND 5 gate
 csp.add_constraint(operator.ne, ['or4', 'not6'])  # add NOT 6 gate
 csp.add_constraint(gates.or_gate(['and5', 'not6', 'z']))  # add OR 7 gate
 
-# Size of Pegasus Graph
-m = 2
-pegasus = dnx.generators.pegasus.pegasus_graph(m)
+# Size of Chimera Graph
+m,n,t = 4,4,4
+chimera = dnx.generators.chimera.chimera_graph(m,n,t)
 
 #strucsampler = StructureComposite(ExactSolver(), chimera.nodes, chimera.edges)
 #strucsampler = StructureComposite(RandomSampler(), chimera.nodes, chimera.edges)
-structsampler = StructureComposite(SimulatedAnnealingSampler(), pegasus.nodes, pegasus.edges)
-sampler = EmbeddingComposite(structsampler, minorminer)
+structsampler = StructureComposite(SimulatedAnnealingSampler(), chimera.nodes, chimera.edges)
+sampler = MinorMinerEmbeddingComposite(structsampler)
 
 # Convert the binary constraint satisfaction problem to a binary quadratic model
 bqm = dcsp.stitch(csp)

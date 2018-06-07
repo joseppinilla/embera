@@ -64,7 +64,6 @@ class MinorMinerEmbeddingComposite(dimod.ComposedSampler):
         """
 
         """
-        embedding_method = self._embedding_method
         self._embedding_parameters = embedding_parameters
 
         if get_new or not self._embedding:
@@ -93,7 +92,6 @@ class MinorMinerEmbeddingComposite(dimod.ComposedSampler):
         """
 
         # use the given embedding method with the given parameters
-        embedding_method = self._embedding_method
         embedding_parameters = self._embedding_parameters
 
         # solve the problem on the child system

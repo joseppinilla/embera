@@ -36,8 +36,8 @@ chimera = dnx.generators.chimera.chimera_graph(m,n,t)
 
 #strucsampler = StructureComposite(ExactSolver(), chimera.nodes, chimera.edges)
 #strucsampler = StructureComposite(RandomSampler(), chimera.nodes, chimera.edges)
-strucsampler = StructureComposite(SimulatedAnnealingSampler(), chimera.nodes, chimera.edges)
-sampler = EmbeddingComposite(strucsampler, minorminer)
+structsampler = StructureComposite(SimulatedAnnealingSampler(), chimera.nodes, chimera.edges)
+sampler = EmbeddingComposite(structsampler, minorminer)
 
 # Convert the binary constraint satisfaction problem to a binary quadratic model
 bqm = dcsp.stitch(csp)
