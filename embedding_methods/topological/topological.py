@@ -2,7 +2,7 @@
 import traceback
 import networkx as nx
 import dwave_networkx as dnx
-
+from embedding_methods.utilities import *
 
 __max_chimera__ = 16
 __max_pegasus__ = 16
@@ -14,11 +14,13 @@ __default_construction__ =  {"family": "chimera", "rows": 16, "columns": 16,
 __all__ = ["find_embedding"]
 
 class Tile:
-    def __init__(self, i, j, m, n):
+    """Tile for migration stage
+    """
+    def __init__(self, Tg, i, j, m, n):
         self.name = (i,j)
         self.index = j*m + i
         self.nodes = set()
-        self.supply = 0
+        self.supply = _get_supply(Tg, i, j)
         self.concentration = 0.0
         self.velocity_x = 0.0
         self.velocity_y = 0.0
@@ -28,87 +30,38 @@ class Tile:
 
 
 class Tiling:
-    def __init__(self, m, n):
+    """Tiling for migration stage
+    """
+    def __init__(self, Tg, opts):
+        m = opts.construction['rows']
+        n = opts.construction['columns']
+        family = opts.construction['family']
         self.size = m*n
         self.tiles = {}
-        for i in m:
-            for j in n:
-                self.tiles[(i,j)] = Tile(i,j,m,m)
+        self.family = family
+        for i in range(m):
+            for j in range(n):
+                tile = (i,j)
+                self.tiles[tile] = Tile(Tg,i,j,m,n)
 
-
-
-class Options:
+class TopologicalOptions(EmbedderOptions):
     def __init__(self, **params):
-        self.topology = None
-        self.enable_migration = True
-        self.random_seed = None
-        self.tries = 1
-        self.construction = __default_construction__
-        self.coordinates = None
-        self.verbose = 0
+        EmbedderOptions.__init__(self, **params)
+        # Parse optional parameters
+        self.names.update({"topology", "enable_migration"})
 
-def _read_source_graph(S, opts):
+        for name in params:
+            if name not in self.names:
+                raise ValueError("%s is not a valid parameter for topological find_embedding"%name)
 
-    Sg = nx.Graph(S)
-    nx.set_node_attributes(Sg, topology, 'coordinate')
+        # If a topology of the graph is not provided, generate one
+        try: self.topology =  params['topology']
+        except KeyError: self.topology = _simulated_annealing_placement(S)
 
-    if opts.verbose >= 1:
-        print("Drawing Source Graph")
-        plt.clf()
-        nx.draw(Sg, with_labels=True)
-        plt.show()
+        try: self.enable_migration = params['enable_migration']
+        except: self.enable_migration = True
 
-    return Sg
 
-def _read_target_graph(T, opts):
-
-    if opts.construction['family'] =='chimera':
-        Tg = _read_chimera_graph(T, opts)
-    elif opts.construction['family'] =='pegasus':
-        Tg = _read_pegasus_graph(T, opts)
-    else:
-        raise RuntimeError("Target architecture graph %s not recognized" % opts.construction['family'])
-    return Tg
-
-def _read_chimera_graph(T, opts):
-
-    m = opts.construction['rows']
-    n = opts.construction['columns']
-    t = opts.construction['tile']
-    data = opts.construction['data']
-    coordinates = opts.construction['labels'] == 'coordinate'
-
-    Tg = dnx.chimera_graph(m, n, t, edge_list=T, data=data, coordinates=coordinates)
-
-    if opts.verbose >= 1:
-        print("Drawing Chimera Graph")
-        plt.clf()
-        dnx.draw_chimera(Tg, with_labels=True)
-        plt.show()
-
-    return Tg
-
-def _read_pegasus_graph(T, opts):
-
-    m = opts.construction['rows']
-    n = opts.construction['columns']
-    t = opts.construction['tile']
-    data = opts.construction['data']
-    vertical_offsets = opts.construction['vertical_offsets']
-    horizontal_offsets = opts.construction['horizontal_offsets']
-    coordinates = opts.construction['labels'] == 'coordinate'
-
-    Tg = dnx.pegasus_graph(m, edge_list=T, data=True,
-        offset_lists=(vertical_offsets,horizontal_offsets),
-        coordinates=coordinates)
-
-    if opts.verbose >= 1:
-        print("Drawing Pegasus Graph")
-        plt.clf()
-        dnx.draw_pegasus(Tg, with_labels=True)
-        plt.show()
-
-    return Tg
 
 
 def _loc2tile(loc, family):
@@ -156,10 +109,10 @@ def _scale(Sg, Tg, opts):
     return scale_loc
 
 def _get_velocity(tile):
+    pass
 
 
-
-def _step(Tsupply, scale_loc, tiling, opts):
+def _step(tiling, scale_loc, opts):
 
     N = len(scale_loc)
     m = opts.construction['rows']
@@ -167,13 +120,9 @@ def _step(Tsupply, scale_loc, tiling, opts):
 
     center_x, center_y = m/2.0, n/2.0
 
-    # Store new node sets per tile
-    new_tiling = n*m*[set()]
-
-    for tile in tiling:
-        nodes = tiling[tile]['nodes'] #TODO: Use this dict structure
-        demand_tile = len(nodes)
-        concentration = demand_tile/Tsupply[]
+    for name, tile in tiling.tiles.items():
+        demand_tile = len(tile.nodes)
+        #concentration = demand_tile/Tsupply[]
 
         velocity_step = _get_velocity()
 
@@ -187,7 +136,7 @@ def _step(Tsupply, scale_loc, tiling, opts):
     dispersion = dist_accum/N
     return dispersion
 
-def _get_supply(Tg):
+def _get_supply(Tg, i, j):
     #TODO: Implement _get_supply from Target
     pass
 
@@ -197,14 +146,11 @@ def _migrate(Sg, Tg, scale_loc, opts):
     N = len(scale_loc)
     m = opts.construction['rows']
     n = opts.construction['columns']
+    familiy = opts.construction['family']
 
-    Tsupply = _get_supply(Tg)
+    tiling = Tiling(Tg, opts)
 
-    tiling = m*n*[(0, set(), 0.0)] # supply, node_list, velocity_step
-    tile_velocity = N*[0.0]
-    concentration = m*n*[0.0]
-
-    concentration, tile, migrating = _step(Tsupply, scale_loc, tiling, opts)
+    _step(tiling, scale_loc, opts)
 
     while migrating:
         velocity_step =  _gradient(concentration, tile)
@@ -216,42 +162,6 @@ def _migrate(Sg, Tg, scale_loc, opts):
 def _route():
 
     return chains
-
-def _parse_params(**params):
-    """ Parse the optional parameters, assign default values or perform
-    necessary actions.
-
-    """
-    # Parse optional parameters
-    names = {"topology", "enable_migration", "random_seed", "construction", "tries", "verbose"}
-
-    for name in params:
-        if name not in names:
-            raise ValueError("%s is not a valid parameter for topological find_embedding"%name)
-
-    opts = Options()
-
-    # If a topology of the graph is not provided
-    try: opts.topology =  params['topology']
-    except KeyError: opts.topology = _simulated_annealing_placement(S)
-
-    # For the other parameters, keep defeaults
-    try: opts.enable_migration = params['enable_migration']
-    except: pass
-
-    try: opts.random_seed = params['random_seed']
-    except: pass
-
-    try: opts.tries = params['tries']
-    except: pass
-
-    try: opts.construction = params['construction']
-    except: pass
-
-    try: opts.verbose = params['verbose']
-    except: pass
-
-    return opts
 
 def find_embedding(S, T, **params):
     """
@@ -298,11 +208,13 @@ def find_embedding(S, T, **params):
 
     """
 
-    opts = _parse_params(**params)
+    opts = TopologicalOptions(**params)
 
-    Sg = _read_source_graph(S, opts)
+    print(vars(opts))
 
-    Tg = _read_target_graph(T, opts)
+    Sg = read_source_graph(S, opts)
+
+    Tg = read_target_graph(T, opts)
 
     scale_loc = _scale(Sg, Tg, opts)
 
@@ -323,8 +235,8 @@ if __name__== "__main__":
     S = nx.grid_2d_graph(4,4)
     topology = {v:v for v in S}
 
-    T = dnx.chimera_graph(m, coordinates=True)
-    #T = dnx.pegasus_graph(m, coordinates=True)
+    #T = dnx.chimera_graph(m, coordinates=True)
+    T = dnx.pegasus_graph(m, coordinates=True)
 
     S_edgelist = list(S.edges())
     T_edgelist = list(T.edges())

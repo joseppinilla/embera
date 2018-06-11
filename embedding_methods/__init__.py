@@ -1,3 +1,4 @@
 from embedding_methods import composites
 from embedding_methods import dense
 from embedding_methods import topological
+from embedding_methods import utilities
