@@ -1,7 +1,7 @@
+import random
 import networkx as nx
 import matplotlib.pyplot as plt
 import dwave_networkx as dnx
-
 
 __all__ = ["EmbedderOptions","read_source_graph","read_target_graph"]
 
@@ -10,8 +10,10 @@ class EmbedderOptions:
         # Parse optional parameters
         self.names = {"random_seed", "construction", "tries", "verbose"}
 
+        # Random Number Generator
         try: self.random_seed = params['random_seed']
         except: self.random_seed = None
+        self.rng = random.Random(self.random_seed)
 
         try: self.tries = params['tries']
         except: self.tries = 1

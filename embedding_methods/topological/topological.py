@@ -16,17 +16,46 @@ __all__ = ["find_embedding"]
 class Tile:
     """Tile for migration stage
     """
-    def __init__(self, Tg, i, j, m, n):
+    def __init__(self, Tg, family, i, j, m, n, t):
         self.name = (i,j)
         self.index = j*m + i
         self.nodes = set()
-        self.supply = _get_supply(Tg, i, j)
         self.concentration = 0.0
         self.velocity_x = 0.0
         self.velocity_y = 0.0
 
-    def add_node(self, node):
-        self.nodes.add(node)
+        if family=='chimera':
+            self._get_chimera_qubits(Tg, t, i, j)
+        elif family=='pegasus':
+            self._get_pegasus_qubits(Tg, t, i, j)
+
+        print (self.qubits)
+
+    def _get_chimera_qubits(self, Tg, family, i, j, m, n, t):
+
+        self.qubits = set()
+        v = 0
+
+        for u in range(2):
+            for k in range(t):
+                qubit_index = (i, j, u, k)
+                if qubit_index in Tg.nodes:
+                    self.qubits.add(qubit_index)
+                    v += 1
+
+
+    def _get_pegasus_qubits(self, Tg, t, w, z):
+
+        self.qubits = set()
+        v=0
+
+        for u in range(2):
+            for k in range(t):
+                qubit_index = (u, w, k, z)
+                if qubit_index in Tg.nodes:
+                    self.qubits.add(qubit_index)
+                    v += 1
+
 
 
 class Tiling:
@@ -35,6 +64,7 @@ class Tiling:
     def __init__(self, Tg, opts):
         m = opts.construction['rows']
         n = opts.construction['columns']
+        t = opts.construction['tile']
         family = opts.construction['family']
         self.size = m*n
         self.tiles = {}
@@ -42,7 +72,7 @@ class Tiling:
         for i in range(m):
             for j in range(n):
                 tile = (i,j)
-                self.tiles[tile] = Tile(Tg,i,j,m,n)
+                self.tiles[tile] = Tile(Tg, family, i, j, m, n, t)
 
 class TopologicalOptions(EmbedderOptions):
     def __init__(self, **params):
@@ -56,23 +86,26 @@ class TopologicalOptions(EmbedderOptions):
 
         # If a topology of the graph is not provided, generate one
         try: self.topology =  params['topology']
-        except KeyError: self.topology = _simulated_annealing_placement(S)
+        except KeyError: self.topology = self._simulated_annealing_placement(S)
 
         try: self.enable_migration = params['enable_migration']
         except: self.enable_migration = True
 
 
+    def _simulated_annealing_placement(self, S):
+
+        rng = self.rng
+        m = self.construction['rows']
+        n = self.construction['columns']
+        family = self.construction['family']
+
+        init_loc = {}
+        for node in S:
+            init_loc[node] = (rng.uniform(0,n),rng.uniform(0,m))
+
+        return init_loc
 
 
-def _loc2tile(loc, family):
-
-    tile = None
-
-    return tile
-
-def _simulated_annealing_placement():
-
-    return init_loc
 
 def _scale(Sg, Tg, opts):
     """ Transform node locations to in-scale values of the dimension
@@ -121,10 +154,8 @@ def _step(tiling, scale_loc, opts):
     center_x, center_y = m/2.0, n/2.0
 
     for name, tile in tiling.tiles.items():
-        demand_tile = len(tile.nodes)
-        #concentration = demand_tile/Tsupply[]
 
-        velocity_step = _get_velocity()
+        velocity_step = _get_velocity(tile)
 
         for node in nodes:
             node_x, node_y = scale_loc[node]
@@ -136,10 +167,14 @@ def _step(tiling, scale_loc, opts):
     dispersion = dist_accum/N
     return dispersion
 
-def _get_supply(Tg, i, j):
-    #TODO: Implement _get_supply from Target
-    pass
+def _get_demand(Sg, tiling, opts):
 
+
+    demand = len(tile.nodes)
+    supply = len(tile.qubits)
+    concentration = demand/supply
+
+    pass
 
 def _migrate(Sg, Tg, scale_loc, opts):
 
@@ -150,16 +185,15 @@ def _migrate(Sg, Tg, scale_loc, opts):
 
     tiling = Tiling(Tg, opts)
 
-    _step(tiling, scale_loc, opts)
-
+    migrating = opts.enable_migration
     while migrating:
-        velocity_step =  _gradient(concentration, tile)
-        concentration, tile, migrating = _step(velocity_step)
+        _get_demand(Sg, tiling, opts)
+        _step(tiling, scale_loc, opts)
 
 
-    return node_loc
+    return tiling, node_loc
 
-def _route():
+def _route(Sg, Tg, tiling, node_loc, opts):
 
     return chains
 
@@ -218,9 +252,9 @@ def find_embedding(S, T, **params):
 
     scale_loc = _scale(Sg, Tg, opts)
 
-    node_loc = _migrate(Sg, Tg, scale_loc, opts)
+    tiling, node_loc = _migrate(Sg, Tg, scale_loc, opts)
 
-    embedding = _route(S, T, node_loc, opts)
+    embedding = _route(Sg, Tg, tiling, node_loc, opts)
 
     return embedding
 
@@ -243,5 +277,6 @@ if __name__== "__main__":
 
     try:
         find_embedding(S_edgelist, T_edgelist, topology=topology, construction=T.graph, verbose=verbose)
+        #find_embedding(S_edgelist, T_edgelist, construction=T.graph, verbose=verbose)
     except:
         traceback.print_exc()
