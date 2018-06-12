@@ -5,9 +5,8 @@ import dwave_networkx as dnx
 from math import floor, sqrt
 from embedding_methods.utilities import *
 
-__max_chimera__ = 16
-__max_pegasus__ = 16
-
+__chimera_qubits__ = 8
+__pegasus_qubits__ = 20
 __default_construction__ =  {"family": "chimera", "rows": 16, "columns": 16,
                             "tile": 4, "data": True, "labels": "coordinate"}
 
@@ -20,34 +19,36 @@ def i2c(index, n):
     """
     return divmod(index,n)
 
-def _get_neighbours(i, j, m, n, index):
+def _get_neighbours(i, j, m, n, index, vicinity):
     """ Calculate indices and names of negihbouring tiles to use recurrently
         during migration and routing.
         The vicinity parameter is later used to prune out the neighbours of
         interest.
         Uses cardinal notation north, south, ...
     """
-
-    n = i2c(index - n)     if (j > 0)      else   None
-    s = i2c(index + n)     if (j < m-1)    else   None
-    w = i2c(index - 1)     if (i > 0)      else   None
-    e = i2c(index + 1)     if (i < n-1)    else   None
+    north = i2c(index - n, n)     if (j > 0)      else   None
+    south = i2c(index + n, n)     if (j < m-1)    else   None
+    west =  i2c(index - 1, n)     if (i > 0)      else   None
+    east =  i2c(index + 1, n)     if (i < n-1)    else   None
 
     if vicinity>1 or vicinity<4:
-        nw = i2c(index - n - 1)  if (j > 0    and i > 0)    else None
-        ne = i2c(index - n + 1)  if (j > 0    and i < n-1)  else None
-        se = i2c(index + n + 1)  if (j < m-1  and i < n-1)  else None
-        sw = i2c(index + n - 1)  if (j < m-1  and i > 0)    else None
-        return (n,s,w,e,ns,ne,se,sw)
+        nw = i2c(index - n - 1, n)  if (j > 0    and i > 0)    else None
+        ne = i2c(index - n + 1, n)  if (j > 0    and i < n-1)  else None
+        se = i2c(index + n + 1, n)  if (j < m-1  and i < n-1)  else None
+        sw = i2c(index + n - 1, n)  if (j < m-1  and i > 0)    else None
+        return (north,south,west,east,nw,ne,se,sw)
     else:
         raise ValueError("%s is not a valid value for \
             the topological embedding vicinity parameter."%name)
 
-    return (n,s,w,e)
+    return (north,south,west,east)
 
 class DummyTile:
     def __init__(self):
-        self.concentration = __tile_boundary__
+        # Treat as a fully occupied tile
+        self.concentration = 1.0
+        # Dummy empty set to skip calculations
+        self.nodes = set()
 
 class Tile:
     """ Tile for migration stage
@@ -67,7 +68,6 @@ class Tile:
         self.concentration = 0.0
         self.velocity_x = 0.0
         self.velocity_y = 0.0
-
         self.neighbours = _get_neighbours(i, j, m, n, index, vicinity)
 
         if family=='chimera':
@@ -129,6 +129,7 @@ class Tiling:
         t = opts.construction['tile']
         family = opts.construction['family']
         self.size = m*n
+        self.qubits = len(Tg)
         self.family = family
         # Add Tile objects
         self.tiles = {}
@@ -138,42 +139,6 @@ class Tiling:
                 self.tiles[tile] = Tile(Tg, i, j, opts)
         # Dummy tile to represent boundaries
         self.tiles[None] = DummyTile()
-
-class TopologicalOptions(EmbedderOptions):
-    def __init__(self, **params):
-        EmbedderOptions.__init__(self, **params)
-        # Parse optional parameters
-        self.names.update({"topology", "enable_migration", "vicinity"})
-
-        for name in params:
-            if name not in self.names:
-                raise ValueError("%s is not a valid parameter for topological find_embedding"%name)
-
-        # If a topology of the graph is not provided, generate one
-        try: self.topology =  params['topology']
-        except KeyError: self.topology = self._simulated_annealing_placement(S)
-
-        try: self.enable_migration = params['enable_migration']
-        except: self.enable_migration = True
-
-        try: self.vicinity = params['vicinity']
-        except: self.vicinity = 0
-
-
-    def _simulated_annealing_placement(self, S):
-
-        rng = self.rng
-        m = self.construction['rows']
-        n = self.construction['columns']
-        family = self.construction['family']
-
-        init_loc = {}
-        for node in S:
-            init_loc[node] = (rng.uniform(0,n),rng.uniform(0,m))
-
-        return init_loc
-
-
 
 def _scale(Sg, Tg, opts):
     """ Transform node locations to in-scale values of the dimension
@@ -206,31 +171,46 @@ def _scale(Sg, Tg, opts):
         scaled_sy = norm_sy * m
         Sg.nodes[s]['coordinate'] = (scaled_sx, scaled_sy)
 
-def _get_velocity(tile):
+def _get_gradient(tile):
 
     return 0.0,0.0
 
 
 def _step(Sg, tiling, opts):
 
-    N = len(Sg)
+    # Problem size
+    P = len(Sg)
+    # Number of Qubits
+    Q = tiling.qubits
+
     m = opts.construction['rows']
     n = opts.construction['columns']
+    delta_t = opts.delta_t
+    viscosity = opts.viscosity
 
-    center_x, center_y = m/2.0, n/2.0
+    center_x, center_y = n/2.0, m/2.0
     dist_accum = 0.0
 
-    for t_name, tile in tiling.tiles.items():
+    # Diffusivity
+    D = (viscosity*P) / Q
 
-        velocity_step = _get_velocity(tile)
+    # Iterate over tiles
+    for name, tile in tiling.tiles.items():
 
+        del_x, del_y = _get_gradient(tile)
+        # Iterate over nodes in tile and migrate
         for s in tile.nodes:
-            node_x, node_y = Sg.nodes[s]['coordinate']
-            v_x, v_y = velocity_step
-            new_x, new_y = node_x + v_x, node_y + v_y
-            dist_accum += (new_x-center_x)**2 + (new_y-center_x)**2
+            x, y = Sg.nodes[s]['coordinate']
+            l_x = 2.0*x/n
+            l_y = 2.0*y/m
+            v_x = l_x * del_x
+            v_y = l_y * del_y
+            x_1 = x + (1 - D) * v_x * delta_t
+            y_1 = y + (1 - D) * v_y * delta_t
+            Sg.nodes[s]['coordinate'] = (x_1, y_1)
+            dist_accum += (x_1-center_x)**2 + (y_1-center_x)**2
 
-    dispersion = dist_accum/N
+    dispersion = dist_accum/P
     return dispersion
 
 def _get_demand(Sg, tiling, opts):
@@ -266,6 +246,46 @@ def _migrate(Sg, Tg, opts):
 def _route(Sg, Tg, tiling, opts):
     chains = {}
     return chains
+
+class TopologicalOptions(EmbedderOptions):
+    def __init__(self, **params):
+        EmbedderOptions.__init__(self, **params)
+        # Parse optional parameters
+        self.names.update({"topology", "enable_migration", "vicinity"})
+
+        for name in params:
+            if name not in self.names:
+                raise ValueError("%s is not a valid parameter for topological find_embedding"%name)
+
+        # If a topology of the graph is not provided, generate one
+        try: self.topology =  params['topology']
+        except KeyError: self.topology = self._simulated_annealing_placement(S)
+
+        try: self.enable_migration = params['enable_migration']
+        except: self.enable_migration = True
+
+        try: self.vicinity = params['vicinity']
+        except: self.vicinity = 0
+
+        try: self.delta_t = params['delta_t']
+        except: self.delta_t = 0.2
+
+        try: self.viscosity = params['viscosity']
+        except: self.viscosity = 3.0
+
+
+    def _simulated_annealing_placement(self, S):
+
+        rng = self.rng
+        m = self.construction['rows']
+        n = self.construction['columns']
+        family = self.construction['family']
+
+        init_loc = {}
+        for node in S:
+            init_loc[node] = (rng.uniform(0,n),rng.uniform(0,m))
+
+        return init_loc
 
 def find_embedding(S, T, **params):
     """
