@@ -2,6 +2,7 @@
 import traceback
 import networkx as nx
 import dwave_networkx as dnx
+from math import floor, sqrt
 from embedding_methods.utilities import *
 
 __max_chimera__ = 16
@@ -25,38 +26,54 @@ class Tile:
         self.velocity_y = 0.0
 
         if family=='chimera':
-            self._get_chimera_qubits(Tg, t, i, j)
+            self.supply = self._get_chimera_qubits(Tg, t, i, j)
         elif family=='pegasus':
-            self._get_pegasus_qubits(Tg, t, i, j)
+            self.supply = self._get_pegasus_qubits(Tg, t, i, j)
 
-        print (self.qubits)
+    def add_node(self, node):
+        self.nodes.add(node)
 
-    def _get_chimera_qubits(self, Tg, family, i, j, m, n, t):
+    def _get_chimera_qubits(self, Tg, t, i, j):
+        """ Finds the avilable qubits associated to tile (i,j) of the Chimera
+            Graph and returns the supply or number of qubits found.
 
+            The notation (i, j, u, k) is called the chimera index:
+                i : indexes the row of the Chimera tile from 0 to m inclusive
+                j : indexes the column of the Chimera tile from 0 to n inclusive
+                u : qubit orientation (0 = left-hand nodes, 1 = right-hand nodes)
+                k : indexes the qubit within either the left- or right-hand shore
+                    from 0 to t inclusive
+        """
         self.qubits = set()
         v = 0
-
         for u in range(2):
             for k in range(t):
-                qubit_index = (i, j, u, k)
-                if qubit_index in Tg.nodes:
-                    self.qubits.add(qubit_index)
+                chimera_index = (i, j, u, k)
+                if chimera_index in Tg.nodes:
+                    self.qubits.add(chimera_index)
                     v += 1
+        return v
 
 
-    def _get_pegasus_qubits(self, Tg, t, w, z):
+    def _get_pegasus_qubits(self, Tg, t, i, j):
+        """ Finds the avilable qubits associated to tile (i,j) of the Pegasus
+            Graph and returns the supply or number of qubits found.
 
+            The notation (u, w, k, z) is called the pegasus index:
+                u : qubit orientation (0 = vertical, 1 = horizontal)
+                w : orthogonal major offset
+                k : orthogonal minor offset
+                z : parallel offset
+        """
         self.qubits = set()
         v=0
-
         for u in range(2):
             for k in range(t):
-                qubit_index = (u, w, k, z)
-                if qubit_index in Tg.nodes:
-                    self.qubits.add(qubit_index)
+                pegasus_index = (u, j, k, i)
+                if pegasus_index in Tg.nodes:
+                    self.qubits.add(pegasus_index)
                     v += 1
-
-
+        return v
 
 class Tiling:
     """Tiling for migration stage
@@ -130,55 +147,54 @@ def _scale(Sg, Tg, opts):
     Sheight = (Sx_max - Sx_min)
 
     ###### Normalize and scale
-    scale_loc = {}
     for s in Sg:
         sx,sy = Sg.nodes[s]['coordinate']
         norm_sx = sx / Swidth
         norm_sy = sy / Sheight
         scaled_sx = norm_sx * n
         scaled_sy = norm_sy * m
-        scale_loc[s] = scaled_sx, scaled_sy
-
-    return scale_loc
+        Sg.nodes[s]['coordinate'] = (scaled_sx, scaled_sy)
 
 def _get_velocity(tile):
-    pass
+    return 0.0,0.0
 
 
-def _step(tiling, scale_loc, opts):
+def _step(Sg, tiling, opts):
 
-    N = len(scale_loc)
+    N = len(Sg)
     m = opts.construction['rows']
     n = opts.construction['columns']
 
     center_x, center_y = m/2.0, n/2.0
+    dist_accum = 0.0
 
-    for name, tile in tiling.tiles.items():
+    for t_name, tile in tiling.tiles.items():
 
         velocity_step = _get_velocity(tile)
 
-        for node in nodes:
-            node_x, node_y = scale_loc[node]
+        for s in tile.nodes:
+            node_x, node_y = Sg.nodes[s]['coordinate']
             v_x, v_y = velocity_step
             new_x, new_y = node_x + v_x, node_y + v_y
             dist_accum += (new_x-center_x)**2 + (new_y-center_x)**2
-            new_tiling[tile].add(node)
 
     dispersion = dist_accum/N
     return dispersion
 
 def _get_demand(Sg, tiling, opts):
 
+    m = opts.construction['rows']
+    n = opts.construction['columns']
 
-    demand = len(tile.nodes)
-    supply = len(tile.qubits)
-    concentration = demand/supply
+    for name, node in Sg.nodes(data=True):
+        x,y = node['coordinate']
+        i = min(floor(x), n-1)
+        j = min(floor(y), m-1)
+        tile = (i,j)
+        tiling.tiles[tile].add_node(name)
 
-    pass
+def _migrate(Sg, Tg, opts):
 
-def _migrate(Sg, Tg, scale_loc, opts):
-
-    N = len(scale_loc)
     m = opts.construction['rows']
     n = opts.construction['columns']
     familiy = opts.construction['family']
@@ -188,13 +204,14 @@ def _migrate(Sg, Tg, scale_loc, opts):
     migrating = opts.enable_migration
     while migrating:
         _get_demand(Sg, tiling, opts)
-        _step(tiling, scale_loc, opts)
+        dispersion = _step(Sg, tiling, opts)
 
+        migrating=False #TODO: Test mode
 
-    return tiling, node_loc
+    return tiling
 
-def _route(Sg, Tg, tiling, node_loc, opts):
-
+def _route(Sg, Tg, tiling, opts):
+    chains = {}
     return chains
 
 def find_embedding(S, T, **params):
@@ -244,17 +261,15 @@ def find_embedding(S, T, **params):
 
     opts = TopologicalOptions(**params)
 
-    print(vars(opts))
-
     Sg = read_source_graph(S, opts)
 
     Tg = read_target_graph(T, opts)
 
-    scale_loc = _scale(Sg, Tg, opts)
+    _scale(Sg, Tg, opts)
 
-    tiling, node_loc = _migrate(Sg, Tg, scale_loc, opts)
+    tiling = _migrate(Sg, Tg, opts)
 
-    embedding = _route(Sg, Tg, tiling, node_loc, opts)
+    embedding = _route(Sg, Tg, tiling, opts)
 
     return embedding
 
@@ -269,8 +284,8 @@ if __name__== "__main__":
     S = nx.grid_2d_graph(4,4)
     topology = {v:v for v in S}
 
-    #T = dnx.chimera_graph(m, coordinates=True)
-    T = dnx.pegasus_graph(m, coordinates=True)
+    T = dnx.chimera_graph(m, coordinates=True)
+    #T = dnx.pegasus_graph(m, coordinates=True)
 
     S_edgelist = list(S.edges())
     T_edgelist = list(T.edges())
