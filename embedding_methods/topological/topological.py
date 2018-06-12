@@ -14,16 +14,61 @@ __default_construction__ =  {"family": "chimera", "rows": 16, "columns": 16,
 
 __all__ = ["find_embedding"]
 
-class Tile:
-    """Tile for migration stage
+
+def i2c(index, n):
+    """ Convert tile index to coordinate
     """
-    def __init__(self, Tg, family, i, j, m, n, t):
+    return divmod(index,n)
+
+def _get_neighbours(i, j, m, n, index):
+    """ Calculate indices and names of negihbouring tiles to use recurrently
+        during migration and routing.
+        The vicinity parameter is later used to prune out the neighbours of
+        interest.
+        Uses cardinal notation north, south, ...
+    """
+
+    n = i2c(index - n)     if (j > 0)      else   None
+    s = i2c(index + n)     if (j < m-1)    else   None
+    w = i2c(index - 1)     if (i > 0)      else   None
+    e = i2c(index + 1)     if (i < n-1)    else   None
+
+    if vicinity>1 or vicinity<4:
+        nw = i2c(index - n - 1)  if (j > 0    and i > 0)    else None
+        ne = i2c(index - n + 1)  if (j > 0    and i < n-1)  else None
+        se = i2c(index + n + 1)  if (j < m-1  and i < n-1)  else None
+        sw = i2c(index + n - 1)  if (j < m-1  and i > 0)    else None
+        return (n,s,w,e,ns,ne,se,sw)
+    else:
+        raise ValueError("%s is not a valid value for \
+            the topological embedding vicinity parameter."%name)
+
+    return (n,s,w,e)
+
+class DummyTile:
+    def __init__(self):
+        self.concentration = __tile_boundary__
+
+class Tile:
+    """ Tile for migration stage
+    """
+    def __init__(self, Tg, i, j, opts):
+
+        m = opts.construction['rows']
+        n = opts.construction['columns']
+        t = opts.construction['tile']
+        family = opts.construction['family']
+        vicinity = opts.vicinity
+        index = j*m + i
+
         self.name = (i,j)
-        self.index = j*m + i
+        self.index = index
         self.nodes = set()
         self.concentration = 0.0
         self.velocity_x = 0.0
         self.velocity_y = 0.0
+
+        self.neighbours = _get_neighbours(i, j, m, n, index, vicinity)
 
         if family=='chimera':
             self.supply = self._get_chimera_qubits(Tg, t, i, j)
@@ -84,18 +129,21 @@ class Tiling:
         t = opts.construction['tile']
         family = opts.construction['family']
         self.size = m*n
-        self.tiles = {}
         self.family = family
+        # Add Tile objects
+        self.tiles = {}
         for i in range(m):
             for j in range(n):
                 tile = (i,j)
-                self.tiles[tile] = Tile(Tg, family, i, j, m, n, t)
+                self.tiles[tile] = Tile(Tg, i, j, opts)
+        # Dummy tile to represent boundaries
+        self.tiles[None] = DummyTile()
 
 class TopologicalOptions(EmbedderOptions):
     def __init__(self, **params):
         EmbedderOptions.__init__(self, **params)
         # Parse optional parameters
-        self.names.update({"topology", "enable_migration"})
+        self.names.update({"topology", "enable_migration", "vicinity"})
 
         for name in params:
             if name not in self.names:
@@ -107,6 +155,9 @@ class TopologicalOptions(EmbedderOptions):
 
         try: self.enable_migration = params['enable_migration']
         except: self.enable_migration = True
+
+        try: self.vicinity = params['vicinity']
+        except: self.vicinity = 0
 
 
     def _simulated_annealing_placement(self, S):
@@ -156,6 +207,7 @@ def _scale(Sg, Tg, opts):
         Sg.nodes[s]['coordinate'] = (scaled_sx, scaled_sy)
 
 def _get_velocity(tile):
+
     return 0.0,0.0
 
 
@@ -194,7 +246,8 @@ def _get_demand(Sg, tiling, opts):
         tiling.tiles[tile].add_node(name)
 
 def _migrate(Sg, Tg, opts):
-
+    """
+    """
     m = opts.construction['rows']
     n = opts.construction['columns']
     familiy = opts.construction['family']
@@ -238,6 +291,14 @@ def find_embedding(S, T, **params):
         topology ({<node>:(<x>,<y>),...}):
             Dict of 2D positions assigned to the source graph nodes.
 
+        vicinity (int): Configuration of the set of tiles that will provide the
+            candidate qubits.
+            0: Single tile
+            1: Immediate neighbours (north, south, east, west)
+            2: Extended neighbours (Immediate) + diagonals
+            3: Directed (Single) + 3 tiles closest to the node
+
+
         random_seed (int):
 
         tries (int):
@@ -251,8 +312,7 @@ def find_embedding(S, T, **params):
             **family_parameters:
 
 
-        verbose (int):
-            Verbosity level
+        verbose (int): Verbosity level
             0: Quiet mode
             1: Print statements
             2: NetworkX graph drawings
