@@ -5,21 +5,20 @@ import dwave_networkx as dnx
 from math import floor, sqrt
 from embedding_methods.utilities import *
 
-__chimera_qubits__ = 8
-__pegasus_qubits__ = 20
+# Concentration limit
+__d_lim__ = 0.75
+
 __default_construction__ =  {"family": "chimera", "rows": 16, "columns": 16,
                             "tile": 4, "data": True, "labels": "coordinate"}
 
-
 __all__ = ["find_embedding"]
-
 
 def i2c(index, n):
     """ Convert tile index to coordinate
     """
     return divmod(index,n)
 
-def _get_neighbours(i, j, m, n, index, vicinity):
+def _get_neighbours(i, j, m, n, index):
     """ Calculate indices and names of negihbouring tiles to use recurrently
         during migration and routing.
         The vicinity parameter is later used to prune out the neighbours of
@@ -31,20 +30,17 @@ def _get_neighbours(i, j, m, n, index, vicinity):
     west =  i2c(index - 1, n)     if (i > 0)      else   None
     east =  i2c(index + 1, n)     if (i < n-1)    else   None
 
-    if vicinity>1 or vicinity<4:
-        nw = i2c(index - n - 1, n)  if (j > 0    and i > 0)    else None
-        ne = i2c(index - n + 1, n)  if (j > 0    and i < n-1)  else None
-        se = i2c(index + n + 1, n)  if (j < m-1  and i < n-1)  else None
-        sw = i2c(index + n - 1, n)  if (j < m-1  and i > 0)    else None
-        return (north,south,west,east,nw,ne,se,sw)
-    else:
-        raise ValueError("%s is not a valid value for \
-            the topological embedding vicinity parameter."%name)
+    nw = i2c(index - n - 1, n)  if (j > 0    and i > 0)    else None
+    ne = i2c(index - n + 1, n)  if (j > 0    and i < n-1)  else None
+    se = i2c(index + n + 1, n)  if (j < m-1  and i < n-1)  else None
+    sw = i2c(index + n - 1, n)  if (j < m-1  and i > 0)    else None
 
-    return (north,south,west,east)
+    return (north,south,west,east,nw,ne,se,sw)
 
 class DummyTile:
     def __init__(self):
+        # Keyed in tile dictionary as None
+        self.name = None
         # Treat as a fully occupied tile
         self.concentration = 1.0
         # Dummy empty set to skip calculations
@@ -59,16 +55,13 @@ class Tile:
         n = opts.construction['columns']
         t = opts.construction['tile']
         family = opts.construction['family']
-        vicinity = opts.vicinity
         index = j*m + i
 
         self.name = (i,j)
         self.index = index
         self.nodes = set()
         self.concentration = 0.0
-        self.velocity_x = 0.0
-        self.velocity_y = 0.0
-        self.neighbours = _get_neighbours(i, j, m, n, index, vicinity)
+        self.neighbours = _get_neighbours(i, j, m, n, index)
 
         if family=='chimera':
             self.supply = self._get_chimera_qubits(Tg, t, i, j)
@@ -77,6 +70,9 @@ class Tile:
 
     def add_node(self, node):
         self.nodes.add(node)
+
+    def remove_node(self, node):
+        self.nodes.remove(node)
 
     def _get_chimera_qubits(self, Tg, t, i, j):
         """ Finds the avilable qubits associated to tile (i,j) of the Chimera
@@ -128,7 +124,9 @@ class Tiling:
         n = opts.construction['columns']
         t = opts.construction['tile']
         family = opts.construction['family']
-        self.size = m*n
+        self.m = m
+        self.n = n
+        self.t = t
         self.qubits = len(Tg)
         self.family = family
         # Add Tile objects
@@ -139,21 +137,27 @@ class Tiling:
                 self.tiles[tile] = Tile(Tg, i, j, opts)
         # Dummy tile to represent boundaries
         self.tiles[None] = DummyTile()
+        # Dispersion cost accumulator for termination
+        self.dispersion_accum = None
 
-def _scale(Sg, Tg, opts):
+"""
+"""
+
+def _scale(Sg, tiling, opts):
     """ Transform node locations to in-scale values of the dimension
     of the target graph.
     """
-
+    P = len(Sg)
     m = opts.construction['rows']
     n = opts.construction['columns']
+    topology = opts.topology
 
     ###### Find dimensions of source graph S
     Sx_min = Sy_min = float("inf")
     Sx_max = Sy_max = 0.0
     # Loop through all source graph nodes to find dimensions
-    for s in Sg:
-        sx,sy = Sg.nodes[s]['coordinate']
+    for name, node in Sg.nodes(data=True):
+        sx,sy = topology[name]
         Sx_min = min(sx,Sx_min)
         Sx_max = max(sx,Sx_max)
         Sy_min = min(sy,Sy_min)
@@ -162,18 +166,51 @@ def _scale(Sg, Tg, opts):
     Swidth =  (Sx_max - Sx_min)
     Sheight = (Sx_max - Sx_min)
 
+    center_x, center_y = n/2.0, m/2.0
+    dist_accum = 0.0
     ###### Normalize and scale
-    for s in Sg:
-        sx,sy = Sg.nodes[s]['coordinate']
-        norm_sx = sx / Swidth
-        norm_sy = sy / Sheight
-        scaled_sx = norm_sx * n
-        scaled_sy = norm_sy * m
-        Sg.nodes[s]['coordinate'] = (scaled_sx, scaled_sy)
+    for name, node in Sg.nodes(data=True):
+        x,y = topology[name]
+        norm_x = x / Swidth
+        norm_y = y / Sheight
+        scaled_x = norm_x * n
+        scaled_y = norm_y * m
+        node['coordinate'] = (scaled_x, scaled_y)
+        tile = min(floor(scaled_x), n-1), min(floor(scaled_y), m-1)
+        node['tile'] = tile
+        tiling.tiles[tile].nodes.add(name)
+        dist_accum += (scaled_x-center_x)**2 + (scaled_y-center_x)**2
 
-def _get_gradient(tile):
+    # Initial dispersion
+    dispersion = dist_accum/P
+    tiling.dispersion_accum = [dispersion] * 3
 
-    return 0.0,0.0
+def _get_attractors(tiling, i, j):
+
+    n,s,w,e,nw,ne,se,sw = tiling.tiles[(i,j)].neighbours
+
+    lh = (i - 0.5*tiling.n) > 0.0
+    lv = (j - 0.5*tiling.m) > 0.0
+
+    if (lh):
+        if (lv):    return w,s,sw
+        else:       return w,s,nw
+    else:
+        if (lv):    return e,s,se
+        else:       return e,n,ne
+
+def _get_gradient(tile, tiling):
+
+    d_ij = tile.concentration
+    if d_ij == 0.0 or tile.name==None: return 0.0, 0.0
+    h, v, hv = _get_attractors(tiling, *tile.name)
+    d_h = tiling.tiles[h].concentration
+    d_v = tiling.tiles[v].concentration
+    d_hv = tiling.tiles[hv].concentration
+    del_x = - (__d_lim__ - (d_h + 0.5*d_hv)) / (2.0 * d_ij)
+    del_y = - (__d_lim__ - (d_v + 0.5*d_hv)) / (2.0 * d_ij)
+
+    return del_x, del_y
 
 
 def _step(Sg, tiling, opts):
@@ -182,7 +219,6 @@ def _step(Sg, tiling, opts):
     P = len(Sg)
     # Number of Qubits
     Q = tiling.qubits
-
     m = opts.construction['rows']
     n = opts.construction['columns']
     delta_t = opts.delta_t
@@ -195,19 +231,19 @@ def _step(Sg, tiling, opts):
     D = (viscosity*P) / Q
 
     # Iterate over tiles
-    for name, tile in tiling.tiles.items():
+    for _, tile in tiling.tiles.items():
 
-        del_x, del_y = _get_gradient(tile)
+        del_x, del_y = _get_gradient(tile, tiling)
         # Iterate over nodes in tile and migrate
-        for s in tile.nodes:
-            x, y = Sg.nodes[s]['coordinate']
+        for node in tile.nodes:
+            x, y = Sg.nodes[node]['coordinate']
             l_x = 2.0*x/n
             l_y = 2.0*y/m
             v_x = l_x * del_x
             v_y = l_y * del_y
             x_1 = x + (1 - D) * v_x * delta_t
             y_1 = y + (1 - D) * v_y * delta_t
-            Sg.nodes[s]['coordinate'] = (x_1, y_1)
+            Sg.nodes[node]['coordinate'] = (x_1, y_1)
             dist_accum += (x_1-center_x)**2 + (y_1-center_x)**2
 
     dispersion = dist_accum/P
@@ -220,38 +256,74 @@ def _get_demand(Sg, tiling, opts):
 
     for name, node in Sg.nodes(data=True):
         x,y = node['coordinate']
+        tile = node['tile']
         i = min(floor(x), n-1)
         j = min(floor(y), m-1)
-        tile = (i,j)
-        tiling.tiles[tile].add_node(name)
+        new_tile = (i,j)
+        tiling.tiles[tile].nodes.remove(name)
+        tiling.tiles[new_tile].nodes.add(name)
+        node['tile'] = new_tile
 
-def _migrate(Sg, Tg, opts):
+    for name, tile in tiling.tiles.items():
+        if name!=None:
+            tile.concentration = len(tile.nodes)/tile.supply
+
+def _condition(tiling, dispersion):
+    """ The algorithm iterates until the dispersion, or average distance of
+    the cells from the centre of the tile array, increases or has a cumulative
+    variance lower than 1%
+    """
+    tiling.dispersion_accum.pop(0)
+    tiling.dispersion_accum.append(dispersion)
+    mean = sum(tiling.dispersion_accum) / 3.0
+    prev_val = 0.0
+    diff_accum = 0.0
+    increasing = True
+    for value in tiling.dispersion_accum:
+        sq_diff = (value-mean)**2
+        diff_accum = diff_accum + sq_diff
+        if (value<prev_val):
+            increasing = False
+        prev_val = value
+    variance = (diff_accum/3.0)
+    std_dev = sqrt(variance)
+    spread = (std_dev/mean) > 0.01
+
+    return spread and not increasing
+
+
+
+def _migrate(Sg, tiling, opts):
     """
     """
     m = opts.construction['rows']
     n = opts.construction['columns']
     familiy = opts.construction['family']
 
-    tiling = Tiling(Tg, opts)
-
     migrating = opts.enable_migration
     while migrating:
         _get_demand(Sg, tiling, opts)
         dispersion = _step(Sg, tiling, opts)
-
-        migrating=False #TODO: Test mode
+        migrating = _condition(tiling, dispersion)
 
     return tiling
 
+"""
+
+"""
 def _route(Sg, Tg, tiling, opts):
     chains = {}
     return chains
 
+
+"""
+
+"""
 class TopologicalOptions(EmbedderOptions):
     def __init__(self, **params):
         EmbedderOptions.__init__(self, **params)
         # Parse optional parameters
-        self.names.update({"topology", "enable_migration", "vicinity"})
+        self.names.update({"topology", "enable_migration", "vicinity", "delta_t", "viscosity"})
 
         for name in params:
             if name not in self.names:
@@ -345,9 +417,11 @@ def find_embedding(S, T, **params):
 
     Tg = read_target_graph(T, opts)
 
-    _scale(Sg, Tg, opts)
+    tiling = Tiling(Tg, opts)
 
-    tiling = _migrate(Sg, Tg, opts)
+    _scale(Sg, tiling, opts)
+
+    _migrate(Sg, tiling, opts)
 
     embedding = _route(Sg, Tg, tiling, opts)
 

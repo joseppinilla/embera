@@ -26,10 +26,8 @@ class EmbedderOptions:
 
 def read_source_graph(S, opts):
 
-    topology = opts.topology
 
     Sg = nx.Graph(S)
-    nx.set_node_attributes(Sg, topology, 'coordinate')
 
     if opts.verbose >= 1:
         print("Drawing Source Graph")
