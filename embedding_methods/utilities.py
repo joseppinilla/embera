@@ -3,7 +3,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import dwave_networkx as dnx
 
-__all__ = ["EmbedderOptions","read_source_graph","read_target_graph"]
+__all__ = ["EmbedderOptions","read_source_graph","read_target_graph","draw_source_graph", "draw_tiled_graph"]
 
 class EmbedderOptions:
     def __init__(self, **params):
@@ -29,10 +29,11 @@ def read_source_graph(S, opts):
 
     Sg = nx.Graph(S)
 
-    if opts.verbose >= 1:
+    if opts.verbose > 1:
         print("Drawing Source Graph")
         plt.clf()
-        nx.draw(Sg, with_labels=True)
+        try:    nx.draw(Sg, pos=opts.topology, with_labels=True)
+        except: nx.draw(Sg, with_labels=True)
         plt.show()
 
     return Sg
@@ -57,7 +58,7 @@ def _read_chimera_graph(T, opts):
 
     Tg = dnx.chimera_graph(m, n, t, edge_list=T, data=data, coordinates=coordinates)
 
-    if opts.verbose >= 1:
+    if opts.verbose > 1:
         print("Drawing Chimera Graph")
         plt.clf()
         dnx.draw_chimera(Tg, with_labels=True)
@@ -79,10 +80,30 @@ def _read_pegasus_graph(T, opts):
         offset_lists=(vertical_offsets,horizontal_offsets),
         coordinates=coordinates)
 
-    if opts.verbose >= 1:
+    if opts.verbose > 1:
         print("Drawing Pegasus Graph")
         plt.clf()
         dnx.draw_pegasus(Tg, with_labels=True)
         plt.show()
 
     return Tg
+
+## Drawings
+
+def draw_tiled_graph(G, n, m, **kwargs):
+    layout = {name:node['coordinate'] for name,node in G.nodes(data=True)}
+
+    dnx.drawing.qubit_layout.draw_qubit_graph(G, layout,**kwargs)
+    plt.grid('on')
+    plt.axis('on')
+    plt.axis([0,n,0,m])
+    x_ticks = range(0, n+1) # steps are width/width = 1 without scaling
+    y_ticks = range(0, m+1)
+    plt.xticks(x_ticks)
+    plt.yticks(y_ticks)
+
+def draw_source_graph(G, **kwargs):
+
+    layout = {name:node['coordinate'] for name,node in G.nodes(data=True)}
+
+    dnx.drawing.qubit_layout.draw_qubit_graph(G, layout,**kwargs)

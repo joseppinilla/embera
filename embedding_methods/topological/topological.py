@@ -16,9 +16,10 @@ __all__ = ["find_embedding"]
 def i2c(index, n):
     """ Convert tile index to coordinate
     """
-    return divmod(index,n)
+    j,i = divmod(index,n)
+    return i,j
 
-def _get_neighbours(i, j, m, n, index):
+def _get_neighbours(i, j, n, m, index):
     """ Calculate indices and names of negihbouring tiles to use recurrently
         during migration and routing.
         The vicinity parameter is later used to prune out the neighbours of
@@ -55,13 +56,13 @@ class Tile:
         n = opts.construction['columns']
         t = opts.construction['tile']
         family = opts.construction['family']
-        index = j*m + i
+        index = j*n + i
 
         self.name = (i,j)
         self.index = index
         self.nodes = set()
         self.concentration = 0.0
-        self.neighbours = _get_neighbours(i, j, m, n, index)
+        self.neighbours = _get_neighbours(i, j, n, m, index)
 
         if family=='chimera':
             self.supply = self._get_chimera_qubits(Tg, t, i, j)
@@ -86,13 +87,13 @@ class Tile:
                     from 0 to t inclusive
         """
         self.qubits = set()
-        v = 0
+        v = 0.0
         for u in range(2):
             for k in range(t):
                 chimera_index = (i, j, u, k)
                 if chimera_index in Tg.nodes:
                     self.qubits.add(chimera_index)
-                    v += 1
+                    v += 1.0
         return v
 
 
@@ -107,13 +108,13 @@ class Tile:
                 z : parallel offset
         """
         self.qubits = set()
-        v=0
+        v=0.0
         for u in range(2):
             for k in range(t):
                 pegasus_index = (u, j, k, i)
                 if pegasus_index in Tg.nodes:
                     self.qubits.add(pegasus_index)
-                    v += 1
+                    v += 1.0
         return v
 
 class Tiling:
@@ -127,7 +128,7 @@ class Tiling:
         self.m = m
         self.n = n
         self.t = t
-        self.qubits = len(Tg)
+        self.qubits = 1.0*len(Tg)
         self.family = family
         # Add Tile objects
         self.tiles = {}
@@ -144,7 +145,7 @@ class Tiling:
 """
 
 def _scale(Sg, tiling, opts):
-    """ Transform node locations to in-scale values of the dimension
+    """ Assign node locations to in-scale values of the dimension
     of the target graph.
     """
     P = len(Sg)
@@ -173,8 +174,8 @@ def _scale(Sg, tiling, opts):
         x,y = topology[name]
         norm_x = x / Swidth
         norm_y = y / Sheight
-        scaled_x = norm_x * n
-        scaled_y = norm_y * m
+        scaled_x = norm_x * (n-1)
+        scaled_y = norm_y * (m-1)
         node['coordinate'] = (scaled_x, scaled_y)
         tile = min(floor(scaled_x), n-1), min(floor(scaled_y), m-1)
         node['tile'] = tile
@@ -188,16 +189,15 @@ def _scale(Sg, tiling, opts):
 def _get_attractors(tiling, i, j):
 
     n,s,w,e,nw,ne,se,sw = tiling.tiles[(i,j)].neighbours
-
-    lh = (i - 0.5*tiling.n) > 0.0
-    lv = (j - 0.5*tiling.m) > 0.0
+    lh = (i >= 0.5*tiling.n)
+    lv = (j >= 0.5*tiling.m)
 
     if (lh):
-        if (lv):    return w,s,sw
+        if (lv):    return w,n,sw
         else:       return w,s,nw
     else:
-        if (lv):    return e,s,se
-        else:       return e,n,ne
+        if (lv):    return e,n,se
+        else:       return e,s,ne
 
 def _get_gradient(tile, tiling):
 
@@ -209,7 +209,6 @@ def _get_gradient(tile, tiling):
     d_hv = tiling.tiles[hv].concentration
     del_x = - (__d_lim__ - (d_h + 0.5*d_hv)) / (2.0 * d_ij)
     del_y = - (__d_lim__ - (d_v + 0.5*d_hv)) / (2.0 * d_ij)
-
     return del_x, del_y
 
 
@@ -237,14 +236,14 @@ def _step(Sg, tiling, opts):
         # Iterate over nodes in tile and migrate
         for node in tile.nodes:
             x, y = Sg.nodes[node]['coordinate']
-            l_x = 2.0*x/n
-            l_y = 2.0*y/m
+            l_x = (2.0*x/n)-1.0
+            l_y = (2.0*y/m)-1.0
             v_x = l_x * del_x
             v_y = l_y * del_y
-            x_1 = x + (1 - D) * v_x * delta_t
-            y_1 = y + (1 - D) * v_y * delta_t
+            x_1 = x + (1.0 - D) * v_x * delta_t
+            y_1 = y + (1.0 - D) * v_y * delta_t
             Sg.nodes[node]['coordinate'] = (x_1, y_1)
-            dist_accum += (x_1-center_x)**2 + (y_1-center_x)**2
+            dist_accum += (x_1-center_x)**2 + (y_1-center_y)**2
 
     dispersion = dist_accum/P
     return dispersion
@@ -282,13 +281,12 @@ def _condition(tiling, dispersion):
     for value in tiling.dispersion_accum:
         sq_diff = (value-mean)**2
         diff_accum = diff_accum + sq_diff
-        if (value<prev_val):
+        if (value<=prev_val):
             increasing = False
         prev_val = value
     variance = (diff_accum/3.0)
-    std_dev = sqrt(variance)
-    spread = (std_dev/mean) > 0.01
-
+    spread = variance > 0.01
+    print(variance, spread, increasing, dispersion)
     return spread and not increasing
 
 
@@ -305,6 +303,9 @@ def _migrate(Sg, tiling, opts):
         _get_demand(Sg, tiling, opts)
         dispersion = _step(Sg, tiling, opts)
         migrating = _condition(tiling, dispersion)
+        if verbose==3:
+            draw_tiled_graph(Sg,n,m)
+            plt.show()
 
     return tiling
 
@@ -331,7 +332,7 @@ class TopologicalOptions(EmbedderOptions):
 
         # If a topology of the graph is not provided, generate one
         try: self.topology =  params['topology']
-        except KeyError: self.topology = self._simulated_annealing_placement(S)
+        except KeyError: self.topology = None
 
         try: self.enable_migration = params['enable_migration']
         except: self.enable_migration = True
@@ -346,18 +347,35 @@ class TopologicalOptions(EmbedderOptions):
         except: self.viscosity = 3.0
 
 
-    def _simulated_annealing_placement(self, S):
+def _place(Sg, tiling, opts):
+    """
 
-        rng = self.rng
-        m = self.construction['rows']
-        n = self.construction['columns']
-        family = self.construction['family']
+    """
+    if opts.topology:
+        _scale(Sg, tiling, opts)
+        _migrate(Sg, tiling, opts)
+    else:
+        opts.topology = nx.spring_layout(Sg, center=(1.0,1.0))
+        _scale(Sg, tiling, opts)
+        _migrate(Sg, tiling, opts)
 
-        init_loc = {}
-        for node in S:
-            init_loc[node] = (rng.uniform(0,n),rng.uniform(0,m))
+    #TODO: Plugin different placement methods
+    #elif:
+    #_simulated_annealing(Sg, tiling, opts)
 
-        return init_loc
+
+def _simulated_annealing(Sg, tiling, opts):
+    rng = opts.rng
+    m = opts.construction['rows']
+    n = opts.construction['columns']
+    family = opts.construction['family']
+
+    init_loc = {}
+    for node in S:
+        init_loc[node] = (rng.randint(0,n),rng.randint(0,m))
+
+    opts.enable_migration = False
+    return init_loc
 
 def find_embedding(S, T, **params):
     """
@@ -408,6 +426,7 @@ def find_embedding(S, T, **params):
             0: Quiet mode
             1: Print statements
             2: NetworkX graph drawings
+            3: Migration process
 
     """
 
@@ -419,9 +438,7 @@ def find_embedding(S, T, **params):
 
     tiling = Tiling(Tg, opts)
 
-    _scale(Sg, tiling, opts)
-
-    _migrate(Sg, tiling, opts)
+    _place(Sg, tiling, opts)
 
     embedding = _route(Sg, Tg, tiling, opts)
 
@@ -431,13 +448,14 @@ def find_embedding(S, T, **params):
 #Temporary standalone test
 if __name__== "__main__":
 
-    verbose = 2
+    verbose = 3
     import matplotlib.pyplot as plt
 
-    m = 2
-    S = nx.grid_2d_graph(4,4)
+    p = 10
+    S = nx.grid_2d_graph(p,p)
     topology = {v:v for v in S}
 
+    m = 4
     T = dnx.chimera_graph(m, coordinates=True)
     #T = dnx.pegasus_graph(m, coordinates=True)
 
