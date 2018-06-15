@@ -90,17 +90,19 @@ def _read_pegasus_graph(T, opts):
 
 ## Drawings
 
-def draw_tiled_graph(G, n, m, **kwargs):
+def draw_tiled_graph(G, n, m, tile_labels={}, **kwargs):
     layout = {name:node['coordinate'] for name,node in G.nodes(data=True)}
-
     dnx.drawing.qubit_layout.draw_qubit_graph(G, layout,**kwargs)
     plt.grid('on')
     plt.axis('on')
     plt.axis([0,n,0,m])
-    x_ticks = range(0, n+1) # steps are width/width = 1 without scaling
-    y_ticks = range(0, m+1)
+    x_ticks = range(0, n) # steps are width/width = 1 without scaling
+    y_ticks = range(0, m)
     plt.xticks(x_ticks)
     plt.yticks(y_ticks)
+    # Label tiles
+    for (i,j), label in tile_labels.items():
+        plt.text(i,j,label)
 
 def draw_source_graph(G, **kwargs):
 

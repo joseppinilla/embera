@@ -172,10 +172,10 @@ def _scale(Sg, tiling, opts):
     ###### Normalize and scale
     for name, node in Sg.nodes(data=True):
         x,y = topology[name]
-        norm_x = x / Swidth
-        norm_y = y / Sheight
-        scaled_x = norm_x * (n-1)
-        scaled_y = norm_y * (m-1)
+        norm_x = (x-Sx_min) / Swidth
+        norm_y = (y-Sy_min) / Sheight
+        scaled_x = norm_x * (n-1) + 0.5
+        scaled_y = norm_y * (m-1) + 0.5
         node['coordinate'] = (scaled_x, scaled_y)
         tile = min(floor(scaled_x), n-1), min(floor(scaled_y), m-1)
         node['tile'] = tile
@@ -193,11 +193,11 @@ def _get_attractors(tiling, i, j):
     lv = (j >= 0.5*tiling.m)
 
     if (lh):
-        if (lv):    return w,n,sw
-        else:       return w,s,nw
+        if (lv):    return w,n,nw
+        else:       return w,s,sw
     else:
-        if (lv):    return e,n,se
-        else:       return e,s,ne
+        if (lv):    return e,n,ne
+        else:       return e,s,se
 
 def _get_gradient(tile, tiling):
 
@@ -227,10 +227,10 @@ def _step(Sg, tiling, opts):
     dist_accum = 0.0
 
     # Diffusivity
-    D = (viscosity*P) / Q
+    D = min( (viscosity*P) / Q, 1.0)
 
     # Iterate over tiles
-    for _, tile in tiling.tiles.items():
+    for name, tile in tiling.tiles.items():
 
         del_x, del_y = _get_gradient(tile, tiling)
         # Iterate over nodes in tile and migrate
@@ -286,7 +286,6 @@ def _condition(tiling, dispersion):
         prev_val = value
     variance = (diff_accum/3.0)
     spread = variance > 0.01
-    print(variance, spread, increasing, dispersion)
     return spread and not increasing
 
 
@@ -301,11 +300,12 @@ def _migrate(Sg, tiling, opts):
     migrating = opts.enable_migration
     while migrating:
         _get_demand(Sg, tiling, opts)
+        if verbose==3:
+            concentrations = {name : "d=%s"%tile.concentration for name, tile in tiling.tiles.items() if name!=None}
+            draw_tiled_graph(Sg,n,m,concentrations)
+            plt.show()
         dispersion = _step(Sg, tiling, opts)
         migrating = _condition(tiling, dispersion)
-        if verbose==3:
-            draw_tiled_graph(Sg,n,m)
-            plt.show()
 
     return tiling
 
@@ -344,7 +344,7 @@ class TopologicalOptions(EmbedderOptions):
         except: self.delta_t = 0.2
 
         try: self.viscosity = params['viscosity']
-        except: self.viscosity = 3.0
+        except: self.viscosity = 0.0
 
 
 def _place(Sg, tiling, opts):
@@ -451,9 +451,12 @@ if __name__== "__main__":
     verbose = 3
     import matplotlib.pyplot as plt
 
-    p = 10
+    p = 12
     S = nx.grid_2d_graph(p,p)
     topology = {v:v for v in S}
+
+    #S = nx.cycle_graph(p)
+    #topology = nx.circular_layout(S)
 
     m = 4
     T = dnx.chimera_graph(m, coordinates=True)
