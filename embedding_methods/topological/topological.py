@@ -267,6 +267,11 @@ def _get_demand(Sg, tiling, opts):
         if name!=None:
             tile.concentration = len(tile.nodes)/tile.supply
 
+    if verbose==3:
+        concentrations = {name : "d=%s"%tile.concentration for name, tile in tiling.tiles.items() if name!=None}
+        draw_tiled_graph(Sg,n,m,concentrations)
+        plt.show()
+
 def _condition(tiling, dispersion):
     """ The algorithm iterates until the dispersion, or average distance of
     the cells from the centre of the tile array, increases or has a cumulative
@@ -300,22 +305,10 @@ def _migrate(Sg, tiling, opts):
     migrating = opts.enable_migration
     while migrating:
         _get_demand(Sg, tiling, opts)
-        if verbose==3:
-            concentrations = {name : "d=%s"%tile.concentration for name, tile in tiling.tiles.items() if name!=None}
-            draw_tiled_graph(Sg,n,m,concentrations)
-            plt.show()
         dispersion = _step(Sg, tiling, opts)
         migrating = _condition(tiling, dispersion)
 
     return tiling
-
-"""
-
-"""
-def _route(Sg, Tg, tiling, opts):
-    chains = {}
-    return chains
-
 
 """
 
@@ -376,6 +369,43 @@ def _simulated_annealing(Sg, tiling, opts):
 
     opts.enable_migration = False
     return init_loc
+
+
+"""
+
+"""
+
+def _routing_graph(Sg, Tg, tiling, opts):
+
+    history = {k:1.0 for k in Tg.nodes}
+    nx.set_node_attribute(Tg, history, 'history')
+
+    Tg.add_nodes_from(Sg.nodes())
+    for name, tile in tiling.tiles.items():
+        if name!=None:
+            qubits =  tile.qubits
+            for node in tile.nodes:
+                for qubit in qubits:
+                    Tg.add_edge(node, qubit)
+def _rip_up(Sg, Tg):
+    pass
+
+def _embed_first(Sg, Tg):
+    pass
+
+def _route(Sg, Tg, tiling, opts):
+    tries = opts.tries
+    chains = {}
+    _routing_graph(Sg, Tg, tiling, opts)
+    legal = False
+    while (not legal) and (tries > 0):
+        _rip_up(Sg, Tg)
+        unrouted = _embed_first(Sg, Tg)
+        while unrouted:
+            _negotiated_congestion()
+        _update_costs(Tg)
+        tries-=1
+    return chains
 
 def find_embedding(S, T, **params):
     """
@@ -448,8 +478,7 @@ def find_embedding(S, T, **params):
 #Temporary standalone test
 if __name__== "__main__":
 
-    verbose = 3
-    import matplotlib.pyplot as plt
+    verbose = 0
 
     p = 12
     S = nx.grid_2d_graph(p,p)
