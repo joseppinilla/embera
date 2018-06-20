@@ -93,6 +93,7 @@ class Tile:
                 chimera_index = (i, j, u, k)
                 if chimera_index in Tg.nodes:
                     self.qubits.add(chimera_index)
+                    Tg.nodes[chimera_index]['tile'] = (i,j)
                     v += 1.0
         return v
 
@@ -140,6 +141,12 @@ class Tiling:
         self.tiles[None] = DummyTile()
         # Dispersion cost accumulator for termination
         self.dispersion_accum = None
+        # Maximum degree of qubits
+        # TODO: Move get_xxx_qubits methods to Tiling and pass as argument to Tile
+        if family=='chimera':
+            self.max_degree = 6
+        elif family=='pegasus':
+            self.max_degree = 15
 
 """
 """
@@ -377,33 +384,84 @@ def _simulated_annealing(Sg, tiling, opts):
 
 def _routing_graph(Sg, Tg, tiling, opts):
 
-    history = {k:1.0 for k in Tg.nodes}
-    nx.set_node_attribute(Tg, history, 'history')
+    for name, qubit in Tg.nodes(data=True):
+        qubit['history'] =  1.0
+        qubit['degree'] = Tg.degree(name)
+        qubit['path'] = []
+        qubit['nodes'] = set()
+        qubit['mapped'] = {}
 
-    Tg.add_nodes_from(Sg.nodes())
+    for name, node in Sg.nodes(data=True):
+        node['qubits'] = set()
+        node['degree'] = Sg.degree(name)
+
+    Rg =  Tg.to_directed()
+    Rg.add_nodes_from(Sg.nodes(data=True))
     for name, tile in tiling.tiles.items():
         if name!=None:
             qubits =  tile.qubits
             for node in tile.nodes:
                 for qubit in qubits:
-                    Tg.add_edge(node, qubit)
-def _rip_up(Sg, Tg):
+                    Rg.add_edge(qubit, node)
+    return Rg
+
+
+def _rip_up(Sg, Tg, Rg):
+
+    for u,v,edge in Sg.edges.data():
+        edge['routed'] =  False
+        edge['path'] =  []
+
+    for name,node in Sg.nodes(data=True):
+        node['main'] = None
+        node['qubits'].clear()
+        node['routed'] = False
+
+    for name, qubit  in Tg.nodes(data=True):
+        qubit['path'][:] = []
+        qubit['nodes'].clear()
+        qubit['mapped'].clear()
+
+def _get_candidate_cost(node, qubit, tiling, opts):
+
+    print(node)
+    print(qubit)
+
+    scope_cost = 0.0 if node['tile']==qubit['tile'] else 1.0
+
+    degree_q = qubit['degree']
+    degree_cost = (1.0-degree_q/tiling.max_degree)
+
+    base_cost = 1.0 + degree_cost + scope_cost
+
+    history_cost = qubit['history']
+
+    return base_cost * history_cost
+
+def _embed_first(Sg, Tg, Rg, tiling, opts):
+    # Pick first node
+    name,node = list(Sg.nodes(data=True))[0]
+    tile = node['tile']
+    # Get best candidate
+    candidates = tiling.tiles[tile].qubits #TODO: Consider granularity of candidates
+    qubit = min(candidates, key=lambda candidate:
+                _get_candidate_cost(node,Rg.nodes[candidate],tiling,opts))
+    print(qubit)
+
+def _update_costs(Tg):
     pass
 
-def _embed_first(Sg, Tg):
-    pass
-
-def _route(Sg, Tg, tiling, opts):
+def _route(Sg, Tg, Rg, tiling, opts):
     tries = opts.tries
     chains = {}
-    _routing_graph(Sg, Tg, tiling, opts)
+
     legal = False
     while (not legal) and (tries > 0):
-        _rip_up(Sg, Tg)
-        unrouted = _embed_first(Sg, Tg)
+        _rip_up(Sg, Tg, Rg)
+        unrouted = _embed_first(Sg, Tg, Rg, tiling, opts)
         while unrouted:
             _negotiated_congestion()
-        _update_costs(Tg)
+        legal = _update_costs(Tg)
         tries-=1
     return chains
 
@@ -470,7 +528,9 @@ def find_embedding(S, T, **params):
 
     _place(Sg, tiling, opts)
 
-    embedding = _route(Sg, Tg, tiling, opts)
+    Rg = _routing_graph(Sg, Tg, tiling, opts)
+
+    embedding = _route(Sg, Tg, Rg, tiling, opts)
 
     return embedding
 
