@@ -2,6 +2,7 @@
 import traceback
 import networkx as nx
 import dwave_networkx as dnx
+from heapq import heapify, heappop, heappush
 from math import floor, sqrt
 import matplotlib.pyplot as plt
 from embedding_methods.utilities import *
@@ -9,9 +10,6 @@ from embedding_methods.utilities import *
 
 # Concentration limit
 __d_lim__ = 0.75
-
-__default_construction__ =  {"family": "chimera", "rows": 16, "columns": 16,
-                            "tile": 4, "data": True, "labels": "coordinate"}
 
 __all__ = ["find_embedding"]
 
@@ -59,17 +57,20 @@ class Tile:
         t = opts.construction['tile']
         family = opts.construction['family']
         index = j*n + i
-
         self.name = (i,j)
         self.index = index
         self.nodes = set()
-        self.concentration = 0.0
         self.neighbors = _get_neighbors(i, j, n, m, index)
 
         if family=='chimera':
             self.supply = self._get_chimera_qubits(Tg, t, i, j)
         elif family=='pegasus':
             self.supply = self._get_pegasus_qubits(Tg, t, i, j)
+
+        if self.supply == 0.0:
+            self.concentration = 1.0
+        else:
+            self.concentration = 0.0
 
     def add_node(self, node):
         self.nodes.add(node)
@@ -117,6 +118,7 @@ class Tile:
                 pegasus_index = (u, j, k, i)
                 if pegasus_index in Tg.nodes:
                     self.qubits.add(pegasus_index)
+                    Tg.nodes[pegasus_index]['tile'] = (i,j)
                     v += 1.0
         return v
 
@@ -124,10 +126,19 @@ class Tiling:
     """Tiling for migration stage
     """
     def __init__(self, Tg, opts):
-        m = opts.construction['rows']
-        n = opts.construction['columns']
-        t = opts.construction['tile']
+        # Support for different target architectures
         family = opts.construction['family']
+        # Maximum degree of qubits
+        # TODO: Move get_xxx_qubits methods to Tiling and pass as argument to Tile
+        if family=='chimera':
+            self.max_degree = 6
+        elif family=='pegasus':
+            self.max_degree = 15
+            opts.construction['columns'] -= 1
+
+        n = opts.construction['columns']
+        m = opts.construction['rows']
+        t = opts.construction['tile']
         self.m = m
         self.n = n
         self.t = t
@@ -135,20 +146,14 @@ class Tiling:
         self.family = family
         # Add Tile objects
         self.tiles = {}
-        for i in range(m):
-            for j in range(n):
+        for i in range(n):
+            for j in range(m):
                 tile = (i,j)
                 self.tiles[tile] = Tile(Tg, i, j, opts)
         # Dummy tile to represent boundaries
         self.tiles[None] = DummyTile()
         # Dispersion cost accumulator for termination
         self.dispersion_accum = None
-        # Maximum degree of qubits
-        # TODO: Move get_xxx_qubits methods to Tiling and pass as argument to Tile
-        if family=='chimera':
-            self.max_degree = 6
-        elif family=='pegasus':
-            self.max_degree = 15
 
 """
 """
@@ -273,11 +278,14 @@ def _get_demand(Sg, tiling, opts):
         node['tile'] = new_tile
 
     for name, tile in tiling.tiles.items():
-        if name!=None:
+        if name!=None and tile.supply!=0:
             tile.concentration = len(tile.nodes)/tile.supply
 
+
     if verbose==3:
-        concentrations = {name : "d=%s"%tile.concentration for name, tile in tiling.tiles.items() if name!=None}
+        concentrations = {name : "d=%s"%tile.concentration
+                        for name, tile in tiling.tiles.items() if name!=None}
+
         draw_tiled_graph(Sg,n,m,concentrations)
         plt.show()
 
@@ -326,11 +334,16 @@ class TopologicalOptions(EmbedderOptions):
     def __init__(self, **params):
         EmbedderOptions.__init__(self, **params)
         # Parse optional parameters
-        self.names.update({"topology", "enable_migration", "vicinity", "delta_t", "viscosity"})
+        self.names.update({ "topology",
+                            "enable_migration",
+                            "vicinity",
+                            "delta_t",
+                            "viscosity"})
 
         for name in params:
             if name not in self.names:
-                raise ValueError("%s is not a valid parameter for topological find_embedding"%name)
+                raise ValueError("%s is not a valid parameter for \
+                                    topological find_embedding"%name)
 
         # If a topology of the graph is not provided, generate one
         try: self.topology =  params['topology']
@@ -392,11 +405,16 @@ def _routing_graph(Sg, Tg, tiling, opts):
         qubit['path'] = []
         qubit['nodes'] = set()
         qubit['mapped'] = {}
+        qubit['sharing'] = 0.0
+        qubit['visited'] = False
+        qubit['cost'] = 1.0
 
     for name, node in Sg.nodes(data=True):
         node['qubits'] = set()
         node['degree'] = Sg.degree(name)
         node['main'] =  name
+        node['visited'] = False
+        node['cost'] = 1.0
 
     Rg =  Tg.to_directed()
     Rg.add_nodes_from(Sg.nodes(data=True))
@@ -422,6 +440,8 @@ def _rip_up(Sg, Tg, Rg):
         node['qubits'].clear()
         # All source graph nodes are unrouted
         node['routed'] = False
+        # BFS record of nodes visited
+        node['visited'] = False
 
     for name, qubit  in Tg.nodes(data=True):
         qubit['path'][:] = []
@@ -430,7 +450,7 @@ def _rip_up(Sg, Tg, Rg):
         qubit['sharing'] = 0.0
         qubit['visited'] =  False
 
-def _get_cost(node, qubit, opts):
+def _get_cost(node, qubit):
 
     sharing_cost = qubit['sharing']
 
@@ -449,9 +469,11 @@ def _embed_first(Sg, Tg, Rg, tiling, opts):
     unrouted = list(Sg.nodes(data=True))
     name,node = unrouted.pop()
     tile = node['tile']
+    print(tile)
+    print(vars(tiling.tiles[tile]))
     # Get best candidate
     candidates = tiling.tiles[tile].qubits #TODO: Consider granularity of candidates
-    q_index = min( candidates, key=lambda q: _get_cost(node, Rg.nodes[q], opts) )
+    q_index = min( candidates, key=lambda q: _get_cost(node, Rg.nodes[q]) )
     qubit = Rg.nodes[q_index]
 
     # Populate qubit
@@ -470,16 +492,27 @@ def _unrouted_neighbors(source, Sg):
 
 def _bfs(source_main, target_main, Rg):
     node = source_main
-    queue = set()
+    queue = []
+
+    print(node)
+    print(target_main)
+
+    #TODO: Use visited dictionary instead of 'visited' graph attributes
+    visited = {}
 
     while (node != target_main):
-
-        for next in Rg.neighbors(node):
+        print("Node: %s"%str(node))
+        for next in Rg[node]:
             if not Rg.nodes[next]['visited']:
-                queue.update(next)
-                Rg.nodes[next]['visited'] = True
-        node = queue.pop()
-
+                if next==target_main:
+                    heappush(queue, (Rg.nodes[node]['cost'], next))
+                else:
+                    Rg.nodes[next]['cost'] = _get_cost(Rg.nodes[node], Rg.nodes[next])
+                    heappush(queue, (Rg.nodes[next]['cost'], next))
+            print(queue)
+        Rg.nodes[node]['visited'] = True
+        cost, node = heappop(queue)
+    print('Found target')
 
 
 def _traceback():
@@ -597,7 +630,7 @@ if __name__== "__main__":
 
     verbose = 0
 
-    p = 2
+    p = 6
     S = nx.grid_2d_graph(p,p)
     topology = {v:v for v in S}
 
@@ -605,8 +638,8 @@ if __name__== "__main__":
     #topology = nx.circular_layout(S)
 
     m = 4
-    T = dnx.chimera_graph(m, coordinates=True)
-    #T = dnx.pegasus_graph(m, coordinates=True)
+    #T = dnx.chimera_graph(m, coordinates=True)
+    T = dnx.pegasus_graph(m, coordinates=True)
 
     S_edgelist = list(S.edges())
     T_edgelist = list(T.edges())

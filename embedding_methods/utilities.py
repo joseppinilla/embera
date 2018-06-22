@@ -5,6 +5,9 @@ import dwave_networkx as dnx
 
 __all__ = ["EmbedderOptions","read_source_graph","read_target_graph","draw_source_graph", "draw_tiled_graph"]
 
+__default_construction__ =  {"family": "chimera", "rows": 16, "columns": 16,
+                            "tile": 4, "data": True, "labels": "coordinate"}
+
 class EmbedderOptions:
     def __init__(self, **params):
         # Parse optional parameters
