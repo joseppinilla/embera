@@ -3,7 +3,9 @@ import traceback
 import networkx as nx
 import dwave_networkx as dnx
 from math import floor, sqrt
+import matplotlib.pyplot as plt
 from embedding_methods.utilities import *
+
 
 # Concentration limit
 __d_lim__ = 0.75
@@ -19,10 +21,10 @@ def i2c(index, n):
     j,i = divmod(index,n)
     return i,j
 
-def _get_neighbours(i, j, n, m, index):
+def _get_neighbors(i, j, n, m, index):
     """ Calculate indices and names of negihbouring tiles to use recurrently
         during migration and routing.
-        The vicinity parameter is later used to prune out the neighbours of
+        The vicinity parameter is later used to prune out the neighbors of
         interest.
         Uses cardinal notation north, south, ...
     """
@@ -62,7 +64,7 @@ class Tile:
         self.index = index
         self.nodes = set()
         self.concentration = 0.0
-        self.neighbours = _get_neighbours(i, j, n, m, index)
+        self.neighbors = _get_neighbors(i, j, n, m, index)
 
         if family=='chimera':
             self.supply = self._get_chimera_qubits(Tg, t, i, j)
@@ -195,7 +197,7 @@ def _scale(Sg, tiling, opts):
 
 def _get_attractors(tiling, i, j):
 
-    n,s,w,e,nw,ne,se,sw = tiling.tiles[(i,j)].neighbours
+    n,s,w,e,nw,ne,se,sw = tiling.tiles[(i,j)].neighbors
     lh = (i >= 0.5*tiling.n)
     lv = (j >= 0.5*tiling.m)
 
@@ -386,7 +388,7 @@ def _routing_graph(Sg, Tg, tiling, opts):
 
     for name, qubit in Tg.nodes(data=True):
         qubit['history'] =  1.0
-        qubit['degree'] = Tg.degree(name)
+        qubit['degree'] = 1.0 - ( Tg.degree(name)/tiling.max_degree )
         qubit['path'] = []
         qubit['nodes'] = set()
         qubit['mapped'] = {}
@@ -394,6 +396,7 @@ def _routing_graph(Sg, Tg, tiling, opts):
     for name, node in Sg.nodes(data=True):
         node['qubits'] = set()
         node['degree'] = Sg.degree(name)
+        node['main'] =  name
 
     Rg =  Tg.to_directed()
     Rg.add_nodes_from(Sg.nodes(data=True))
@@ -413,24 +416,27 @@ def _rip_up(Sg, Tg, Rg):
         edge['path'] =  []
 
     for name,node in Sg.nodes(data=True):
-        node['main'] = None
+        # If unrouted, main node is source graph node
+        node['main'] = name
+        # No qubits are assigned to source graph nodes
         node['qubits'].clear()
+        # All source graph nodes are unrouted
         node['routed'] = False
 
     for name, qubit  in Tg.nodes(data=True):
         qubit['path'][:] = []
         qubit['nodes'].clear()
         qubit['mapped'].clear()
+        qubit['sharing'] = 0.0
+        qubit['visited'] =  False
 
-def _get_candidate_cost(node, qubit, tiling, opts):
+def _get_cost(node, qubit, opts):
 
-    print(node)
-    print(qubit)
+    sharing_cost = qubit['sharing']
 
     scope_cost = 0.0 if node['tile']==qubit['tile'] else 1.0
 
-    degree_q = qubit['degree']
-    degree_cost = (1.0-degree_q/tiling.max_degree)
+    degree_cost = qubit['degree']
 
     base_cost = 1.0 + degree_cost + scope_cost
 
@@ -440,13 +446,61 @@ def _get_candidate_cost(node, qubit, tiling, opts):
 
 def _embed_first(Sg, Tg, Rg, tiling, opts):
     # Pick first node
-    name,node = list(Sg.nodes(data=True))[0]
+    unrouted = list(Sg.nodes(data=True))
+    name,node = unrouted.pop()
     tile = node['tile']
     # Get best candidate
     candidates = tiling.tiles[tile].qubits #TODO: Consider granularity of candidates
-    qubit = min(candidates, key=lambda candidate:
-                _get_candidate_cost(node,Rg.nodes[candidate],tiling,opts))
-    print(qubit)
+    q_index = min( candidates, key=lambda q: _get_cost(node, Rg.nodes[q], opts) )
+    qubit = Rg.nodes[q_index]
+
+    # Populate qubit
+    node['main'] = q_index
+    node['qubits'].add(q_index)
+    qubit['sharing'] += 1.0
+
+    return (name,node), unrouted
+
+def _unrouted_neighbors(source, Sg):
+
+    unrouted = [neighbor for neighbor in Sg[source]
+                if Sg.edges[source,neighbor]['routed']==False]
+
+    return unrouted
+
+def _bfs(source_main, target_main, Rg):
+    node = source_main
+    queue = set()
+
+    while (node != target_main):
+
+        for next in Rg.neighbors(node):
+            if not Rg.nodes[next]['visited']:
+                queue.update(next)
+                Rg.nodes[next]['visited'] = True
+        node = queue.pop()
+
+
+
+def _traceback():
+    pass
+
+def _negotiated_congestion(source, targets, Sg, Rg):
+
+    source_node = Sg.nodes[source]
+    for target in targets:
+        target_node = Rg.nodes[target]
+        source_main = source_node['main']
+        target_main = target_node['main']
+
+        if (source_main==target_main):
+            pass
+        else:
+            _bfs(source_main, target_main, Rg)
+            _traceback()
+
+
+        Sg.edges[source,target]['routed'] = True
 
 def _update_costs(Tg):
     pass
@@ -458,11 +512,14 @@ def _route(Sg, Tg, Rg, tiling, opts):
     legal = False
     while (not legal) and (tries > 0):
         _rip_up(Sg, Tg, Rg)
-        unrouted = _embed_first(Sg, Tg, Rg, tiling, opts)
+        (source, node), unrouted = _embed_first(Sg, Tg, Rg, tiling, opts)
         while unrouted:
-            _negotiated_congestion()
+            targets = _unrouted_neighbors(source, Sg)
+            _negotiated_congestion(source, targets, Sg, Rg)
+            source,node = unrouted.pop()
+            Sg.nodes[source]['routed'] = True
         legal = _update_costs(Tg)
-        tries-=1
+        tries -= 1
     return chains
 
 def find_embedding(S, T, **params):
@@ -492,8 +549,8 @@ def find_embedding(S, T, **params):
         vicinity (int): Configuration of the set of tiles that will provide the
             candidate qubits.
             0: Single tile
-            1: Immediate neighbours (north, south, east, west)
-            2: Extended neighbours (Immediate) + diagonals
+            1: Immediate neighbors (north, south, east, west)
+            2: Extended neighbors (Immediate) + diagonals
             3: Directed (Single) + 3 tiles closest to the node
 
 
@@ -535,12 +592,12 @@ def find_embedding(S, T, **params):
     return embedding
 
 
-#Temporary standalone test
+#TEMP: standalone test
 if __name__== "__main__":
 
     verbose = 0
 
-    p = 12
+    p = 2
     S = nx.grid_2d_graph(p,p)
     topology = {v:v for v in S}
 
