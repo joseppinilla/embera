@@ -129,7 +129,6 @@ class Tiling:
         # Support for different target architectures
         family = opts.construction['family']
         # Maximum degree of qubits
-        # TODO: Move get_xxx_qubits methods to Tiling and pass as argument to Tile
         if family=='chimera':
             self.max_degree = 6
         elif family=='pegasus':
@@ -327,41 +326,6 @@ def _migrate(Sg, tiling, opts):
 
     return tiling
 
-"""
-
-"""
-class TopologicalOptions(EmbedderOptions):
-    def __init__(self, **params):
-        EmbedderOptions.__init__(self, **params)
-        # Parse optional parameters
-        self.names.update({ "topology",
-                            "enable_migration",
-                            "vicinity",
-                            "delta_t",
-                            "viscosity"})
-
-        for name in params:
-            if name not in self.names:
-                raise ValueError("%s is not a valid parameter for \
-                                    topological find_embedding"%name)
-
-        # If a topology of the graph is not provided, generate one
-        try: self.topology =  params['topology']
-        except KeyError: self.topology = None
-
-        try: self.enable_migration = params['enable_migration']
-        except: self.enable_migration = True
-
-        try: self.vicinity = params['vicinity']
-        except: self.vicinity = 0
-
-        try: self.delta_t = params['delta_t']
-        except: self.delta_t = 0.2
-
-        try: self.viscosity = params['viscosity']
-        except: self.viscosity = 0.0
-
-
 def _place(Sg, tiling, opts):
     """
 
@@ -415,6 +379,8 @@ def _routing_graph(Sg, Tg, tiling, opts):
         node['main'] =  name
         node['visited'] = False
         node['cost'] = 1.0
+        node['sharing'] = 0.0
+        node['history'] = 0.0
 
     Rg =  Tg.to_directed()
     Rg.add_nodes_from(Sg.nodes(data=True))
@@ -443,6 +409,7 @@ def _rip_up(Sg, Tg, Rg):
         # BFS record of nodes visited
         node['visited'] = False
 
+
     for name, qubit  in Tg.nodes(data=True):
         qubit['path'][:] = []
         qubit['nodes'].clear()
@@ -450,17 +417,19 @@ def _rip_up(Sg, Tg, Rg):
         qubit['sharing'] = 0.0
         qubit['visited'] =  False
 
-def _get_cost(node, qubit):
+def _get_cost(node, next_node):
 
-    sharing_cost = qubit['sharing']
+    #print('Next:' + str(next_node))
 
-    scope_cost = 0.0 if node['tile']==qubit['tile'] else 1.0
+    sharing_cost = next_node['sharing']
 
-    degree_cost = qubit['degree']
+    scope_cost = 0.0 if node['tile']==next_node['tile'] else 1.0
+
+    degree_cost = next_node['degree']
 
     base_cost = 1.0 + degree_cost + scope_cost
 
-    history_cost = qubit['history']
+    history_cost = next_node['history']
 
     return base_cost * history_cost
 
@@ -469,7 +438,7 @@ def _embed_first(Sg, Tg, Rg, tiling, opts):
     unrouted = list(Sg.nodes(data=True))
     name,node = unrouted.pop()
     tile = node['tile']
-    print(tile)
+    print('Node:' + str(name) + 'Tile:' + str(tile))
     print(vars(tiling.tiles[tile]))
     # Get best candidate
     candidates = tiling.tiles[tile].qubits #TODO: Consider granularity of candidates
@@ -494,46 +463,64 @@ def _bfs(source_main, target_main, Rg):
     node = source_main
     queue = []
 
+    print('Path')
     print(node)
     print(target_main)
 
     #TODO: Use visited dictionary instead of 'visited' graph attributes
     visited = {}
+    parents = {}
 
     while (node != target_main):
-        print("Node: %s"%str(node))
+        #print("Node: %s"%str(node))
         for next in Rg[node]:
-            if not Rg.nodes[next]['visited']:
+            #if not Rg.nodes[next]['visited']:
+            if next not in visited:
                 if next==target_main:
                     heappush(queue, (Rg.nodes[node]['cost'], next))
+                    parents[next] = node
                 else:
                     Rg.nodes[next]['cost'] = _get_cost(Rg.nodes[node], Rg.nodes[next])
+                    parents[next] = node
                     heappush(queue, (Rg.nodes[next]['cost'], next))
-            print(queue)
-        Rg.nodes[node]['visited'] = True
+            #print(queue)
+        #Rg.nodes[node]['visited'] = True
+        visited[node] = Rg.nodes[node]['cost']
         cost, node = heappop(queue)
     print('Found target')
+    main = parents[target_main]
+    chain = {}
+    return main, chain
 
-
-def _traceback():
-    pass
 
 def _negotiated_congestion(source, targets, Sg, Rg):
 
+    tree = {}
+
     source_node = Sg.nodes[source]
+    source_main = source_node['main']
     for target in targets:
+        edge =  (source,target)
         target_node = Rg.nodes[target]
-        source_main = source_node['main']
         target_main = target_node['main']
 
         if (source_main==target_main):
+            print('source_main==target_main')
             pass
         else:
-            _bfs(source_main, target_main, Rg)
-            _traceback()
+            main, chain = _bfs(source_main, target_main, Rg)
+            Sg.nodes[target]['main'] = main
+            tree.update(chain)
+
+
+        # Trace back
+        print('Assigned Main:' + str(main))
+        tree[edge] = main
 
 
         Sg.edges[source,target]['routed'] = True
+
+    return tree
 
 def _update_costs(Tg):
     pass
@@ -547,13 +534,60 @@ def _route(Sg, Tg, Rg, tiling, opts):
         _rip_up(Sg, Tg, Rg)
         (source, node), unrouted = _embed_first(Sg, Tg, Rg, tiling, opts)
         while unrouted:
+            print(unrouted)
+            print('Source Main:' + str(Sg.nodes[source]['main']))
             targets = _unrouted_neighbors(source, Sg)
-            _negotiated_congestion(source, targets, Sg, Rg)
+            tree = _negotiated_congestion(source, targets, Sg, Rg)
+            chains.update(tree)
             source,node = unrouted.pop()
             Sg.nodes[source]['routed'] = True
         legal = _update_costs(Tg)
         tries -= 1
     return chains
+
+def _solve_chains(Sg, Rg):
+
+    embedding = {}
+    for name, node in Sg.nodes(data=True):
+        # TEMP: mapping only main qubits
+        embedding[name] = [node['main']]
+
+    return embedding
+
+
+"""
+
+"""
+class TopologicalOptions(EmbedderOptions):
+    def __init__(self, **params):
+        EmbedderOptions.__init__(self, **params)
+        # Parse optional parameters
+        self.names.update({ "topology",
+                            "enable_migration",
+                            "vicinity",
+                            "delta_t",
+                            "viscosity"})
+
+        for name in params:
+            if name not in self.names:
+                raise ValueError("%s is not a valid parameter for \
+                                    topological find_embedding"%name)
+
+        # If a topology of the graph is not provided, generate one
+        try: self.topology =  params['topology']
+        except KeyError: self.topology = None
+
+        try: self.enable_migration = params['enable_migration']
+        except: self.enable_migration = True
+
+        try: self.vicinity = params['vicinity']
+        except: self.vicinity = 0
+
+        try: self.delta_t = params['delta_t']
+        except: self.delta_t = 0.2
+
+        try: self.viscosity = params['viscosity']
+        except: self.viscosity = 0.0
 
 def find_embedding(S, T, **params):
     """
@@ -620,7 +654,9 @@ def find_embedding(S, T, **params):
 
     Rg = _routing_graph(Sg, Tg, tiling, opts)
 
-    embedding = _route(Sg, Tg, Rg, tiling, opts)
+    chains = _route(Sg, Tg, Rg, tiling, opts)
+
+    embedding = _solve_chains(Sg, Rg)
 
     return embedding
 
@@ -630,22 +666,27 @@ if __name__== "__main__":
 
     verbose = 0
 
-    p = 6
+    p = 2
     S = nx.grid_2d_graph(p,p)
     topology = {v:v for v in S}
 
     #S = nx.cycle_graph(p)
     #topology = nx.circular_layout(S)
 
-    m = 4
-    #T = dnx.chimera_graph(m, coordinates=True)
-    T = dnx.pegasus_graph(m, coordinates=True)
+    m = 2
+    T = dnx.chimera_graph(m, coordinates=True)
+    #T = dnx.pegasus_graph(m, coordinates=True)
 
     S_edgelist = list(S.edges())
     T_edgelist = list(T.edges())
 
     try:
-        find_embedding(S_edgelist, T_edgelist, topology=topology, construction=T.graph, verbose=verbose)
+        #find_embedding(S_edgelist, T_edgelist, topology=topology, construction=T.graph, verbose=verbose)
+        embedding = find_embedding(S_edgelist, T_edgelist, topology=topology, construction=T.graph, enable_migration=False, verbose=verbose)
         #find_embedding(S_edgelist, T_edgelist, construction=T.graph, verbose=verbose)
     except:
         traceback.print_exc()
+
+    print(embedding)
+    dnx.draw_chimera_embedding(T, embedding)
+    plt.show()
