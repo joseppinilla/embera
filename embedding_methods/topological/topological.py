@@ -459,38 +459,44 @@ def _unrouted_neighbors(source, Sg):
 
     return unrouted
 
-def _bfs(source_main, target_main, Rg):
-    node = source_main
-    queue = []
+def _bfs(source, target, Sg, Rg):
 
-    print('Path')
-    print(node)
-    print(target_main)
-
-    #TODO: Use visited dictionary instead of 'visited' graph attributes
     visited = {}
+    queue = []
     parents = {}
 
-    while (node != target_main):
+    node = source
+    while (node != target):
         #print("Node: %s"%str(node))
         for next in Rg[node]:
-            #if not Rg.nodes[next]['visited']:
             if next not in visited:
-                if next==target_main:
+                if next==target:
                     heappush(queue, (Rg.nodes[node]['cost'], next))
                     parents[next] = node
                 else:
-                    Rg.nodes[next]['cost'] = _get_cost(Rg.nodes[node], Rg.nodes[next])
+                    Rg.nodes[next]['cost'] = Rg.nodes[node]['cost'] + _get_cost(Rg.nodes[node], Rg.nodes[next])
                     parents[next] = node
                     heappush(queue, (Rg.nodes[next]['cost'], next))
             #print(queue)
-        #Rg.nodes[node]['visited'] = True
         visited[node] = Rg.nodes[node]['cost']
         cost, node = heappop(queue)
     print('Found target')
-    main = parents[target_main]
-    chain = {}
-    return main, chain
+    # Traceback
+    if target in Sg:
+        node = parents[target]
+        Sg.nodes[target]['main'] = node
+        print('Assigned Main:' + str(node))
+    else:
+        node =  target
+
+    chain = []
+    while(node != source):
+        chain.append(node)
+        node = parents[node]
+    chain.append(source)
+
+    print("Chain:" + str(chain))
+    return chain
 
 
 def _negotiated_congestion(source, targets, Sg, Rg):
@@ -501,6 +507,7 @@ def _negotiated_congestion(source, targets, Sg, Rg):
     source_main = source_node['main']
     for target in targets:
         edge =  (source,target)
+        print('Edge' + str(edge))
         target_node = Rg.nodes[target]
         target_main = target_node['main']
 
@@ -508,15 +515,9 @@ def _negotiated_congestion(source, targets, Sg, Rg):
             print('source_main==target_main')
             pass
         else:
-            main, chain = _bfs(source_main, target_main, Rg)
-            Sg.nodes[target]['main'] = main
-            tree.update(chain)
-
-
-        # Trace back
-        print('Assigned Main:' + str(main))
-        tree[edge] = main
-
+            chain = _bfs(source_main, target_main, Sg, Rg)
+            print(chain)
+            tree.update({edge:chain})
 
         Sg.edges[source,target]['routed'] = True
 
@@ -545,12 +546,20 @@ def _route(Sg, Tg, Rg, tiling, opts):
         tries -= 1
     return chains
 
-def _solve_chains(Sg, Rg):
+def _solve_chains(chains, Sg, Rg):
 
     embedding = {}
-    for name, node in Sg.nodes(data=True):
-        # TEMP: mapping only main qubits
-        embedding[name] = [node['main']]
+    for edge, chain in chains.items():
+        u,v = edge
+        if u not in embedding:
+            embedding[u] = chain
+        else:
+            embedding[v] = chain
+
+    # embedding = {}
+    # for name, node in Sg.nodes(data=True):
+    #     # TEMP: mapping only main qubits
+    #     embedding[name] = [node['main']]
 
     return embedding
 
@@ -656,7 +665,7 @@ def find_embedding(S, T, **params):
 
     chains = _route(Sg, Tg, Rg, tiling, opts)
 
-    embedding = _solve_chains(Sg, Rg)
+    embedding = _solve_chains(chains, Sg, Rg)
 
     return embedding
 
