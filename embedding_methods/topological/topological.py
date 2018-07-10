@@ -459,12 +459,17 @@ def _unrouted_neighbors(source, Sg):
 
     return unrouted
 
-def _bfs(source, target, Sg, Rg):
+def _bfs(source, target, visited, parents, queue, Rg):
+    """ Breadth-First Search
+        Args:
+            source:
+            target:
+            visited:
+            parents:
+            Rg: Routing Graph
 
-    visited = {}
-    queue = []
-    parents = {}
-
+    """
+    # Breadth-First Search Priority Queue
     node = source
     while (node != target):
         #print("Node: %s"%str(node))
@@ -481,54 +486,68 @@ def _bfs(source, target, Sg, Rg):
         visited[node] = Rg.nodes[node]['cost']
         cost, node = heappop(queue)
     print('Found target')
-    # Traceback
+
+def _traceback(source, target, parents, Sg, Rg):
+
     if target in Sg:
         node = parents[target]
         Sg.nodes[target]['main'] = node
         print('Assigned Main:' + str(node))
     else:
-        node =  target
+        node = target
 
-    chain = []
+    path = []
     while(node != source):
-        chain.append(node)
+        path.append(node)
         node = parents[node]
-    chain.append(source)
+    path.append(source)
 
-    print("Chain:" + str(chain))
-    return chain
+    print("Path:" + str(path))
+    return path
 
 
-def _negotiated_congestion(source, targets, Sg, Rg):
+def _steiner_tree(source, targets, Sg, Rg):
 
+    # Breadth-First Search structures
+    visited = {}
+    parents = {}
+    queue = []
+
+    # Resulting tree dictionary keyed by edges and path values.
     tree = {}
 
+    # Steiner Tree Search
     source_node = Sg.nodes[source]
     source_main = source_node['main']
     for target in targets:
-        edge =  (source,target)
-        print('Edge' + str(edge))
-        target_node = Rg.nodes[target]
-        target_main = target_node['main']
-
-        if (source_main==target_main):
-            print('source_main==target_main')
-            pass
+        edge = (source,target)
+        target_main = Rg.nodes[target]['main']
+        if target_main not in visited:
+            print('Edge' + str(edge))
+            _bfs(source_main, target_main, visited, parents, queue, Rg)
+            path = _traceback(source_main, target_main, parents, Sg, Rg)
         else:
-            chain = _bfs(source_main, target_main, Sg, Rg)
-            print(chain)
-            tree.update({edge:chain})
+            path = _traceback(source_main, target_main, parents, Sg, Rg)
+        tree.update({edge:path})
+
 
         Sg.edges[source,target]['routed'] = True
 
     return tree
 
-def _update_costs(Tg):
-    pass
+def _update_costs(paths, Tg):
+    """ Update present-sharing and history-sharing costs
+
+    """
+    return True
 
 def _route(Sg, Tg, Rg, tiling, opts):
+    """ Negotiated-congestion based router for multiple
+        disjoint Steiner Tree Search.
+
+    """
     tries = opts.tries
-    chains = {}
+    paths = {}
 
     legal = False
     while (not legal) and (tries > 0):
@@ -538,23 +557,23 @@ def _route(Sg, Tg, Rg, tiling, opts):
             print(unrouted)
             print('Source Main:' + str(Sg.nodes[source]['main']))
             targets = _unrouted_neighbors(source, Sg)
-            tree = _negotiated_congestion(source, targets, Sg, Rg)
-            chains.update(tree)
+            tree = _steiner_tree(source, targets, Sg, Rg)
+            paths.update(tree)
             source,node = unrouted.pop()
             Sg.nodes[source]['routed'] = True
-        legal = _update_costs(Tg)
+        legal = _update_costs(paths, Tg)
         tries -= 1
-    return chains
+    return paths
 
-def _solve_chains(chains, Sg, Rg):
+def _paths_to_chains(paths, Sg, Rg):
 
     embedding = {}
-    for edge, chain in chains.items():
+    for edge, path in paths.items():
         u,v = edge
         if u not in embedding:
-            embedding[u] = chain
+            embedding[u] = path
         else:
-            embedding[v] = chain
+            embedding[v] = path
 
     # embedding = {}
     # for name, node in Sg.nodes(data=True):
@@ -663,9 +682,9 @@ def find_embedding(S, T, **params):
 
     Rg = _routing_graph(Sg, Tg, tiling, opts)
 
-    chains = _route(Sg, Tg, Rg, tiling, opts)
+    paths = _route(Sg, Tg, Rg, tiling, opts)
 
-    embedding = _solve_chains(chains, Sg, Rg)
+    embedding = _paths_to_chains(paths, Sg, Rg)
 
     return embedding
 
