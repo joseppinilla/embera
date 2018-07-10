@@ -439,7 +439,7 @@ def _embed_first(Sg, Tg, Rg, tiling, opts):
     name,node = unrouted.pop()
     tile = node['tile']
     print('Node:' + str(name) + 'Tile:' + str(tile))
-    print(vars(tiling.tiles[tile]))
+    print('Tile vars:' + str(vars(tiling.tiles[tile])))
     # Get best candidate
     candidates = tiling.tiles[tile].qubits #TODO: Consider granularity of candidates
     q_index = min( candidates, key=lambda q: _get_cost(node, Rg.nodes[q]) )
@@ -521,7 +521,8 @@ def _steiner_tree(source, targets, Sg, Rg):
     source_main = source_node['main']
     for target in targets:
         edge = (source,target)
-        target_main = Rg.nodes[target]['main']
+        target_main = Sg.nodes[target]['main']
+        print('BFS:' + str(source_main) + str(target_main))
         if target_main not in visited:
             print('Edge' + str(edge))
             _bfs(source_main, target_main, visited, parents, queue, Rg)
@@ -539,6 +540,11 @@ def _update_costs(paths, Tg):
     """ Update present-sharing and history-sharing costs
 
     """
+    for edge, path in paths.items():
+        print(edge, path)
+
+
+
     return True
 
 def _route(Sg, Tg, Rg, tiling, opts):
@@ -554,7 +560,7 @@ def _route(Sg, Tg, Rg, tiling, opts):
         _rip_up(Sg, Tg, Rg)
         (source, node), unrouted = _embed_first(Sg, Tg, Rg, tiling, opts)
         while unrouted:
-            print(unrouted)
+            print('Unrouted:' + str(unrouted))
             print('Source Main:' + str(Sg.nodes[source]['main']))
             targets = _unrouted_neighbors(source, Sg)
             tree = _steiner_tree(source, targets, Sg, Rg)
