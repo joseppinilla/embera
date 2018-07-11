@@ -477,22 +477,16 @@ def _bfs(target_set, visited, parents, queue, Rg):
     print('Found target' + str(node))
     return node
 
-def _traceback(edge, reached, parents, Sg, Rg):
+def _traceback(source, target, reached, parents, Sg):
 
-    source, target = edge
-
-    #TODO: Test if modifying reference works.
-    source_node = Sg.nodes[source]
     target_node = Sg.nodes[target]
 
     if reached in Sg:
-        target_root = parents[target]
-        Sg.nodes[target]['assigned'].add(target_root)
-    else:
-        target_root = reached
+        reached = parents[target]
+        target_node['assigned'].add(reached)
 
-    path = [target_root]
-    node = parents[target_root]
+    path = [reached]
+    node = parents[reached]
     while(node != source):
         path.append(node)
         node = parents[node]
@@ -502,16 +496,18 @@ def _traceback(edge, reached, parents, Sg, Rg):
 
 
 def _steiner_tree(source, targets, Sg, Rg):
+    """ Steiner Tree Search
+    """
 
     # Breadth-First Search structures
     visited = {}
     parents = {}
-
     # Resulting tree dictionary keyed by edges and path values.
     tree = {}
-
-    # Steiner Tree Search
+    # Priority Queue
     queue = []
+
+    # Start search using pre-assigned nodes
     for node in Sg.nodes[source]['assigned']:
         parents[node] = source
         heappush(queue, (0.0, node))
@@ -521,20 +517,22 @@ def _steiner_tree(source, targets, Sg, Rg):
     for target in targets:
         print('BFS:' + str(source) + str(target))
         edge = (source,target)
+
+        # Search for target node, or nodes pre-assigned to target
         target_node = Sg.nodes[target]
         target_assigned = target_node['assigned']
-
         target_set = set([target]) if not target_assigned else target_assigned
 
         print('Queue:' + str(queue))
         print('Target set:' + str(target_set))
 
+        # Don't continue BFS expansion if target has been reached
         reached = next((tgt for tgt in target_set if tgt in visited), False)
 
         if not reached:
             reached = _bfs(target_set, visited, parents, queue, Rg)
 
-        path = _traceback(edge, reached, parents, Sg, Rg)
+        path = _traceback(source, target, reached, parents, Sg)
 
         tree.update({edge:path})
 
