@@ -457,20 +457,25 @@ def _bfs(target_set, visited, parents, queue, Rg):
             Rg: Routing Graph
 
     """
+
+    # Don't continue BFS expansion if target has been reached
+    reached = next((tgt for tgt in target_set if tgt in visited), False)
+    if reached: return reached
+
     # Breadth-First Search Priority Queue
     node_cost, node = heappop(queue)
     while (node not in target_set):
         #print("Node: %s"%str(node))
-        for next in Rg[node]:
-            if next not in visited:
-                if next in target_set:
-                    heappush(queue, (node_cost, next))
-                    parents[next] = node
+        for neighbor in Rg[node]:
+            if neighbor not in visited:
+                if neighbor in target_set:
+                    heappush(queue, (node_cost, neighbor))
+                    parents[neighbor] = node
                 else:
-                    next_cost = node_cost + _get_cost(Rg.nodes[node], Rg.nodes[next])
-                    parents[next] = node
-                    heappush(queue, (next_cost, next))
-                    Rg.nodes[next]['cost'] = next_cost
+                    next_cost = node_cost + _get_cost(Rg.nodes[node], Rg.nodes[neighbor])
+                    parents[neighbor] = node
+                    heappush(queue, (next_cost, neighbor))
+                    Rg.nodes[neighbor]['cost'] = next_cost
                 #print('Queue:' + str(queue))
         visited[node] = node_cost
         node_cost, node = heappop(queue)
@@ -526,11 +531,7 @@ def _steiner_tree(source, targets, Sg, Rg):
         print('Queue:' + str(queue))
         print('Target set:' + str(target_set))
 
-        # Don't continue BFS expansion if target has been reached
-        reached = next((tgt for tgt in target_set if tgt in visited), False)
-
-        if not reached:
-            reached = _bfs(target_set, visited, parents, queue, Rg)
+        reached = _bfs(target_set, visited, parents, queue, Rg)
 
         path = _traceback(source, target, reached, parents, Sg)
 
