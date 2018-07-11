@@ -3,10 +3,22 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import dwave_networkx as dnx
 
-__all__ = ["EmbedderOptions","read_source_graph","read_target_graph","draw_source_graph", "draw_tiled_graph"]
+__all__ = ["i2c", "EmbedderOptions","read_source_graph","read_target_graph","draw_source_graph", "draw_tiled_graph"]
 
 __default_construction__ =  {"family": "chimera", "rows": 16, "columns": 16,
                             "tile": 4, "data": True, "labels": "coordinate"}
+
+""" General Utilities
+"""
+
+def i2c(index, n):
+    """ Convert array index to coordinate
+    """
+    j,i = divmod(index,n)
+    return i,j
+
+""" Embedding specific
+"""
 
 class EmbedderOptions:
     def __init__(self, **params):

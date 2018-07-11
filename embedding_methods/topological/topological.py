@@ -13,12 +13,6 @@ __d_lim__ = 0.75
 
 __all__ = ["find_embedding"]
 
-def i2c(index, n):
-    """ Convert tile index to coordinate
-    """
-    j,i = divmod(index,n)
-    return i,j
-
 def _get_neighbors(i, j, n, m, index):
     """ Calculate indices and names of negihbouring tiles to use recurrently
         during migration and routing.
@@ -374,9 +368,8 @@ def _routing_graph(Sg, Tg, tiling, opts):
         qubit['cost'] = 1.0
 
     for name, node in Sg.nodes(data=True):
-        node['qubits'] = set()
         node['degree'] = Sg.degree(name)
-        node['main'] =  name
+        node['assigned'] = set()
         node['visited'] = False
         node['cost'] = 1.0
         node['sharing'] = 0.0
@@ -400,12 +393,8 @@ def _rip_up(Sg, Tg, Rg):
         edge['path'] =  []
 
     for name,node in Sg.nodes(data=True):
-        # If unrouted, main node is source graph node
-        node['main'] = name
-        # No qubits are assigned to source graph nodes
-        node['qubits'].clear()
-        # All source graph nodes are unrouted
-        node['routed'] = False
+        # No qubits are assigned to the source graph node
+        node['assigned'] = set()
         # BFS record of nodes visited
         node['visited'] = False
 
@@ -446,8 +435,7 @@ def _embed_first(Sg, Tg, Rg, tiling, opts):
     qubit = Rg.nodes[q_index]
 
     # Populate qubit
-    node['main'] = q_index
-    node['qubits'].add(q_index)
+    node['assigned'].add(q_index)
     qubit['sharing'] += 1.0
 
     return (name,node), unrouted
@@ -459,7 +447,7 @@ def _unrouted_neighbors(source, Sg):
 
     return unrouted
 
-def _bfs(source, target, visited, parents, queue, Rg):
+def _bfs(source, target_set, visited, parents, queue, Rg):
     """ Breadth-First Search
         Args:
             source:
@@ -470,37 +458,44 @@ def _bfs(source, target, visited, parents, queue, Rg):
 
     """
     # Breadth-First Search Priority Queue
-    node = source
-    while (node != target):
+    node_cost, node = heappop(queue)
+    while (node not in target_set):
         #print("Node: %s"%str(node))
         for next in Rg[node]:
             if next not in visited:
-                if next==target:
-                    heappush(queue, (Rg.nodes[node]['cost'], next))
+                if next in target_set:
+                    heappush(queue, (node_cost, next))
                     parents[next] = node
                 else:
-                    Rg.nodes[next]['cost'] = Rg.nodes[node]['cost'] + _get_cost(Rg.nodes[node], Rg.nodes[next])
+                    next_cost = node_cost + _get_cost(Rg.nodes[node], Rg.nodes[next])
                     parents[next] = node
-                    heappush(queue, (Rg.nodes[next]['cost'], next))
-            #print(queue)
-        visited[node] = Rg.nodes[node]['cost']
-        cost, node = heappop(queue)
-    print('Found target')
+                    heappush(queue, (next_cost, next))
+                    Rg.nodes[next]['cost'] = next_cost
+                #print('Queue:' + str(queue))
+        visited[node] = node_cost
+        node_cost, node = heappop(queue)
+    print('Found target' + str(node))
+    return node
 
-def _traceback(source, target, parents, Sg, Rg):
+def _traceback(edge, reached, parents, Sg, Rg):
 
-    if target in Sg:
-        node = parents[target]
-        Sg.nodes[target]['main'] = node
-        print('Assigned Main:' + str(node))
+    source, target = edge
+
+    #TODO: Test if modifying reference works.
+    source_node = Sg.nodes[source]
+    target_node = Sg.nodes[target]
+
+    if reached in Sg:
+        target_root = parents[target]
+        Sg.nodes[target]['assigned'].add(target_root)
     else:
-        node = target
+        target_root = reached
 
-    path = []
+    path = [target_root]
+    node = parents[target_root]
     while(node != source):
         path.append(node)
         node = parents[node]
-    path.append(source)
 
     print("Path:" + str(path))
     return path
@@ -511,26 +506,38 @@ def _steiner_tree(source, targets, Sg, Rg):
     # Breadth-First Search structures
     visited = {}
     parents = {}
-    queue = []
 
     # Resulting tree dictionary keyed by edges and path values.
     tree = {}
 
     # Steiner Tree Search
-    source_node = Sg.nodes[source]
-    source_main = source_node['main']
-    for target in targets:
-        edge = (source,target)
-        target_main = Sg.nodes[target]['main']
-        print('BFS:' + str(source_main) + str(target_main))
-        if target_main not in visited:
-            print('Edge' + str(edge))
-            _bfs(source_main, target_main, visited, parents, queue, Rg)
-            path = _traceback(source_main, target_main, parents, Sg, Rg)
-        else:
-            path = _traceback(source_main, target_main, parents, Sg, Rg)
-        tree.update({edge:path})
+    queue = []
+    for node in Sg.nodes[source]['assigned']:
+        parents[node] = source
+        heappush(queue, (0.0, node))
 
+    print('Init Queue:' + str(queue))
+
+    for target in targets:
+        print('BFS:' + str(source) + str(target))
+        edge = (source,target)
+        target_node = Sg.nodes[target]
+        target_set = target_node['assigned'].copy()
+
+        if not target_set:
+            target_set.add(target)
+
+        print('Queue:' + str(queue))
+        print('Target set:' + str(target_set))
+
+        reached = next((tgt for tgt in target_set if tgt in visited), False)
+
+        if not reached:
+            reached = _bfs(source, target_set, visited, parents, queue, Rg)
+
+        path = _traceback(edge, reached, parents, Sg, Rg)
+
+        tree.update({edge:path})
 
         Sg.edges[source,target]['routed'] = True
 
@@ -561,17 +568,19 @@ def _route(Sg, Tg, Rg, tiling, opts):
         (source, node), unrouted = _embed_first(Sg, Tg, Rg, tiling, opts)
         while unrouted:
             print('Unrouted:' + str(unrouted))
-            print('Source Main:' + str(Sg.nodes[source]['main']))
             targets = _unrouted_neighbors(source, Sg)
             tree = _steiner_tree(source, targets, Sg, Rg)
             paths.update(tree)
             source,node = unrouted.pop()
-            Sg.nodes[source]['routed'] = True
         legal = _update_costs(paths, Tg)
         tries -= 1
     return paths
 
 def _paths_to_chains(paths, Sg, Rg):
+
+    print('Assigned')
+    for name, node in Sg.nodes(data=True):
+        print(str(name) + str(node['assigned']))
 
     embedding = {}
     for edge, path in paths.items():
@@ -580,11 +589,6 @@ def _paths_to_chains(paths, Sg, Rg):
             embedding[u] = path
         else:
             embedding[v] = path
-
-    # embedding = {}
-    # for name, node in Sg.nodes(data=True):
-    #     # TEMP: mapping only main qubits
-    #     embedding[name] = [node['main']]
 
     return embedding
 
