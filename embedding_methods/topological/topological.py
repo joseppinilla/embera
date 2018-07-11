@@ -447,7 +447,7 @@ def _unrouted_neighbors(source, Sg):
 
     return unrouted
 
-def _bfs(source, target_set, visited, parents, queue, Rg):
+def _bfs(target_set, visited, parents, queue, Rg):
     """ Breadth-First Search
         Args:
             source:
@@ -522,10 +522,9 @@ def _steiner_tree(source, targets, Sg, Rg):
         print('BFS:' + str(source) + str(target))
         edge = (source,target)
         target_node = Sg.nodes[target]
-        target_set = target_node['assigned'].copy()
+        target_assigned = target_node['assigned']
 
-        if not target_set:
-            target_set.add(target)
+        target_set = set([target]) if not target_assigned else target_assigned
 
         print('Queue:' + str(queue))
         print('Target set:' + str(target_set))
@@ -533,7 +532,7 @@ def _steiner_tree(source, targets, Sg, Rg):
         reached = next((tgt for tgt in target_set if tgt in visited), False)
 
         if not reached:
-            reached = _bfs(source, target_set, visited, parents, queue, Rg)
+            reached = _bfs(target_set, visited, parents, queue, Rg)
 
         path = _traceback(edge, reached, parents, Sg, Rg)
 
