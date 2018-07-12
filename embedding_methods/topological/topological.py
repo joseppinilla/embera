@@ -616,12 +616,43 @@ def _setup_lp(paths, unassigned, Sg, Rg):
     lp += Z, "OBJ"
 
     var_map = {}
+    Lpvars = {}
+    chain = {}
 
+    for node in Sg.nodes():
+        node_name = str(node).replace(" ","")
+        lp += len(Sg.nodes[node]['assigned']) <= Z, node_name
 
+    for edge, path in paths.items():
+        # Nodes in path excluding source and target
+        shared = len(path) - 2
+        if len(path)>2:
+            # PuLP variable names do not support spaces
+            s_name, t_name = (str(x).replace(" ","") for x in edge)
+            # Name of variables are var<source><edge> and var<target><edge>
+            var_s = "var" + s_name + s_name + t_name
+            var_t = "var" + t_name + s_name + t_name
+
+            # create variables
+            Lpvars[var_s] = pulp.LpVariable(var_s, lowBound=0, cat='Integer')
+            Lpvars[var_t] = pulp.LpVariable(var_t, lowBound=0, cat='Integer')
+
+            var_map[edge] = {}
+            var_map[edge][s_name] = var_s
+            var_map[edge][t_name] = var_t
+
+            constraint_name = "ZeroSum" + s_name + t_name
+            lp += Lpvars[var_s] + Lpvars[var_t] == shared, constraint_name
+
+            lp.constraints[s_name] += Lpvars[var_s]
+            lp.constraints[t_name] += Lpvars[var_t]
+
+    for constraint in lp.constraints.items():
+        print(constraint)
 
     return lp, var_map
 
-def _assign_nodes():
+def _assign_nodes(paths, lp_sol, var_map, Sg):
     pass
 
 
@@ -637,16 +668,18 @@ def _paths_to_chains(paths, unassigned, Sg, Rg):
 
     lp, var_map = _setup_lp(paths, unassigned, Sg, Rg)
 
-    #if verbose>1: lp.writeLP("SHARING.lp")
+    if verbose==0: lp.writeLP("SHARING.lp") #TEMP change to verbose 3
 
-    #lp.solve(solver=pulp.GLPK_CMD(msg=verbose))
+    lp.solve(solver=pulp.GLPK_CMD(msg=verbose))
 
     # read solution
-    #lp_sol = {}
-    #for v in  lp.variables():
-    #    lp_sol[v.name] = v.varValue
+    lp_sol = {}
+    for v in  lp.variables():
+        lp_sol[v.name] = v.varValue
 
-    #embedding = _assign_nodes(lp_sol)
+    print(lp_sol)
+
+    embedding = _assign_nodes(paths, lp_sol, var_map, Sg)
 
     #return embedding
 
