@@ -1,4 +1,4 @@
-
+import pulp
 import traceback
 import networkx as nx
 import dwave_networkx as dnx
@@ -488,7 +488,7 @@ def _bfs(target_set, visited, parents, queue, Rg):
     print('Found target' + str(node))
     return node
 
-def _traceback(source, target, reached, parents, Sg, Rg):
+def _traceback(source, target, reached, parents, unassigned, Sg, Rg):
 
     target_node = Sg.nodes[target]
     source_node = Sg.nodes[source]
@@ -503,21 +503,43 @@ def _traceback(source, target, reached, parents, Sg, Rg):
     node = parents[reached]
     while(node != source):
         path.append(node)
+
         Rg.nodes[node]['nodes'].add(source)
         Rg.nodes[node]['nodes'].add(target)
+
+        if node in unassigned:
+            if source in unassigned[node]:
+                del unassigned[node]
+                Sg.nodes[source]['assigned'].add(node)
+            elif target in unassigned[node]:
+                del unassigned[node]
+                Sg.nodes[target]['assigned'].add(node)
+            else:
+                unassigned[node].add(source)
+                unassigned[node].add(target)
+        else:
+            if node in Sg.nodes[source]['assigned']:
+                pass
+            elif node in Sg.nodes[target]['assigned']:
+                pass
+            else:
+                unassigned[node] = set([source, target])
+
+
         node = parents[node]
 
     print("Path:" + str(path))
     return path
 
 
-def _steiner_tree(source, targets, Sg, Rg):
+def _steiner_tree(source, targets, unassigned, Sg, Rg):
     """ Steiner Tree Search
     """
 
     # Breadth-First Search structures
     visited = {}
     parents = {}
+
     # Resulting tree dictionary keyed by edges and path values.
     tree = {}
 
@@ -540,7 +562,7 @@ def _steiner_tree(source, targets, Sg, Rg):
         reached = _bfs(target_set, visited, parents, queue, Rg)
 
         # Retrace steps from target to source
-        path = _traceback(source, target, reached, parents, Sg, Rg)
+        path = _traceback(source, target, reached, parents, unassigned, Sg, Rg)
 
         edge = (source,target)
         tree.update({edge:path})
@@ -567,6 +589,7 @@ def _route(Sg, Tg, Rg, tiling, opts):
     """
     tries = opts.tries
     paths = {}
+    unassigned = {}
 
     legal = False
     while (not legal) and (tries > 0):
@@ -575,18 +598,57 @@ def _route(Sg, Tg, Rg, tiling, opts):
         while node_list:
             print('Unassigned:' + str(node_list))
             targets = _unrouted_edges(source, Sg)
-            tree = _steiner_tree(source, targets, Sg, Rg)
+            tree = _steiner_tree(source, targets, unassigned, Sg, Rg)
             paths.update(tree)
             source,node = node_list.pop()
         legal = _update_costs(paths, Tg)
         tries -= 1
-    return paths
+    return paths, unassigned
 
-def _paths_to_chains(paths, Sg, Rg):
+def _setup_lp(paths, unassigned, Sg, Rg):
+    """ Setup linear Programming Problem
+        Goal: Minimize
+
+    """
+    lp = pulp.LpProblem("Solve Chains",pulp.LpMinimize)
+
+    Z = pulp.LpVariable('Z',lowBound=0,cat='Integer')
+    lp += Z, "OBJ"
+
+    var_map = {}
+
+
+
+    return lp, var_map
+
+def _assign_nodes():
+    pass
+
+
+def _paths_to_chains(paths, unassigned, Sg, Rg):
 
     print('Assigned')
     for name, node in Sg.nodes(data=True):
         print(str(name) + str(node['assigned']))
+
+    print('Unassigned')
+    for node, shared in unassigned.items():
+        print(str(node) + str(shared))
+
+    lp, var_map = _setup_lp(paths, unassigned, Sg, Rg)
+
+    #if verbose>1: lp.writeLP("SHARING.lp")
+
+    #lp.solve(solver=pulp.GLPK_CMD(msg=verbose))
+
+    # read solution
+    #lp_sol = {}
+    #for v in  lp.variables():
+    #    lp_sol[v.name] = v.varValue
+
+    #embedding = _assign_nodes(lp_sol)
+
+    #return embedding
 
     embedding = {}
     for edge, path in paths.items():
@@ -698,9 +760,9 @@ def find_embedding(S, T, **params):
 
     Rg = _routing_graph(Sg, Tg, tiling, opts)
 
-    paths = _route(Sg, Tg, Rg, tiling, opts)
+    paths, unassigned = _route(Sg, Tg, Rg, tiling, opts)
 
-    embedding = _paths_to_chains(paths, Sg, Rg)
+    embedding = _paths_to_chains(paths, unassigned, Sg, Rg)
 
     return embedding
 
@@ -731,6 +793,6 @@ if __name__== "__main__":
     except:
         traceback.print_exc()
 
-    print(embedding)
+    print('Embedding:' + str(embedding))
     dnx.draw_chimera_embedding(T, embedding)
     plt.show()
