@@ -605,6 +605,17 @@ def _route(Sg, Tg, Rg, tiling, opts):
         tries -= 1
     return paths, unassigned
 
+
+""" Linear Programming formulation to solve unassigned nodes.
+
+    Constraints for all edges:
+        var<source><source><target> + var<target><source><target> = |path|
+    Constraints for all nodes:
+        Z - All( var<node><source><target> ) >= |<node['assigned']>|
+    Goal:
+        min(Z)
+"""
+
 def _setup_lp(paths, unassigned, Sg, Rg):
     """ Setup linear Programming Problem
         Goal: Minimize
@@ -621,12 +632,12 @@ def _setup_lp(paths, unassigned, Sg, Rg):
 
     for node in Sg.nodes():
         node_name = str(node).replace(" ","")
-        lp += len(Sg.nodes[node]['assigned']) <= Z, node_name
+        lp += Z >= len(Sg.nodes[node]['assigned']), node_name
 
     for edge, path in paths.items():
         # Nodes in path excluding source and target
         shared = len(path) - 2
-        if len(path)>2:
+        if shared>0:
             # PuLP variable names do not support spaces
             s_name, t_name = (str(x).replace(" ","") for x in edge)
             # Name of variables are var<source><edge> and var<target><edge>
@@ -643,17 +654,28 @@ def _setup_lp(paths, unassigned, Sg, Rg):
 
             constraint_name = "ZeroSum" + s_name + t_name
             lp += Lpvars[var_s] + Lpvars[var_t] == shared, constraint_name
-
-            lp.constraints[s_name] += Lpvars[var_s]
-            lp.constraints[t_name] += Lpvars[var_t]
-
-    for constraint in lp.constraints.items():
-        print(constraint)
+            lp.constraints[s_name] -= Lpvars[var_s]
+            lp.constraints[t_name] -= Lpvars[var_t]
 
     return lp, var_map
 
 def _assign_nodes(paths, lp_sol, var_map, Sg):
-    pass
+
+    for edge, path in paths.items():
+        # Nodes in path excluding source and target
+        shared = len(path) - 2
+        if shared>0:
+
+            source, target = edge
+            (s_name, var_s), (t_name, var_t) = var_map[edge].items()
+            num_s = lp_sol[var_s]
+            num_t = lp_sol[var_t]
+            # Path from traceback starts from target
+            for i in range(1,shared+1):
+                if i > num_t:
+                    Sg.nodes[source]['assigned'].add(path[i])
+                else:
+                    Sg.nodes[target]['assigned'].add(path[i])
 
 
 def _paths_to_chains(paths, unassigned, Sg, Rg):
@@ -681,18 +703,13 @@ def _paths_to_chains(paths, unassigned, Sg, Rg):
 
     embedding = _assign_nodes(paths, lp_sol, var_map, Sg)
 
-    #return embedding
-
+    print('Assigned')
     embedding = {}
-    for edge, path in paths.items():
-        u,v = edge
-        if u not in embedding:
-            embedding[u] = path
-        else:
-            embedding[v] = path
+    for name, node in Sg.nodes(data=True):
+        print(str(name) + str(node['assigned']))
+        embedding[name] = node['assigned']
 
     return embedding
-
 
 """
 
@@ -812,7 +829,7 @@ if __name__== "__main__":
     #S = nx.cycle_graph(p)
     #topology = nx.circular_layout(S)
 
-    m = 2
+    m = 4
     T = dnx.chimera_graph(m, coordinates=True)
     #T = dnx.pegasus_graph(m, coordinates=True)
 
