@@ -73,7 +73,7 @@ class Tile:
         self.nodes.remove(node)
 
     def _get_chimera_qubits(self, Tg, t, i, j):
-        """ Finds the avilable qubits associated to tile (i,j) of the Chimera
+        """ Finds the available qubits associated to tile (i,j) of the Chimera
             Graph and returns the supply or number of qubits found.
 
             The notation (i, j, u, k) is called the chimera index:
@@ -336,6 +336,11 @@ def _place(Sg, tiling, opts):
     #elif:
     #_simulated_annealing(Sg, tiling, opts)
 
+    print("Placement:")
+    for name, node in Sg.nodes(data=True):
+        print(str(name) + str(node['tile']))
+        print('qubits:' + str(tiling.tiles[node['tile']].qubits))
+
 
 def _simulated_annealing(Sg, tiling, opts):
     rng = opts.rng
@@ -347,6 +352,7 @@ def _simulated_annealing(Sg, tiling, opts):
     for node in S:
         init_loc[node] = (rng.randint(0,n),rng.randint(0,m))
 
+    #TODO: Simulated Annealing placement
     opts.enable_migration = False
     return init_loc
 
@@ -360,10 +366,8 @@ def _routing_graph(Sg, Tg, tiling, opts):
     for name, qubit in Tg.nodes(data=True):
         qubit['history'] =  1.0
         qubit['degree'] = 1.0 - ( Tg.degree(name)/tiling.max_degree )
-        qubit['path'] = []
         qubit['nodes'] = set()
-        qubit['mapped'] = {}
-        qubit['sharing'] = 0.0
+        qubit['sharing'] = 1.0
         qubit['visited'] = False
         qubit['cost'] = float(len(Tg))
 
@@ -372,8 +376,9 @@ def _routing_graph(Sg, Tg, tiling, opts):
         node['assigned'] = set()
         node['visited'] = False
         node['cost'] = float(len(Tg))
-        node['sharing'] = 0.0
-        node['history'] = 0.0
+        # Dummy values to calculate costs
+        node['sharing'] = 1.0
+        node['history'] = 1.0
 
     Rg =  Tg.to_directed()
     Rg.add_nodes_from(Sg.nodes(data=True))
@@ -390,7 +395,6 @@ def _rip_up(Sg, Tg, Rg):
 
     for u,v,edge in Sg.edges.data():
         edge['routed'] =  False
-        edge['path'] =  []
 
     for name,node in Sg.nodes(data=True):
         # No qubits are assigned to the source graph node
@@ -400,9 +404,7 @@ def _rip_up(Sg, Tg, Rg):
 
 
     for name, qubit  in Tg.nodes(data=True):
-        qubit['path'][:] = []
         qubit['nodes'].clear()
-        qubit['mapped'].clear()
         qubit['sharing'] = 0.0
         qubit['visited'] =  False
 
@@ -423,7 +425,7 @@ def _get_cost(node_name, neighbor_name, Rg):
 
     history_cost = next_node['history']
 
-    return base_cost * history_cost
+    return base_cost * sharing_cost * history_cost
 
 def _embed_first(Sg, Tg, Rg, tiling, opts):
     # Pick first node
@@ -501,7 +503,8 @@ def _traceback(source, target, reached, parents, unassigned, Sg, Rg):
 
     path = [reached]
     node = parents[reached]
-    while(node != source):
+    #while(node != source):
+    while(node not in source_node['assigned']):
         path.append(node)
 
         Rg.nodes[node]['nodes'].add(source)
@@ -528,6 +531,7 @@ def _traceback(source, target, reached, parents, unassigned, Sg, Rg):
 
         node = parents[node]
 
+    path.append(node)
     print("Path:" + str(path))
     return path
 
@@ -571,10 +575,17 @@ def _steiner_tree(source, targets, unassigned, Sg, Rg):
 
     return tree
 
-def _update_costs(paths, Tg):
+def _update_costs(paths, Sg, Tg, Rg):
     """ Update present-sharing and history-sharing costs
 
     """
+    print("Update Costs:")
+    for name, node in Rg.nodes(data=True):
+        if 'nodes' in node:
+            nodes = node['nodes']
+            print(nodes)
+
+    print("Paths:")
     for edge, path in paths.items():
         print(edge, path)
 
@@ -601,7 +612,7 @@ def _route(Sg, Tg, Rg, tiling, opts):
             tree = _steiner_tree(source, targets, unassigned, Sg, Rg)
             paths.update(tree)
             source,node = node_list.pop()
-        legal = _update_costs(paths, Tg)
+        legal = _update_costs(paths, Sg, Tg, Rg)
         tries -= 1
     return paths, unassigned
 
@@ -820,7 +831,7 @@ def find_embedding(S, T, **params):
 #TEMP: standalone test
 if __name__== "__main__":
 
-    verbose = 0
+    verbose = 3
 
     p = 2
     S = nx.grid_2d_graph(p,p)
@@ -845,4 +856,5 @@ if __name__== "__main__":
 
     print('Embedding:' + str(embedding))
     dnx.draw_chimera_embedding(T, embedding)
+    #dnx.draw_pegasus_embedding(T, embedding)
     plt.show()
