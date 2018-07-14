@@ -364,21 +364,24 @@ def _simulated_annealing(Sg, tiling, opts):
 def _routing_graph(Sg, Tg, tiling, opts):
 
     for name, qubit in Tg.nodes(data=True):
+        # BFS
         qubit['history'] =  1.0
         qubit['degree'] = 1.0 - ( Tg.degree(name)/tiling.max_degree )
-        qubit['nodes'] = set()
-        qubit['sharing'] = 1.0
-        qubit['visited'] = False
+        qubit['sharing'] = 0.0
         qubit['cost'] = float(len(Tg))
+        # Mapping
+        qubit['nodes'] = set()
+        qubit['paths'] = set()
 
     for name, node in Sg.nodes(data=True):
-        node['degree'] = Sg.degree(name)
-        node['assigned'] = set()
-        node['visited'] = False
+        # High initial cost
         node['cost'] = float(len(Tg))
-        # Dummy values to calculate costs
-        node['sharing'] = 1.0
+        # BFS. Dummy values to calculate costs
+        node['degree'] = Sg.degree(name)
+        node['sharing'] = 0.0
         node['history'] = 1.0
+        # Mapping
+        node['assigned'] = set()
 
     Rg =  Tg.to_directed()
     Rg.add_nodes_from(Sg.nodes(data=True))
@@ -399,14 +402,13 @@ def _rip_up(Sg, Tg, Rg):
     for name,node in Sg.nodes(data=True):
         # No qubits are assigned to the source graph node
         node['assigned'] = set()
-        # BFS record of nodes visited
-        node['visited'] = False
 
 
     for name, qubit  in Tg.nodes(data=True):
-        qubit['nodes'].clear()
         qubit['sharing'] = 0.0
-        qubit['visited'] =  False
+        
+        qubit['nodes'].clear()
+        qubit['paths'].clear()
 
 def _get_cost(node_name, neighbor_name, Rg):
 
@@ -415,7 +417,7 @@ def _get_cost(node_name, neighbor_name, Rg):
 
     #print('Next:' + str(next_node))
 
-    sharing_cost = next_node['sharing']
+    sharing_cost = 1.0 + next_node['sharing']
 
     scope_cost = 0.0 if node['tile']==next_node['tile'] else 1.0
 
@@ -498,40 +500,37 @@ def _traceback(source, target, reached, parents, unassigned, Sg, Rg):
     if reached in Sg:
         reached = parents[target]
         target_node['assigned'].add(reached)
-        target_node['sharing'] += 1.0
+        Rg.nodes[reached]['sharing'] += 1.0
         Rg.nodes[reached]['nodes'].add(target)
 
     path = [reached]
     node = parents[reached]
-    #while(node != source):
     while(node not in source_node['assigned']):
         path.append(node)
-
-        Rg.nodes[node]['nodes'].add(source)
-        Rg.nodes[node]['nodes'].add(target)
 
         if node in unassigned:
             if source in unassigned[node]:
                 del unassigned[node]
                 Sg.nodes[source]['assigned'].add(node)
+                Rg.nodes[node]['nodes'].add(source)
             elif target in unassigned[node]:
                 del unassigned[node]
                 Sg.nodes[target]['assigned'].add(node)
+                Rg.nodes[node]['nodes'].add(target)
             else:
                 unassigned[node].add(source)
                 unassigned[node].add(target)
+                Rg.nodes[node]['nodes'].add(source)
+                Rg.nodes[node]['nodes'].add(target)
         else:
-            if node in Sg.nodes[source]['assigned']:
-                pass
-            elif node in Sg.nodes[target]['assigned']:
-                pass
-            else:
-                unassigned[node] = set([source, target])
+            unassigned[node] = set([source, target])
+            Rg.nodes[node]['nodes'].add(source)
+            Rg.nodes[node]['nodes'].add(target)
 
-
+        Rg.nodes[node]['sharing'] += 1.0
         node = parents[node]
-
     path.append(node)
+
     print("Path:" + str(path))
     return path
 
