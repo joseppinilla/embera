@@ -368,14 +368,11 @@ def _routing_graph(Sg, Tg, tiling, opts):
         qubit['history'] =  1.0
         qubit['degree'] = 1.0 - ( Tg.degree(name)/tiling.max_degree )
         qubit['sharing'] = 0.0
-        qubit['cost'] = float(len(Tg))
         # Mapping
         qubit['nodes'] = set()
         qubit['paths'] = set()
 
     for name, node in Sg.nodes(data=True):
-        # High initial cost
-        node['cost'] = float(len(Tg))
         # BFS. Dummy values to calculate costs
         node['degree'] = Sg.degree(name)
         node['sharing'] = 0.0
@@ -406,7 +403,7 @@ def _rip_up(Sg, Tg, Rg):
 
     for name, qubit  in Tg.nodes(data=True):
         qubit['sharing'] = 0.0
-        
+
         qubit['nodes'].clear()
         qubit['paths'].clear()
 
@@ -483,9 +480,10 @@ def _bfs(target_set, visited, parents, queue, Rg):
                 else:
                     next_cost = node_cost + _get_cost(node, neighbor, Rg)
                     heappush(queue, (next_cost, neighbor))
-                    if next_cost < Rg.nodes[neighbor]['cost']:
+                    # Updates cost and parent if not-visited or lower/same cost
+                    if visited.setdefault(neighbor, next_cost) >= next_cost:
+                        visited[neighbor] = next_cost
                         parents[neighbor] = node
-                        Rg.nodes[neighbor]['cost'] = next_cost
                 #print('Queue:' + str(queue))
         visited[node] = node_cost
         node_cost, node = heappop(queue)
@@ -503,10 +501,17 @@ def _traceback(source, target, reached, parents, unassigned, Sg, Rg):
         Rg.nodes[reached]['sharing'] += 1.0
         Rg.nodes[reached]['nodes'].add(target)
 
+
+
     path = [reached]
     node = parents[reached]
     while(node not in source_node['assigned']):
+        print('Node:' + str(node))
         path.append(node)
+
+        # Node is only reached if path len=1
+        if node == source:
+            print('This')
 
         if node in unassigned:
             if source in unassigned[node]:
@@ -585,11 +590,10 @@ def _update_costs(paths, Sg, Tg, Rg):
             print(nodes)
 
     print("Paths:")
-    for edge, path in paths.items():
-        print(edge, path)
-
-
-
+    for (u,v), path in paths.items():
+        print(u,v,path)
+        for qubit in path:
+            print(Rg.nodes[qubit]['sharing'])
     return True
 
 def _route(Sg, Tg, Rg, tiling, opts):
@@ -839,7 +843,7 @@ if __name__== "__main__":
     #S = nx.cycle_graph(p)
     #topology = nx.circular_layout(S)
 
-    m = 4
+    m = 2
     T = dnx.chimera_graph(m, coordinates=True)
     #T = dnx.pegasus_graph(m, coordinates=True)
 
