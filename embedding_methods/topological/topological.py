@@ -576,7 +576,7 @@ def _traceback(source, target, reached, parents, unassigned, Sg, Rg):
 def _steiner_tree(source, targets, unassigned, Sg, Rg):
     """ Steiner Tree Search
     """
-    print('Soruce:' + str(source))
+    print('Source:' + str(source))
     # Breadth-First Search structures. TODO: Merge cost, parents and distance.
     # TODO: Make visited a set
     cost = {}
@@ -586,20 +586,23 @@ def _steiner_tree(source, targets, unassigned, Sg, Rg):
     # Resulting tree dictionary keyed by edges and path values.
     tree = {}
 
-    # Priority Queue
+    # Priority Queue (cost, name)
     queue = []
-    # Start search using previously-assigned nodes
-    for node in Sg.nodes[source]['assigned']:
-        parents[node] = source
-        if source in Rg[node]:
-            distance[node] = 1
-        else:
-            distance[node] = 2
-        heappush(queue, (0.0, node))
-
-    print('Init Queue:' + str(queue))
 
     for target in targets:
+        # Start search using previously-assigned nodes
+        for node in Sg.nodes[source]['assigned']:
+            parents[node] = source
+            if source in Rg[node]:
+                distance[node] = 1
+            else:
+                distance[node] = 2
+            heappush(queue, (0.0, node))
+
+        if verbose:
+            queue_str = str(["%0.3f %s" % (c,str(n)) for c,n in queue])
+            print('Init Queue:' + queue_str)
+
         print('Target:' + str(target))
         # Search for target node, or nodes pre-assigned to target
         target_node = Sg.nodes[target]
