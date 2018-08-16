@@ -453,7 +453,7 @@ def _unrouted_edges(source, Sg):
 
     return unrouted
 
-def _bfs(target_set, visited, parents, cost, distance, queue, Rg):
+def _bfs(target_set, visited, parents, cost, queue, Rg):
     """ Breadth-First Search
         Args:
             source:
@@ -467,7 +467,7 @@ def _bfs(target_set, visited, parents, cost, distance, queue, Rg):
     # Don't continue BFS expansion if target has been reached in len>1 path
     for tgt in target_set:
         if tgt in visited:
-            if distance[tgt] > 2:
+            if visited[tgt] > 2:
                 # Returns first encounter of valid target
                 return tgt
 
@@ -475,8 +475,7 @@ def _bfs(target_set, visited, parents, cost, distance, queue, Rg):
     #if reached: return reached
 
     # Breadth-First Search Priority Queue
-    node_cost, node = heappop(queue)
-    node_dist = distance[node]
+    node_cost, (node, node_parent, node_dist) = heappop(queue)
     found = False
     while (not found):
         #print("Node: %s"%str(node))
@@ -488,13 +487,12 @@ def _bfs(target_set, visited, parents, cost, distance, queue, Rg):
                     continue
             if neighbor not in visited:
                 if neighbor in target_set:
-                    heappush(queue, (node_cost, neighbor))
+                    heappush(queue, (neighbor_cost, (neighbor, node, neighbor_dist)))
                     parents[neighbor] = node
-                    distance[neighbor] = neighbor_dist
                     cost[neighbor] = node_cost
                 else:
                     neighbor_cost = node_cost + _get_cost(node, neighbor, Rg)
-                    heappush(queue, (neighbor_cost, neighbor))
+                    heappush(queue, (neighbor_cost, (neighbor, node, neighbor_dist)))
                     # Updates cost and parent if not-visited or lower/same cost
                     # if cost.setdefault(neighbor, neighbor_cost) >= neighbor_cost:
                     #     parents[neighbor] = node
@@ -505,19 +503,16 @@ def _bfs(target_set, visited, parents, cost, distance, queue, Rg):
                         if cost[neighbor] > neighbor_cost:
                             parents[neighbor] = node
                             cost[neighbor] = neighbor_cost
-                            distance[neighbor] = neighbor_dist
                     else:
                         parents[neighbor] = node
                         cost[neighbor] = neighbor_cost
-                        distance[neighbor] = neighbor_dist
 
 
                 #print('Queue:' + str(queue))
         # Once all neighbours have been checked
-        visited[node] = node_cost
-        node_cost, node = heappop(queue)
-        node_dist =  distance[node]
-        found = (node in target_set) and (distance[node] > 2)
+        visited[node] = node_dist
+        node_cost, (node, node_parent, node_dist) = heappop(queue)
+        found = (node in target_set) and (node_dist > 2)
 
 
     print('Found target' + str(node))
@@ -581,7 +576,6 @@ def _steiner_tree(source, targets, unassigned, Sg, Rg):
     # TODO: Make visited a set
     cost = {}
     parents = {}
-    distance = {}
     visited = {}
     # Resulting tree dictionary keyed by edges and path values.
     tree = {}
@@ -594,10 +588,11 @@ def _steiner_tree(source, targets, unassigned, Sg, Rg):
         for node in Sg.nodes[source]['assigned']:
             parents[node] = source
             if source in Rg[node]:
-                distance[node] = 1
+                visited[node] = 1
+                heappush(queue, (0.0, (node, source, 1)))
             else:
-                distance[node] = 2
-            heappush(queue, (0.0, node))
+                visited[node] = 2
+                heappush(queue, (0.0, (node, source, 2)))
 
         if verbose:
             queue_str = str(["%0.3f %s" % (c,str(n)) for c,n in queue])
@@ -610,7 +605,7 @@ def _steiner_tree(source, targets, unassigned, Sg, Rg):
         target_set = set([target]) if not target_assigned else target_assigned
 
         # Incremental BFS graph traversal
-        reached = _bfs(target_set, visited, parents, cost, distance, queue, Rg)
+        reached = _bfs(target_set, visited, parents, cost, queue, Rg)
 
         # Retrace steps from target to source
         path = _traceback(source, target, reached, parents, unassigned, Sg, Rg)
