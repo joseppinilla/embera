@@ -469,15 +469,15 @@ def _bfs(target_set, visited, visiting, queue, Sg, Rg):
     # Don't continue BFS expansion if target has been reached in len>1 path
     for tgt in target_set:
         if tgt in visited:
-            _, _, tgt_dist = visited[tgt]
-            if tgt_dist > 2:
+            _, tgt_dist = visited[tgt]
+            if tgt_dist >= 2:
                 # Returns first encounter of valid target
+                print('Found target in visited' + str(tgt) + str(tgt_dist))
                 return tgt
         if tgt in visiting:
             tgt_cost, _, tgt_dist = visiting[tgt]
-            if tgt_dist > 2:
-                # Increase priority in PQ
-                heappush(queue, (tgt_cost-1.0, tgt))
+            # Increase priority in PQ
+            heappush(queue, (tgt_cost-1.0, tgt))
 
     # Breadth-First Search Priority Queue
     node_cost, node = heappop(queue)
@@ -504,13 +504,13 @@ def _bfs(target_set, visited, visiting, queue, Sg, Rg):
 
                 #print('Queue:' + str(queue))
         # Once all neighbours have been checked
-        visited[node] = node_cost, node_parent, node_dist
+        visited[node] = node_parent, node_dist
         node_cost, node = heappop(queue)
         _, node_parent, node_dist = visiting[node]
-        found = (node in target_set) and (node_dist > 2)
+        found = (node in target_set) and (node_dist >= 2)
 
-    print('Found target' + str(node))
-    visited[node] = node_cost, node_parent, node_dist
+    print('Found target' + str(node) + str(node_dist))
+    visited[node] = node_parent, node_dist
     return node
 
 def _traceback(source, target, reached, visited, unassigned, Sg, Rg):
@@ -524,7 +524,7 @@ def _traceback(source, target, reached, visited, unassigned, Sg, Rg):
         Rg.nodes[reached]['nodes'].add(target)
 
     path = [reached]
-    _, node, _ = visited[reached]
+    node, _ = visited[reached]
     while(node not in source_node['assigned']):
         print('Node:' + str(node))
         path.append(node)
@@ -553,7 +553,7 @@ def _traceback(source, target, reached, visited, unassigned, Sg, Rg):
             Rg.nodes[node]['nodes'].add(target)
 
         Rg.nodes[node]['sharing'] += 1.0
-        _, node, _ = visited[node]
+        node, _ = visited[node]
     path.append(node)
 
     print("Path:" + str(path))
@@ -563,22 +563,22 @@ def _traceback(source, target, reached, visited, unassigned, Sg, Rg):
 def _steiner_tree(source, targets, unassigned, Sg, Rg):
     """ Steiner Tree Search
     """
-    print('Source:' + str(source)) # TODO: Source or seeker?
+    print('\n New Source:' + str(source)) # TODO: Source or seeker?
     # Resulting tree dictionary keyed by edges and path values.
     tree = {}
 
     # Breadth-First Search structures.
     visiting = {} # (cost, parent, distance) during search
-    visited = {} # (cost, parent, distance) after popped from queue
+    visited = {} # (parent, distance) after popped from queue
 
     # Priority Queue (cost, name)
     queue = []
     # Start search using previously-assigned nodes
-    for node in Sg.nodes[source]['assigned']:
+    source_node = Sg.nodes[source]
+    for node in source_node['assigned']:
         node_cost = 0.0
         node_parent = source
-        node_dist =  1 if source in Rg[node] else 2
-
+        node_dist =  1 if node in source_node['candidates'] else 2
         visiting[node] = (node_cost, node_parent, node_dist)
         heappush(queue, (node_cost, node))
 
@@ -645,7 +645,7 @@ def _route(Sg, Tg, Rg, tiling, opts):
         _rip_up(Sg, Tg, Rg)
         (source, node), node_list = _embed_first(Sg, Tg, Rg, tiling, opts)
         while node_list:
-            print('Unassigned:' + str(node_list))
+            #print('Unassigned:' + str(node_list))
             targets = _unrouted_edges(source, Sg)
             tree = _steiner_tree(source, targets, unassigned, Sg, Rg)
             paths.update(tree)
