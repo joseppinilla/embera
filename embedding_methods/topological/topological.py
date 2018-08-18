@@ -357,11 +357,30 @@ def _simulated_annealing(Sg, tiling, opts):
     return init_loc
 
 
-"""
+""" Negotiated-congestion based router for multiple
+    disjoint Steiner Tree Search.
+    Args:
+
+
+    Returns:
+        paths: Dictionary keyed by Problem graph edges with assigned nodes
+        unassigned: Dictionary keyed by node from Tg and problem node values
 
 """
 
-def _routing_graph(Sg, Tg, tiling, opts):
+def _init_graphs(Sg, Tg, tiling, opts):
+
+    for name, node in Sg.nodes(data=True):
+        # Candidate Qubits
+        node_tile = node['tile']
+        #TODO: Consider granularity using opts
+        node['candidates'] = tiling.tiles[node_tile].qubits
+        # BFS. Dummy values to calculate costs
+        node['degree'] = Sg.degree(name)
+        node['sharing'] = 0.0
+        node['history'] = 1.0
+        # Mapping
+        node['assigned'] = set()
 
     for name, qubit in Tg.nodes(data=True):
         # BFS
@@ -371,18 +390,6 @@ def _routing_graph(Sg, Tg, tiling, opts):
         # Mapping
         qubit['nodes'] = set()
         qubit['paths'] = set()
-
-    for name, node in Sg.nodes(data=True):
-        # Candidate Qubits
-        node_tile = node['tile'] #TODO: Consider granularity
-        node['candidates'] = tiling.tiles[node_tile].qubits
-        # BFS. Dummy values to calculate costs
-        node['degree'] = Sg.degree(name)
-        node['sharing'] = 0.0
-        node['history'] = 1.0
-        # Mapping
-        node['assigned'] = set()
-
 
 def _rip_up(Sg, Tg):
 
@@ -397,12 +404,29 @@ def _rip_up(Sg, Tg):
         qubit['nodes'].clear()
         qubit['paths'].clear()
 
+
+def _embed_first(Sg, Tg, opts):
+    # Pick first node
+    node_list = list(Sg.nodes())
+    first = node_list.pop() #TODO: Allow pop priority with routed dict (?)
+    first_node = Sg.nodes[first]
+
+    # Get best candidate
+    candidates = first_node['candidates']
+    q_index = min( candidates, key=lambda q: _get_cost(first_node['tile'], q, Tg) )
+
+    # Populate qubit
+    qubit = Tg.nodes[q_index]
+    qubit['sharing'] += 1.0
+    qubit['nodes'].add(first)
+    # Assign qubit to node
+    first_node['assigned'].add(q_index)
+
+    return first, node_list
+
 def _get_cost(node_tile, neighbor_name, Tg):
 
-    #node = Tg.nodes[node_name]
     next_node = Tg.nodes[neighbor_name]
-
-    #print('Next:' + str(next_node))
 
     sharing_cost = 1.0 + next_node['sharing']
 
@@ -416,33 +440,8 @@ def _get_cost(node_tile, neighbor_name, Tg):
 
     return base_cost * sharing_cost * history_cost
 
-def _embed_first(Sg, Tg, tiling, opts):
-    # Pick first node
-    node_list = list(Sg.nodes(data=True))
-    first, first_node = node_list.pop() #TODO: Pops random. Allow pop priority.
+def _pre_search(target_set, queue, visited, visiting):
 
-    # Get best candidate
-    candidates = first_node['candidates']
-    q_index = min( candidates, key=lambda q: _get_cost(first_node['tile'], q, Tg) )
-
-    # Populate qubit
-    qubit = Tg.nodes[q_index]
-    qubit['sharing'] += 1.0
-    qubit['nodes'].add(first)
-
-    # Assign qubit to node
-    first_node['assigned'].add(q_index)
-
-    return (first,first_node), node_list
-
-def _bfs(target_set, visited, visiting, queue, Sg, Tg):
-    """ Breadth-First Search
-        Args:
-            queue: Breadth-First Search Priority Queue
-
-    """
-
-    # If target has been reached in current tree search
     for tgt in target_set:
         if tgt in visited:
             tgt_cost, tgt_parent, tgt_dist = visited[tgt]
@@ -455,12 +454,23 @@ def _bfs(target_set, visited, visiting, queue, Sg, Tg):
             heappush(queue, (tgt_cost-1.0, tgt))
             visiting[tgt] = tgt_cost-1.0, tgt_parent, tgt_dist
 
+def _bfs(target_set, visited, visiting, queue, Sg, Tg):
+    """ Breadth-First Search
+        Args:
+            queue: Breadth-First Search Priority Queue
+
+    """
+
+    # If target has been reached in current tree search
+    _pre_search(target_set, queue, visited, visiting)
+
     # Pop node out of Priority queue and its cost, parent, and distance.
     node_cost, node = heappop(queue)
     _, node_parent, node_dist = visiting[node]
     found = False
     while (not found):
         #print("Node: %s"%str(node))
+        node_tile = Tg.nodes[node]['tile']
         neighbor_dist = node_dist + 1
         neighbor_parent = node
         for neighbor in Tg[node]:
@@ -469,7 +479,7 @@ def _bfs(target_set, visited, visiting, queue, Sg, Tg):
                     # Queue target without added cost
                     neighbor_cost = node_cost
                 else:
-                    neighbor_cost = node_cost + _get_cost(Tg.nodes[node]['tile'], neighbor, Tg)
+                    neighbor_cost = node_cost + _get_cost(node_tile, neighbor, Tg)
 
                 heappush(queue, (neighbor_cost, neighbor))
                 neighbor_data = neighbor_cost, neighbor_parent, neighbor_dist
@@ -508,10 +518,6 @@ def _traceback(source, target, reached, visited, unassigned, Sg, Tg):
     while(node not in source_node['assigned']):
         print('Node:' + str(node))
         path.append(node)
-
-        # Node is only reached if path len=1
-        if node == source:
-            print('This')
 
         if node in unassigned:
             if source in unassigned[node]:
@@ -564,7 +570,7 @@ def _get_targets(target, Sg):
 def _steiner_tree(source, targets, unassigned, routed, Sg, Tg):
     """ Steiner Tree Search
     """
-    print('\n New Source:' + str(source)) # TODO: Source or seeker?
+    print('\n New Source:' + str(source))
     # Resulting tree dictionary keyed by edges and path values.
     tree = {}
     # Breadth-First Search structures.
@@ -619,32 +625,30 @@ def _unrouted_edges(source, routed, Sg):
 
     return unrouted
 
-def _route(Sg, Tg, tiling, opts):
-    """ Negotiated-congestion based router for multiple
-        disjoint Steiner Tree Search.
-        Args:
-
-
-        Returns:
-            paths: Dictionary keyed by Problem graph edges with assigned nodes
-            unassigned: Dictionary keyed by node from Tg and problem node values
+def _route(Sg, Tg, opts):
+    """ Negotiated Congestion algorithm
 
     """
-    tries = opts.tries
+
+    # Search Structures
     paths = {}
     routed = {}
     unassigned = {}
 
+    # Operator getting unrouted problem nodes
+    unrouted = lambda u: [v for v in Sg[u] if frozenset((u,v)) not in routed]
+
+    # Termination criteria
     legal = False
+    tries = opts.tries
     while (not legal) and (tries > 0):
         _rip_up(Sg, Tg)
-        (source, node), node_list = _embed_first(Sg, Tg, tiling, opts)
+        source, node_list = _embed_first(Sg, Tg, opts)
         while node_list:
-            #print('Unassigned:' + str(node_list))
-            targets = _unrouted_edges(source, routed, Sg)
+            targets = unrouted(source)
             tree = _steiner_tree(source, targets, unassigned, routed, Sg, Tg)
             paths.update(tree)
-            source,node = node_list.pop()
+            source = node_list.pop()
         legal = _update_costs(paths, Sg, Tg)
         tries -= 1
     return paths, unassigned
@@ -852,9 +856,9 @@ def find_embedding(S, T, **params):
 
     _place(Sg, tiling, opts)
 
-    _routing_graph(Sg, Tg, tiling, opts)
+    _init_graphs(Sg, Tg, tiling, opts)
 
-    paths, unassigned = _route(Sg, Tg, tiling, opts)
+    paths, unassigned = _route(Sg, Tg, opts)
 
     embedding = _paths_to_chains(paths, unassigned, Sg)
 
