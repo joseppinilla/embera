@@ -399,9 +399,6 @@ def _routing_graph(Sg, Tg, tiling, opts):
 
 def _rip_up(Sg, Tg, Rg):
 
-    for u,v,edge in Sg.edges.data():
-        edge['routed'] =  False
-
     for name,node in Sg.nodes(data=True):
         # No qubits are assigned to the source graph node
         node['assigned'] = set()
@@ -451,35 +448,28 @@ def _embed_first(Sg, Tg, Rg, tiling, opts):
 
     return (first,first_node), node_list
 
-def _unrouted_edges(source, Sg):
-
-    unrouted = [neighbor for neighbor in Sg[source]
-                if Sg.edges[source,neighbor]['routed']==False]
-
-    return unrouted
-
 def _bfs(target_set, visited, visiting, queue, Sg, Rg):
     """ Breadth-First Search
         Args:
-            ...
+            queue: Breadth-First Search Priority Queue
             Rg: Routing Graph
 
     """
 
-    # Don't continue BFS expansion if target has been reached in len>1 path
+    # If target has been reached in current tree search
     for tgt in target_set:
         if tgt in visited:
-            _, tgt_dist = visited[tgt]
-            if tgt_dist >= 2:
-                # Returns first encounter of valid target
-                print('Found target in visited' + str(tgt) + str(tgt_dist))
-                return tgt
-        if tgt in visiting:
-            tgt_cost, _, tgt_dist = visiting[tgt]
-            # Increase priority in PQ
+            tgt_cost, tgt_parent, tgt_dist = visited[tgt]
+            # If newly occupied, node cost has been increased
+            heappush(queue, (tgt_cost, tgt))
+            visiting[tgt] = tgt_cost, tgt_parent, tgt_dist
+        elif tgt in visiting:
+            tgt_cost, tgt_parent, tgt_dist = visiting[tgt]
+            # Decrease cost in PQ
             heappush(queue, (tgt_cost-1.0, tgt))
+            visiting[tgt] = tgt_cost-1.0, tgt_parent, tgt_dist
 
-    # Breadth-First Search Priority Queue
+    # Pop node out of Priority queue and its cost, parent, and distance.
     node_cost, node = heappop(queue)
     _, node_parent, node_dist = visiting[node]
     found = False
@@ -504,16 +494,18 @@ def _bfs(target_set, visited, visiting, queue, Sg, Rg):
 
                 #print('Queue:' + str(queue))
         # Once all neighbours have been checked
-        visited[node] = node_parent, node_dist
+        visited[node] = node_cost, node_parent, node_dist
         node_cost, node = heappop(queue)
         _, node_parent, node_dist = visiting[node]
         found = (node in target_set) and (node_dist >= 2)
 
     print('Found target' + str(node) + str(node_dist))
-    visited[node] = node_parent, node_dist
+    visited[node] = node_cost, node_parent, node_dist
     return node
 
 def _traceback(source, target, reached, visited, unassigned, Sg, Rg):
+
+    node_cost, node_parent, node_dist = visited[reached]
 
     source_node = Sg.nodes[source]
     target_node = Sg.nodes[target]
@@ -522,9 +514,11 @@ def _traceback(source, target, reached, visited, unassigned, Sg, Rg):
         target_node['assigned'].add(reached)
         Rg.nodes[reached]['sharing'] += 1.0
         Rg.nodes[reached]['nodes'].add(target)
+        visited[reached] = node_cost + 1.0, node_parent, node_dist
+
 
     path = [reached]
-    node, _ = visited[reached]
+    node = node_parent
     while(node not in source_node['assigned']):
         print('Node:' + str(node))
         path.append(node)
@@ -553,27 +547,16 @@ def _traceback(source, target, reached, visited, unassigned, Sg, Rg):
             Rg.nodes[node]['nodes'].add(target)
 
         Rg.nodes[node]['sharing'] += 1.0
-        node, _ = visited[node]
+        node_cost, node_parent, node_dist = visited[node]
+        visited[node] = node_cost + 1.0, node_parent, node_dist
+        node = node_parent
     path.append(node)
 
     print("Path:" + str(path))
     return path
 
 
-def _steiner_tree(source, targets, unassigned, Sg, Rg):
-    """ Steiner Tree Search
-    """
-    print('\n New Source:' + str(source)) # TODO: Source or seeker?
-    # Resulting tree dictionary keyed by edges and path values.
-    tree = {}
-
-    # Breadth-First Search structures.
-    visiting = {} # (cost, parent, distance) during search
-    visited = {} # (parent, distance) after popped from queue
-
-    # Priority Queue (cost, name)
-    queue = []
-    # Start search using previously-assigned nodes
+def _init_queue(source, visiting, queue, Sg):
     source_node = Sg.nodes[source]
     for node in source_node['assigned']:
         node_cost = 0.0
@@ -586,25 +569,39 @@ def _steiner_tree(source, targets, unassigned, Sg, Rg):
         queue_str = str(["%0.3f %s" % (c,str(n)) for c,n in queue])
         print('Init Queue:' + queue_str)
 
+def _get_targets(target, Sg):
+    target_node = Sg.nodes[target]
+    target_assigned = target_node['assigned']
+    target_candidates = target_node['candidates']
+    return target_candidates if not target_assigned else target_assigned
+
+def _steiner_tree(source, targets, unassigned, routed, Sg, Rg):
+    """ Steiner Tree Search
+    """
+    print('\n New Source:' + str(source)) # TODO: Source or seeker?
+    # Resulting tree dictionary keyed by edges and path values.
+    tree = {}
+    # Breadth-First Search structures.
+    visiting = {} # (cost, parent, distance) during search
+    visited = {} # (parent, distance) after popped from queue
+    # Priority Queue (cost, name)
+    queue = []
+    # Start search using previously-assigned nodes
+    _init_queue(source, visiting, queue, Sg)
+
     # Breadth-First Search
     for target in targets:
         print('Target:' + str(target))
-        # Search for target node, or nodes pre-assigned to target
-        target_node = Sg.nodes[target]
-        target_assigned = target_node['assigned']
-        target_candidates = target_node['candidates']
-        target_set = target_candidates if not target_assigned else target_assigned
-        print('Target Set: %s' % target_set)
+        # Search for target candidates, or nodes assigned to target
+        target_set = _get_targets(target, Sg)
         # Incremental BFS graph traversal
         reached = _bfs(target_set, visited, visiting, queue, Sg, Rg)
-
         # Retrace steps from target to source
         path = _traceback(source, target, reached, visited, unassigned, Sg, Rg)
-
+        # Update tree
         edge = (source,target)
         tree.update({edge:path})
-
-        Sg.edges[source,target]['routed'] = True
+        routed[frozenset(edge)] = len(path)
 
     return tree
 
@@ -612,6 +609,7 @@ def _update_costs(paths, Sg, Tg, Rg):
     """ Update present-sharing and history-sharing costs
 
     """
+    legal = True
     print("Update Costs:")
     for name, node in Rg.nodes(data=True):
         if 'nodes' in node:
@@ -623,7 +621,17 @@ def _update_costs(paths, Sg, Tg, Rg):
         print(u,v,path)
         for qubit in path:
             print(Rg.nodes[qubit]['sharing'])
-    return True
+            if Rg.nodes[qubit]['sharing'] > 1:
+                legal = False
+
+    return legal
+
+def _unrouted_edges(source, routed, Sg):
+
+    unrouted = [neighbor for neighbor in Sg[source]
+                if frozenset((source,neighbor)) not in routed]
+
+    return unrouted
 
 def _route(Sg, Tg, Rg, tiling, opts):
     """ Negotiated-congestion based router for multiple
@@ -638,6 +646,7 @@ def _route(Sg, Tg, Rg, tiling, opts):
     """
     tries = opts.tries
     paths = {}
+    routed = {}
     unassigned = {}
 
     legal = False
@@ -646,8 +655,8 @@ def _route(Sg, Tg, Rg, tiling, opts):
         (source, node), node_list = _embed_first(Sg, Tg, Rg, tiling, opts)
         while node_list:
             #print('Unassigned:' + str(node_list))
-            targets = _unrouted_edges(source, Sg)
-            tree = _steiner_tree(source, targets, unassigned, Sg, Rg)
+            targets = _unrouted_edges(source, routed, Sg)
+            tree = _steiner_tree(source, targets, unassigned, routed, Sg, Rg)
             paths.update(tree)
             source,node = node_list.pop()
         legal = _update_costs(paths, Sg, Tg, Rg)
@@ -871,14 +880,14 @@ if __name__== "__main__":
 
     verbose = 3
 
-    p = 2
+    p = 4
     S = nx.grid_2d_graph(p,p)
     topology = {v:v for v in S}
 
     #S = nx.cycle_graph(p)
     #topology = nx.circular_layout(S)
 
-    m = 2
+    m = 4
     T = dnx.chimera_graph(m, coordinates=True)
     #T = dnx.pegasus_graph(m, coordinates=True)
 
