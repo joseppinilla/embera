@@ -384,20 +384,7 @@ def _routing_graph(Sg, Tg, tiling, opts):
         node['assigned'] = set()
 
 
-    Rg =  Tg.to_directed()
-    Rg.add_nodes_from(Sg.nodes(data=True))
-
-
-    for name, tile in tiling.tiles.items():
-        if name!=None:
-            qubits =  tile.qubits
-            for node in tile.nodes:
-                for qubit in qubits:
-                    Rg.add_edge(qubit, node)
-    return Rg
-
-
-def _rip_up(Sg, Tg, Rg):
+def _rip_up(Sg, Tg):
 
     for name,node in Sg.nodes(data=True):
         # No qubits are assigned to the source graph node
@@ -410,16 +397,16 @@ def _rip_up(Sg, Tg, Rg):
         qubit['nodes'].clear()
         qubit['paths'].clear()
 
-def _get_cost(node_name, neighbor_name, Rg):
+def _get_cost(node_tile, neighbor_name, Tg):
 
-    node = Rg.nodes[node_name]
-    next_node = Rg.nodes[neighbor_name]
+    #node = Tg.nodes[node_name]
+    next_node = Tg.nodes[neighbor_name]
 
     #print('Next:' + str(next_node))
 
     sharing_cost = 1.0 + next_node['sharing']
 
-    scope_cost = 0.0 if node['tile']==next_node['tile'] else 1.0
+    scope_cost = 0.0 if node_tile==next_node['tile'] else 1.0
 
     degree_cost = next_node['degree']
 
@@ -429,17 +416,17 @@ def _get_cost(node_name, neighbor_name, Rg):
 
     return base_cost * sharing_cost * history_cost
 
-def _embed_first(Sg, Tg, Rg, tiling, opts):
+def _embed_first(Sg, Tg, tiling, opts):
     # Pick first node
     node_list = list(Sg.nodes(data=True))
     first, first_node = node_list.pop() #TODO: Pops random. Allow pop priority.
 
     # Get best candidate
     candidates = first_node['candidates']
-    q_index = min( candidates, key=lambda q: _get_cost(first, q, Rg) )
+    q_index = min( candidates, key=lambda q: _get_cost(first_node['tile'], q, Tg) )
 
     # Populate qubit
-    qubit = Rg.nodes[q_index]
+    qubit = Tg.nodes[q_index]
     qubit['sharing'] += 1.0
     qubit['nodes'].add(first)
 
@@ -448,11 +435,10 @@ def _embed_first(Sg, Tg, Rg, tiling, opts):
 
     return (first,first_node), node_list
 
-def _bfs(target_set, visited, visiting, queue, Sg, Rg):
+def _bfs(target_set, visited, visiting, queue, Sg, Tg):
     """ Breadth-First Search
         Args:
             queue: Breadth-First Search Priority Queue
-            Rg: Routing Graph
 
     """
 
@@ -477,13 +463,13 @@ def _bfs(target_set, visited, visiting, queue, Sg, Rg):
         #print("Node: %s"%str(node))
         neighbor_dist = node_dist + 1
         neighbor_parent = node
-        for neighbor in Rg[node]:
+        for neighbor in Tg[node]:
             if neighbor not in visited:
                 if neighbor in target_set:
                     # Queue target without added cost
                     neighbor_cost = node_cost
                 else:
-                    neighbor_cost = node_cost + _get_cost(node, neighbor, Rg)
+                    neighbor_cost = node_cost + _get_cost(Tg.nodes[node]['tile'], neighbor, Tg)
 
                 heappush(queue, (neighbor_cost, neighbor))
                 neighbor_data = neighbor_cost, neighbor_parent, neighbor_dist
@@ -503,7 +489,7 @@ def _bfs(target_set, visited, visiting, queue, Sg, Rg):
     visited[node] = node_cost, node_parent, node_dist
     return node
 
-def _traceback(source, target, reached, visited, unassigned, Sg, Rg):
+def _traceback(source, target, reached, visited, unassigned, Sg, Tg):
 
     node_cost, node_parent, node_dist = visited[reached]
 
@@ -512,8 +498,8 @@ def _traceback(source, target, reached, visited, unassigned, Sg, Rg):
 
     if reached not in target_node['assigned']:
         target_node['assigned'].add(reached)
-        Rg.nodes[reached]['sharing'] += 1.0
-        Rg.nodes[reached]['nodes'].add(target)
+        Tg.nodes[reached]['sharing'] += 1.0
+        Tg.nodes[reached]['nodes'].add(target)
         visited[reached] = node_cost + 1.0, node_parent, node_dist
 
 
@@ -531,22 +517,22 @@ def _traceback(source, target, reached, visited, unassigned, Sg, Rg):
             if source in unassigned[node]:
                 del unassigned[node]
                 Sg.nodes[source]['assigned'].add(node)
-                Rg.nodes[node]['nodes'].add(source)
+                Tg.nodes[node]['nodes'].add(source)
             elif target in unassigned[node]:
                 del unassigned[node]
                 Sg.nodes[target]['assigned'].add(node)
-                Rg.nodes[node]['nodes'].add(target)
+                Tg.nodes[node]['nodes'].add(target)
             else:
                 unassigned[node].add(source)
                 unassigned[node].add(target)
-                Rg.nodes[node]['nodes'].add(source)
-                Rg.nodes[node]['nodes'].add(target)
+                Tg.nodes[node]['nodes'].add(source)
+                Tg.nodes[node]['nodes'].add(target)
         else:
             unassigned[node] = set([source, target])
-            Rg.nodes[node]['nodes'].add(source)
-            Rg.nodes[node]['nodes'].add(target)
+            Tg.nodes[node]['nodes'].add(source)
+            Tg.nodes[node]['nodes'].add(target)
 
-        Rg.nodes[node]['sharing'] += 1.0
+        Tg.nodes[node]['sharing'] += 1.0
         node_cost, node_parent, node_dist = visited[node]
         visited[node] = node_cost + 1.0, node_parent, node_dist
         node = node_parent
@@ -575,7 +561,7 @@ def _get_targets(target, Sg):
     target_candidates = target_node['candidates']
     return target_candidates if not target_assigned else target_assigned
 
-def _steiner_tree(source, targets, unassigned, routed, Sg, Rg):
+def _steiner_tree(source, targets, unassigned, routed, Sg, Tg):
     """ Steiner Tree Search
     """
     print('\n New Source:' + str(source)) # TODO: Source or seeker?
@@ -595,9 +581,9 @@ def _steiner_tree(source, targets, unassigned, routed, Sg, Rg):
         # Search for target candidates, or nodes assigned to target
         target_set = _get_targets(target, Sg)
         # Incremental BFS graph traversal
-        reached = _bfs(target_set, visited, visiting, queue, Sg, Rg)
+        reached = _bfs(target_set, visited, visiting, queue, Sg, Tg)
         # Retrace steps from target to source
-        path = _traceback(source, target, reached, visited, unassigned, Sg, Rg)
+        path = _traceback(source, target, reached, visited, unassigned, Sg, Tg)
         # Update tree
         edge = (source,target)
         tree.update({edge:path})
@@ -605,13 +591,13 @@ def _steiner_tree(source, targets, unassigned, routed, Sg, Rg):
 
     return tree
 
-def _update_costs(paths, Sg, Tg, Rg):
+def _update_costs(paths, Sg, Tg):
     """ Update present-sharing and history-sharing costs
 
     """
     legal = True
     print("Update Costs:")
-    for name, node in Rg.nodes(data=True):
+    for name, node in Tg.nodes(data=True):
         if 'nodes' in node:
             nodes = node['nodes']
             print(nodes)
@@ -620,8 +606,8 @@ def _update_costs(paths, Sg, Tg, Rg):
     for (u,v), path in paths.items():
         print(u,v,path)
         for qubit in path:
-            print(Rg.nodes[qubit]['sharing'])
-            if Rg.nodes[qubit]['sharing'] > 1:
+            print(Tg.nodes[qubit]['sharing'])
+            if Tg.nodes[qubit]['sharing'] > 1:
                 legal = False
 
     return legal
@@ -633,7 +619,7 @@ def _unrouted_edges(source, routed, Sg):
 
     return unrouted
 
-def _route(Sg, Tg, Rg, tiling, opts):
+def _route(Sg, Tg, tiling, opts):
     """ Negotiated-congestion based router for multiple
         disjoint Steiner Tree Search.
         Args:
@@ -651,15 +637,15 @@ def _route(Sg, Tg, Rg, tiling, opts):
 
     legal = False
     while (not legal) and (tries > 0):
-        _rip_up(Sg, Tg, Rg)
-        (source, node), node_list = _embed_first(Sg, Tg, Rg, tiling, opts)
+        _rip_up(Sg, Tg)
+        (source, node), node_list = _embed_first(Sg, Tg, tiling, opts)
         while node_list:
             #print('Unassigned:' + str(node_list))
             targets = _unrouted_edges(source, routed, Sg)
-            tree = _steiner_tree(source, targets, unassigned, routed, Sg, Rg)
+            tree = _steiner_tree(source, targets, unassigned, routed, Sg, Tg)
             paths.update(tree)
             source,node = node_list.pop()
-        legal = _update_costs(paths, Sg, Tg, Rg)
+        legal = _update_costs(paths, Sg, Tg)
         tries -= 1
     return paths, unassigned
 
@@ -674,7 +660,7 @@ def _route(Sg, Tg, Rg, tiling, opts):
         min(Z)
 """
 
-def _setup_lp(paths, unassigned, Sg, Rg):
+def _setup_lp(paths, unassigned, Sg):
     """ Setup linear Programming Problem
         Goal: Minimize
 
@@ -736,7 +722,7 @@ def _assign_nodes(paths, lp_sol, var_map, Sg):
                     Sg.nodes[target]['assigned'].add(path[i])
 
 
-def _paths_to_chains(paths, unassigned, Sg, Rg):
+def _paths_to_chains(paths, unassigned, Sg):
 
     print('Assigned')
     for name, node in Sg.nodes(data=True):
@@ -746,7 +732,7 @@ def _paths_to_chains(paths, unassigned, Sg, Rg):
     for node, shared in unassigned.items():
         print(str(node) + str(shared))
 
-    lp, var_map = _setup_lp(paths, unassigned, Sg, Rg)
+    lp, var_map = _setup_lp(paths, unassigned, Sg)
 
     if verbose==0: lp.writeLP("SHARING.lp") #TEMP change to verbose 3
 
@@ -866,11 +852,11 @@ def find_embedding(S, T, **params):
 
     _place(Sg, tiling, opts)
 
-    Rg = _routing_graph(Sg, Tg, tiling, opts)
+    _routing_graph(Sg, Tg, tiling, opts)
 
-    paths, unassigned = _route(Sg, Tg, Rg, tiling, opts)
+    paths, unassigned = _route(Sg, Tg, tiling, opts)
 
-    embedding = _paths_to_chains(paths, unassigned, Sg, Rg)
+    embedding = _paths_to_chains(paths, unassigned, Sg)
 
     return embedding
 
