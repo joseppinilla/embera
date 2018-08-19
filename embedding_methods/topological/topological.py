@@ -404,26 +404,6 @@ def _rip_up(Sg, Tg):
         qubit['nodes'].clear()
         qubit['paths'].clear()
 
-
-def _embed_first(Sg, Tg, opts):
-    # Pick first node
-    node_list = list(Sg.nodes())
-    first = node_list.pop() #TODO: Allow pop priority with routed dict (?)
-    first_node = Sg.nodes[first]
-
-    # Get best candidate
-    candidates = first_node['candidates']
-    q_index = min( candidates, key=lambda q: _get_cost(first_node['tile'], q, Tg) )
-
-    # Populate qubit
-    qubit = Tg.nodes[q_index]
-    qubit['sharing'] += 1.0
-    qubit['nodes'].add(first)
-    # Assign qubit to node
-    first_node['assigned'].add(q_index)
-
-    return first, node_list
-
 def _get_cost(node_tile, neighbor_name, Tg):
 
     next_node = Tg.nodes[neighbor_name]
@@ -578,6 +558,7 @@ def _steiner_tree(source, targets, unassigned, routed, Sg, Tg):
     visited = {} # (parent, distance) after popped from queue
     # Priority Queue (cost, name)
     queue = []
+
     # Start search using previously-assigned nodes
     _init_queue(source, visiting, queue, Sg)
 
@@ -618,12 +599,29 @@ def _update_costs(paths, Sg, Tg):
 
     return legal
 
-def _unrouted_edges(source, routed, Sg):
+def _get_node(node_list, opts):
+    if node_list:
+        # Pick first node
+        return node_list.pop() #TODO: Allow pop priority with routed dict (?)
+    else:
+        return None
 
-    unrouted = [neighbor for neighbor in Sg[source]
-                if frozenset((source,neighbor)) not in routed]
+def _embed_node(node_name, Sg, Tg, opts):
 
-    return unrouted
+    node = Sg.nodes[node_name]
+
+    if node['assigned']: return
+
+    # Get best candidate
+    candidates = node['candidates']
+    q_index = min( candidates, key=lambda q: _get_cost(node['tile'], q, Tg) )
+
+    # Populate qubit
+    qubit = Tg.nodes[q_index]
+    qubit['sharing'] += 1.0
+    qubit['nodes'].add(node_name)
+    # Assign qubit to node
+    node['assigned'].add(q_index)
 
 def _route(Sg, Tg, opts):
     """ Negotiated Congestion algorithm
@@ -641,14 +639,15 @@ def _route(Sg, Tg, opts):
     # Termination criteria
     legal = False
     tries = opts.tries
+    source = _get_node(list(Sg.nodes()), opts)
     while (not legal) and (tries > 0):
         _rip_up(Sg, Tg)
-        source, node_list = _embed_first(Sg, Tg, opts)
-        while node_list:
+        while source is not None:
+            _embed_node(source, Sg, Tg, opts)
             targets = unrouted(source)
             tree = _steiner_tree(source, targets, unassigned, routed, Sg, Tg)
             paths.update(tree)
-            source = node_list.pop()
+            source = _get_node(targets, opts)
         legal = _update_costs(paths, Sg, Tg)
         tries -= 1
     return paths, unassigned
@@ -715,7 +714,9 @@ def _assign_nodes(paths, lp_sol, var_map, Sg):
         if shared>0:
 
             source, target = edge
-            (s_name, var_s), (t_name, var_t) = var_map[edge].items()
+            var_s = var_map[edge][str(source).replace(" ","")]
+            var_t = var_map[edge][str(target).replace(" ","")]
+
             num_s = lp_sol[var_s]
             num_t = lp_sol[var_t]
             # Path from traceback starts from target
@@ -738,7 +739,7 @@ def _paths_to_chains(paths, unassigned, Sg):
 
     lp, var_map = _setup_lp(paths, unassigned, Sg)
 
-    if verbose==0: lp.writeLP("SHARING.lp") #TEMP change to verbose 3
+    if verbose>0: lp.writeLP("SHARING.lp") #TEMP change to verbose 3
 
     lp.solve(solver=pulp.GLPK_CMD(msg=verbose))
 
@@ -870,12 +871,16 @@ if __name__== "__main__":
 
     verbose = 3
 
-    p = 4
+    p = 2
     S = nx.grid_2d_graph(p,p)
     topology = {v:v for v in S}
 
     #S = nx.cycle_graph(p)
     #topology = nx.circular_layout(S)
+
+    #S = nx.complete_graph(p)
+    #S = nx.relabel_nodes(S, {0:'A',1:'B',2:'C'})
+    #topology = nx.spring_layout(S)
 
     m = 4
     T = dnx.chimera_graph(m, coordinates=True)
