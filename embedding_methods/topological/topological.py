@@ -547,7 +547,7 @@ def _get_targets(target, Sg):
     target_candidates = target_node['candidates']
     return target_candidates if not target_assigned else target_assigned
 
-def _steiner_tree(source, targets, unassigned, routed, Sg, Tg):
+def _steiner_tree(source, targets, mapped, unassigned, routed, Sg, Tg):
     """ Steiner Tree Search
     """
     print('\n New Source:' + str(source))
@@ -576,6 +576,8 @@ def _steiner_tree(source, targets, unassigned, routed, Sg, Tg):
         tree.update({edge:path})
         routed[frozenset(edge)] = len(path)
 
+    mapped[source] = len(Sg.nodes[source]['assigned'])
+
     return tree
 
 def _update_costs(paths, Sg, Tg):
@@ -599,12 +601,13 @@ def _update_costs(paths, Sg, Tg):
 
     return legal
 
-def _get_node(node_list, opts):
-    if node_list:
-        # Pick first node
-        return node_list.pop() #TODO: Allow pop priority with routed dict (?)
-    else:
-        return None
+def _get_node(node_list, mapped, opts):
+    # Next non-mapped node
+    for node in node_list:
+        if node not in mapped:
+            return node
+    # If list is empty
+    return None
 
 def _embed_node(node_name, Sg, Tg, opts):
 
@@ -629,9 +632,10 @@ def _route(Sg, Tg, opts):
     """
 
     # Search Structures
-    paths = {}
-    routed = {}
-    unassigned = {}
+    paths = {} # { Sg edge : Tg nodes path }
+    mapped = {} # { node: len(nodes_assigned)}
+    routed = {} # {frozenset(u,v) : len(path)}
+    unassigned = {} # {Tg node : set(nodes)}
 
     # Operator getting unrouted problem nodes
     unrouted = lambda u: [v for v in Sg[u] if frozenset((u,v)) not in routed]
@@ -639,15 +643,17 @@ def _route(Sg, Tg, opts):
     # Termination criteria
     legal = False
     tries = opts.tries
-    source = _get_node(list(Sg.nodes()), opts)
+    source = _get_node(list(Sg.nodes()), mapped, opts)
+    #node_list = list(Sg.nodes())
+    #source = node_list.pop()
     while (not legal) and (tries > 0):
         _rip_up(Sg, Tg)
+        _embed_node(source, Sg, Tg, opts)
         while source is not None:
-            _embed_node(source, Sg, Tg, opts)
             targets = unrouted(source)
-            tree = _steiner_tree(source, targets, unassigned, routed, Sg, Tg)
+            tree = _steiner_tree(source, targets, mapped, unassigned, routed, Sg, Tg)
             paths.update(tree)
-            source = _get_node(targets, opts)
+            source = _get_node(targets, mapped, opts)
         legal = _update_costs(paths, Sg, Tg)
         tries -= 1
     return paths, unassigned
@@ -871,7 +877,7 @@ if __name__== "__main__":
 
     verbose = 3
 
-    p = 2
+    p = 4
     S = nx.grid_2d_graph(p,p)
     topology = {v:v for v in S}
 
