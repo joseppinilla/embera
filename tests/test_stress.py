@@ -88,33 +88,37 @@ class StressEmbedding(unittest.TestCase):
         t_start = time.time()
         embedding = sampler.get_embedding(S=S_edgelist, T=self.T_edgelist, verbose=verbose)
         t_end = time.time()
+        time = t_end-t_start
 
-        total, max = self.get_stats(embedding, t_end-t_start)
+        total, max = self.get_stats(embedding)
 
-        print(total, max)
+
+        print(total, max, time)
 
         if verbose > 1:
             dnx.draw_chimera_embedding(self.T,embedding)
             plt.show()
 
-        return total, max
+        return total, max, time
 
     def stress(self, S):
         self.S = S
         valid = 0
-        for pct in self.prune:
+        for val in self.prune:
             S_edgelist = list(S.edges())
-            self.prune_graph(pct, S_edgelist)
+            self.prune_graph(val, S_edgelist)
             for method in self.methods:
                 acc_total = 0
                 acc_max = 0
                 acc_valid = 0
+                acc_time = 0
                 for i in range(tries):
-                    total, max = self.embed_with_method(S_edgelist, method)
+                    total, max, time = self.embed_with_method(S_edgelist, method)
+                    acc_time += time
                     acc_total += total
                     acc_max += max
                     acc_valid += bool(max)
-            print('AVG: %s %s %s' % (acc_total/tries, acc_max/tries, acc_valid/tries))
+            print('AVG: %s %s %s %s' % (acc_total/tries, acc_max/tries, acc_valid/tries, acc_time/tries))
 
 
 
