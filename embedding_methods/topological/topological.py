@@ -275,7 +275,7 @@ def _get_demand(Sg, tiling, opts):
             tile.concentration = len(tile.nodes)/tile.supply
 
 
-    if verbose==3:
+    if opts.verbose==3:
         concentrations = {name : "d=%s"%tile.concentration
                         for name, tile in tiling.tiles.items() if name!=None}
 
@@ -777,7 +777,8 @@ class TopologicalOptions(EmbedderOptions):
                             "enable_migration",
                             "vicinity",
                             "delta_t",
-                            "viscosity"})
+                            "viscosity",
+                            "verbose"})
 
         for name in params:
             if name not in self.names:
@@ -799,6 +800,9 @@ class TopologicalOptions(EmbedderOptions):
 
         try: self.viscosity = params['viscosity']
         except: self.viscosity = 0.0
+
+        try: self.verbose = params['verbose']
+        except: self.verbose = 0
 
 def find_embedding(S, T, **params):
     """
