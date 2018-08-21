@@ -61,7 +61,7 @@ for datum in response.data():
 
 print(valid, invalid)
 
-dnx.draw_chimera_embedding(chimera,embedding)
+dnx.draw_pegasus_embedding(pegasus,embedding)
 plt.show()
 
 plt.ion()
