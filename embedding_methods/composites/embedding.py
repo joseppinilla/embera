@@ -60,15 +60,19 @@ class EmbeddingComposite(dimod.ComposedSampler):
         """
         return {'child_properties': self.child.properties.copy()}
 
-    def get_embedding(self, S=None, T=None, get_new=False, **embedding_parameters):
+    def get_embedding(self, S_edgelist, T_edgelist=None, get_new=False, **embedding_parameters):
         """
 
         """
+        child = self.child
         embedding_method = self._embedding_method
         self._embedding_parameters = embedding_parameters
 
+        if T_edgelist is None:
+            _, T_edgelist, _ = child.structure
+
         if get_new or not self._embedding:
-            embedding = embedding_method.find_embedding(S,T,**embedding_parameters)
+            embedding = embedding_method.find_embedding(S_edgelist, T_edgelist,**embedding_parameters)
             self._embedding = embedding
 
         return self._embedding
