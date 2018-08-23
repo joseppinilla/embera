@@ -65,7 +65,10 @@ ARCHS = {'C4':      ( C4_GEN, C4_DRAW, C4_SPECS ),
         'P6':       ( P6_GEN, P6_DRAW, P6_SPECS ),
         'P16':      ( P16_GEN, P16_DRAW, P16_SPECS )}
 
-filedir = "../results"
+# __file__ = '/tests/'
+dir = os.path.dirname(os.path.realpath(__file__))
+filedir = dir + "/results/"
+
 
 """ Process Data """
 def chain_length_histo(embedding):
@@ -88,6 +91,7 @@ def read_log_pickle(filename):
     return data
 
 def read_logs():
+
     for file in os.listdir(filedir):
         filename = os.path.join(filedir, file)
         base, ext = os.path.splitext(file)
@@ -108,11 +112,7 @@ def read_logs():
                 plt.title(base)
                 plt.show()
                 #draw(T, embedding)
-
-
-
-
-
+                #plt.show()
 
 
 class CharacterizeEmbedding(unittest.TestCase):
@@ -156,6 +156,7 @@ class CharacterizeEmbedding(unittest.TestCase):
             pickle.dump(obj, fp)
 
     def embed(self, S):
+        sampler = self.sampler
         S_edgelist = list(S.edges())
 
         results = {}
@@ -177,7 +178,7 @@ class CharacterizeEmbedding(unittest.TestCase):
     def size_bisection(self, s_generator):
 
         sampler = self.sampler
-        T_size = len(structsampler.nodelist)
+        T_size = len(self.structsampler.nodelist)
 
         # Expect maximum size to embed is equal to size of target
         S_max = T_size
@@ -189,7 +190,7 @@ class CharacterizeEmbedding(unittest.TestCase):
             S = s_generator(S_size)
             valid, results = self.embed(S)
             if valid:
-                self.log(results)
+                self.log(S, results)
                 S_min = S_size
             else:
                 S_max = S_size
