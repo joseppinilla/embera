@@ -11,11 +11,13 @@ Added EmbeddingComposite to bypass need for D-Wave connection
 >> python3 -m unittest tests.test_stress
 
 '''
+import os
+import sys
 import math
 import json
 import time
 import numpy
-import random
+import pickle
 import unittest
 import minorminer
 import networkx as nx
@@ -34,29 +36,90 @@ from dimod.reference.composites.structure import StructureComposite
 from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampler
 
 verbose = 0
-#tries = 1
 
 """ Target Graph Architecture """
+""" C4 """
+C4_GEN = dnx.generators.chimera_graph
+C4_DRAW = dnx.draw_chimera_embedding
+C4_SPECS = [4,4,4]
 """ D-Wave 2X """
 DW2X_GEN = dnx.generators.chimera_graph
+DW2X_DRAW = dnx.draw_chimera_embedding
 DW2X_SPECS = [12,12,4]
 """ D-Wave 2000Q """
 DW2000Q_GEN = dnx.generators.chimera_graph
+DW2000Q_DRAW = dnx.draw_chimera_embedding
 DW2000Q_SPECS = [16,16,4]
 """ D-Wave P6 """
 P6_GEN = dnx.generators.pegasus_graph
+P6_DRAW = dnx.draw_pegasus_embedding
 P6_SPECS = [6]
 """ D-Wave P16 """
 P16_GEN = dnx.generators.pegasus_graph
+P16_DRAW = dnx.draw_pegasus_embedding
 P16_SPECS = [16]
 
+ARCHS = {'C4':      ( C4_GEN, C4_DRAW, C4_SPECS ),
+        'DW2X':     ( DW2X_GEN, DW2X_DRAW, DW2X_SPECS ),
+        'DW2000Q':  ( DW2000Q_GEN, DW2000Q_DRAW, DW2000Q_SPECS ),
+        'P6':       ( P6_GEN, P6_DRAW, P6_SPECS ),
+        'P16':      ( P16_GEN, P16_DRAW, P16_SPECS )}
 
-#@unittest.skip("Comprehensive Test!")
+filedir = "../results"
+
+""" Process Data """
+def chain_length_histo(embedding):
+    histo = Counter()
+    for chain in embedding.values():
+        key = len(chain)
+        histo[key] += 1
+    return histo
+
+def read_log_json(filename):
+    fp = open(filename, 'r')
+    data = json.load(fp)
+    fp.close()
+    return data
+
+def read_log_pickle(filename):
+    fp = open(filename, 'rb')
+    data = pickle.load(fp)
+    fp.close()
+    return data
+
+def read_logs():
+    for file in os.listdir(filedir):
+        filename = os.path.join(filedir, file)
+        base, ext = os.path.splitext(file)
+        if ext=='.pkl':
+            results = read_log_pickle(filename)
+        elif ext=='.json':
+            results = read_log_json(filename)
+        arch, graph, size, method = base.split('-')
+        gen, draw, specs = ARCHS[arch]
+        T = gen(*specs)
+        for i, result in results.items():
+            time, embedding = result
+            if embedding:
+                histo = chain_length_histo(embedding)
+
+                plt.bar(list(histo.keys()), histo.values())
+                plt.xticks(list(histo.keys()))
+                plt.title(base)
+                plt.show()
+                #draw(T, embedding)
+
+
+
+
+
+
+
 class CharacterizeEmbedding(unittest.TestCase):
 
     def setUp(self):
 
-        self.tries = 10
+        self.tries = 3
         self.TARGET = 'C4'
         self.TARGET_GEN = dnx.generators.chimera_graph
         self.TARGET_SPECS = [4,4,4]
@@ -66,63 +129,73 @@ class CharacterizeEmbedding(unittest.TestCase):
         #strucsampler = StructureComposite(RandomSampler(), chimera.nodes, chimera.edges)
         self.structsampler = StructureComposite(SimulatedAnnealingSampler(), self.T.nodes, self.T.edges)
 
+        self.method = minorminer
+        self.sampler = EmbeddingComposite(self.structsampler, self.method)
 
-    def chain_length_histo(self, embedding):
-        histo = Counter()
-        for chain in embedding.values():
-            key = str(len(chain))
-            histo[key] += 1
 
-        return histo
+    def log(self, S, obj):
+        graphstr = '-' + S.name
+        sizestr = '-' + str(len(S))
+        methodstr = '-' + self.method.__name__
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        if not os.path.exists(filedir):
+            os.makedirs(filedir)
+        filename = self.TARGET + graphstr + sizestr + methodstr + ".pkl"
+        self.log_pickle(obj, filedir + filename)
+        #filename = self.TARGET + graphstr + sizestr + methodstr + ".json"
+        #self.log_json(obj, filedir + filename)
 
-    def size_bisection(self, s_generator, method=minorminer):
+    def log_json(self, obj, filename):
+        """ JSON doesn't allow dumping non-string keyed dictionaries """
+        with open(filename, 'w') as fp:
+            pickle.dump(obj, fp)
 
-        structsampler = self.structsampler
+    def log_pickle(self, obj, filename):
+        """ Pickle allows dumping non-string keyed dictionaries """
+        with open(filename, 'wb') as fp:
+            pickle.dump(obj, fp)
+
+    def embed(self, S):
+        S_edgelist = list(S.edges())
+
+        results = {}
+        valid = False
+        for i in range(self.tries):
+            t_start = time.time()
+            embedding = sampler.get_embedding(S_edgelist,
+                                get_new = True,
+                                timeout = 20,
+                                verbose=verbose)
+            t_end = time.time()
+            t_elap = t_end-t_start
+
+            if bool(embedding): valid = True
+            results[i] = [ t_elap, embedding ]
+
+        return valid, results
+
+    def size_bisection(self, s_generator):
+
+        sampler = self.sampler
         T_size = len(structsampler.nodelist)
 
-        sampler = EmbeddingComposite(structsampler, method)
-
         # Expect maximum size to embed is equal to size of target
-        #S_max = T_size
-        S_max = 100
+        S_max = T_size
+        S_size = math.ceil(T_size/2)
         S_min = 0
 
-        while True:
-            S_size = math.ceil( S_min + (S_max-S_min)/2 )
+        # Bisection method to find largest valid problem embedding
+        while (S_max!=S_size):
             S = s_generator(S_size)
-            S_edgelist = list(S.edges())
-
-            results = {}
-            possible = False
-            for i in range(self.tries):
-                t_start = time.time()
-                embedding = sampler.get_embedding(S_edgelist, verbose=verbose)
-                t_end = time.time()
-                t_elap = t_end-t_start
-
-                histo = self.chain_length_histo(embedding)
-                if bool(embedding): possible = True
-                results[i] = [len(S), len(S_edgelist),
-                            t_elap, dict(histo)]
-
-            if (S_max==S_size):
-                print()
-                break
-            elif possible:
-                graphstr = '-' + S.name
-                sizestr = '-' + str(S_size)
-                methodstr = '-' + method.__name__
-                timestr = time.strftime("%Y%m%d-%H%M%S")
-
-                filename = self.TARGET + sizestr + methodstr + graphstr
-                with open(filename, 'w') as fp:
-                    json.dump([ S_size, methodstr, graphstr,
-                    self.TARGET, results],
-                    fp)
-
+            valid, results = self.embed(S)
+            if valid:
+                self.log(results)
                 S_min = S_size
             else:
                 S_max = S_size
+            # Next data point
+            S_size = math.ceil( S_min + (S_max-S_min)/2 )
+
 
     def complete_generator(self, size):
         G = nx.complete_graph(size)
