@@ -14,10 +14,12 @@ import unittest
 import minorminer
 import networkx as nx
 import dwave_networkx as dnx
+import matplotlib.pyplot as plt
 
 from collections import Counter
 
-import matplotlib.pyplot as plt
+from embedding_methods.architectures import *
+
 from embedding_methods.dense import dense
 from embedding_methods.topological import topological
 from embedding_methods.composites.embedding import EmbeddingComposite
@@ -28,98 +30,20 @@ from dimod.reference.composites.structure import StructureComposite
 from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampler
 
 verbose = 0
+tries = 3
 
-""" Target Graph Architecture """
-""" C4 """
-C4_GEN = dnx.generators.chimera_graph
-C4_DRAW = dnx.draw_chimera_embedding
-C4_SPECS = [4,4,4]
-""" D-Wave 2X """
-DW2X_GEN = dnx.generators.chimera_graph
-DW2X_DRAW = dnx.draw_chimera_embedding
-DW2X_SPECS = [12,12,4]
-""" D-Wave 2000Q """
-DW2000Q_GEN = dnx.generators.chimera_graph
-DW2000Q_DRAW = dnx.draw_chimera_embedding
-DW2000Q_SPECS = [16,16,4]
-""" D-Wave P6 """
-P6_GEN = dnx.generators.pegasus_graph
-P6_DRAW = dnx.draw_pegasus_embedding
-P6_SPECS = [6]
-""" D-Wave P16 """
-P16_GEN = dnx.generators.pegasus_graph
-P16_DRAW = dnx.draw_pegasus_embedding
-P16_SPECS = [16]
-
-ARCHS = {'C4':      ( C4_GEN, C4_DRAW, C4_SPECS ),
-        'DW2X':     ( DW2X_GEN, DW2X_DRAW, DW2X_SPECS ),
-        'DW2000Q':  ( DW2000Q_GEN, DW2000Q_DRAW, DW2000Q_SPECS ),
-        'P6':       ( P6_GEN, P6_DRAW, P6_SPECS ),
-        'P16':      ( P16_GEN, P16_DRAW, P16_SPECS )}
-
-# __file__ = './tests/'
-#filedir = dir + "/profiles/"
-dir = os.path.dirname(os.path.realpath(__file__))
-filedir = dir + "/results/"
-
-
-""" Process Data """
-def chain_length_histo(embedding):
-    histo = Counter()
-    for chain in embedding.values():
-        key = len(chain)
-        histo[key] += 1
-    return histo
-
-def read_log_json(filename):
-    fp = open(filename, 'r')
-    data = json.load(fp)
-    fp.close()
-    return data
-
-def read_log_pickle(filename):
-    fp = open(filename, 'rb')
-    data = pickle.load(fp)
-    fp.close()
-    return data
-
-def read_logs():
-
-    for file in os.listdir(filedir):
-        filename = os.path.join(filedir, file)
-        base, ext = os.path.splitext(file)
-        if ext=='.pkl':
-            results = read_log_pickle(filename)
-        elif ext=='.json':
-            results = read_log_json(filename)
-        arch, graph, size, method = base.split('-')
-        gen, draw, specs = ARCHS[arch]
-        T = gen(*specs)
-        for i, result in results.items():
-            time, embedding = result
-            if embedding:
-                histo = chain_length_histo(embedding)
-
-                plt.bar(list(histo.keys()), histo.values())
-                plt.xticks(list(histo.keys()))
-                plt.title(base)
-                plt.show()
-                #draw(T, embedding)
-                #plt.show()
-
+filedir = "./results/"
 
 class CharacterizeEmbedding(unittest.TestCase):
 
     def setUp(self):
 
-        self.tries = 3
-        self.TARGET = 'C4'
+        self.tries = tries
+        self.target = 'C4'
         self.method = minorminer
         gen, _, specs = ARCHS['C4']
         T = gen(*specs)
-
         self.structsampler = StructureComposite(SimulatedAnnealingSampler(), T.nodes, T.edges)
-
         self.sampler = EmbeddingComposite(self.structsampler, self.method)
 
 
@@ -130,9 +54,9 @@ class CharacterizeEmbedding(unittest.TestCase):
         timestr = time.strftime("%Y%m%d-%H%M%S")
         if not os.path.exists(filedir):
             os.makedirs(filedir)
-        filename = self.TARGET + graphstr + sizestr + methodstr + ".pkl"
+        filename = self.target + graphstr + sizestr + methodstr + ".pkl"
         self.log_pickle(obj, filedir + filename)
-        #filename = self.TARGET + graphstr + sizestr + methodstr + ".json"
+        #filename = self.target + graphstr + sizestr + methodstr + ".json"
         #self.log_json(obj, filedir + filename)
 
     def log_json(self, obj, filename):
@@ -218,7 +142,7 @@ class CharacterizeEmbedding(unittest.TestCase):
 class CharacterizeArchitecture(CharacterizeEmbedding):
 
     def all_tests(self):
-        gen, _, specs = ARCHS[self.TARGET]
+        gen, _, specs = ARCHS[self.target]
         T = gen(*specs)
         self.structsampler = StructureComposite(SimulatedAnnealingSampler(), T.nodes, T.edges)
         self.test_grid()
@@ -227,20 +151,20 @@ class CharacterizeArchitecture(CharacterizeEmbedding):
 
     def test_dw2000q(self):
         """ D-Wave 2000Q """
-        self.TARGET = 'DW2000Q'
+        self.target = 'DW2000Q'
         all_tests()
 
     def test_dw2x(self):
         """ D-Wave 2X """
-        self.TARGET = 'DW2X'
+        self.target = 'DW2X'
         all_tests()
 
     def test_p6(self):
         """ D-Wave P6 """
-        self.TARGET = 'P6'
+        self.target = 'P6'
         all_tests()
 
     def test_p16(self):
         """ D-Wave P16 """
-        self.TARGET = 'P16'
+        self.target = 'P16'
         all_tests()
