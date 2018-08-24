@@ -30,6 +30,19 @@ def read_log_pickle(filename):
     fp.close()
     return data
 
+def plot_histo(title):
+    for log in read_logs():
+        arch, graph, size, method, results = log
+        for i, result in results.items():
+            time, embedding = result
+            if embedding:
+                histo = chain_length_histo(embedding)
+                plt.bar(list(histo.keys()), histo.values())
+                plt.xticks(list(histo.keys()))
+                plt.show()
+                #draw(T, embedding)
+                #plt.show()
+
 def read_logs():
     for file in os.listdir(filedir):
         filename = os.path.join(filedir, file)
@@ -41,17 +54,9 @@ def read_logs():
         arch, graph, size, method = base.split('-')
         gen, draw, specs = ARCHS[arch]
         T = gen(*specs)
-        for i, result in results.items():
-            time, embedding = result
-            if embedding:
-                histo = chain_length_histo(embedding)
+        yield arch, graph, size, method, results
 
-                plt.bar(list(histo.keys()), histo.values())
-                plt.xticks(list(histo.keys()))
-                plt.title(base)
-                plt.show()
-                #draw(T, embedding)
-                #plt.show()
+
 
 if __name__== "__main__":
-    read_logs()
+    plot_histo()
