@@ -68,7 +68,7 @@ def log(obj, filename):
     if verbose: print('File: %s' % filepath)
     log_pickle(obj, filepath)
 
-def get_max_chain(embedding):
+def get_stats(embedding):
     max_chain = 0
     total = 0
     for node, chain in embedding.items():
@@ -162,7 +162,7 @@ if __name__== "__main__":
 
                     # Total qubits stats
                     # Max chain stats
-                    max_chain, total = get_max_chain(embedding)
+                    max_chain, total = get_stats(embedding)
 
                     if total < best_embed:
                         i_best_embed = i
