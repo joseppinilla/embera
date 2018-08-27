@@ -1,8 +1,13 @@
 import os
+import sys
 import json
 import math
 import pickle
+
 import matplotlib.pyplot as plt
+
+import matplotlib
+matplotlib.rcParams['axes.formatter.useoffset'] = False
 
 from collections import Counter, OrderedDict
 
@@ -35,6 +40,7 @@ def read_log_pickle(filename):
 
 def get_stats(embedding):
     max_chain = 0
+    min_chain = sys.maxsize
     total = 0
     N = len(embedding)
     for node, chain in embedding.items():
@@ -42,6 +48,8 @@ def get_stats(embedding):
         total += chain_len
         if chain_len > max_chain:
             max_chain = chain_len
+        if chain_len < min_chain:
+            min_chain =  chain_len
     avg_chain = total/N
     sum_deviations = 0
     for node, chain in embedding.items():
@@ -50,9 +58,7 @@ def get_stats(embedding):
         sum_deviations += deviation
     std_dev = math.sqrt(sum_deviations/N)
 
-
-
-    return max_chain, total, avg_chain, std_dev
+    return max_chain, min_chain, total, avg_chain, std_dev
 
 def plot_histo(title, result):
     for i, result in results.items():
@@ -108,32 +114,46 @@ if __name__== "__main__":
             results[arch][graph][size][prune]['max'] = []
             results[arch][graph][size][prune]['avg'] = []
             results[arch][graph][size][prune]['stdev'] = []
+            results[arch][graph][size][prune]['min'] = []
 
         t_elap, embedding = result
-        max_chain, total, avg_chain, std_dev = get_stats(embedding)
+        max_chain, min_chain, total, avg_chain, std_dev = get_stats(embedding)
         if total != 0:
             results[arch][graph][size][prune]['total'].append(total)
             results[arch][graph][size][prune]['time'].append(t_elap)
             results[arch][graph][size][prune]['max'].append(max_chain)
             results[arch][graph][size][prune]['avg'].append(avg_chain)
             results[arch][graph][size][prune]['stdev'].append(std_dev)
+            results[arch][graph][size][prune]['min'].append(min_chain)
 
 
     for i_arch, results_graph in results.items():
         for i_graph, results_size in results_graph.items():
             for i_size, results_prune in results_size.items():
+
+                n = int(i_size)
+                if i_graph=='complete':
+                    edges = ((n**2)-n)/2
+                if i_graph=='bipartite':
+                    edges = (n**2)/4
+                if i_graph=='grid2d':
+                    edges = 2*n - 2*math.sqrt(n)
+
                 prune_labels = ['']
+                prune_ordered = ['']
                 for i_prune in sorted(results_prune.keys()):
-                    prune_labels.append(i_prune)
+                    prune_ordered.append(i_prune)
+                    pct = int(i_prune)/edges*100
+                    prune_labels.append("%.1f%%" % pct)
 
-                ticks = list(range(len(x_labels)+1))
+                ticks = list(range(len(prune_labels)+1))
 
-                for i, metric in enumerate(['max','total','time','avg','stdev']):
+                for i, metric in enumerate(['max','total','time','avg','stdev','min']):
                     plt.clf()
                     plt.figure(i)
                     figname = i_arch + '_' + i_graph + '_' + i_size + '_' + metric
                     data_points = []
-                    for prune in prune_labels[1:]:
+                    for prune in prune_ordered[1:]:
                         data_points.append(results_prune[prune][metric])
                     plt.boxplot(data_points)
                     plt.xticks(ticks, prune_labels, rotation='vertical')

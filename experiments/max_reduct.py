@@ -29,7 +29,7 @@ from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampl
 profilesdir = "./profiles/"
 resultsdir = "./results/"
 
-verbose = 0
+verbose = 1
 
 def read_log_pickle(filename):
     fp = open(filename, 'rb')
@@ -49,28 +49,9 @@ def log(obj, filename):
     if verbose: print('File: %s' % filepath)
     log_pickle(obj, filepath)
 
-def get_stats(embedding):
-    max_chain = 0
-    total = 0
-    for node, chain in embedding.items():
-        chain_len = len(chain)
-        total += chain_len
-        if chain_len > max_chain:
-            max_chain = chain_len
-    return max_chain, total
-
-def read_pickle():
-    filename = resultsdir + "DW2000Q-bipartite-128-minorminer_best"
-    filename = resultsdir + "C4-complete-17-minorminer_best"
-    filename = resultsdir + "C4-bipartite-32-minorminer_best"
-    filename = resultsdir + "C4-grid2d-49-minorminer_best"
-    fp = open(filename, 'rb')
-    data = pickle.load(fp)
-    print(data)
-    fp.close()
-    return data
-
 if __name__== "__main__":
+
+    results_db = set(os.listdir(resultsdir))
 
     for file in os.listdir(profilesdir):
         filename = os.path.join(profilesdir, file)
@@ -83,12 +64,6 @@ if __name__== "__main__":
         size = int(size_str)
         gen, draw, specs = ARCHS[arch]
         T = gen(*specs)
-        #TODO: Test
-        # Find best embedding (min qubits, min max chain)
-            # remove one edge at random find best embedding
-        # remove one node at random
-            #Find best embedding (min qubits, min max chain)
-                # remove one edge at random find best embedding
 
         tries = 200
         method = minorminer
@@ -98,10 +73,6 @@ if __name__== "__main__":
         sampler = EmbeddingComposite(structsampler, method)
 
 
-        best_embed = sys.maxsize
-        i_best_embed = None
-        best_chain = sys.maxsize
-        i_best_chain = None
         if verbose: print('\n\nSize %s' % size)
         if graph == 'complete':
             S = nx.complete_graph(size)
@@ -121,9 +92,11 @@ if __name__== "__main__":
 
         for i_prune in prunes:
             if verbose: print('\n\nPrune %s' % i_prune)
-
             for i in range(tries):
-                #Pruning
+                i_str = "_%s" % i
+                filename = base + i_str + '-' + str(i_prune)
+
+                # Pruning
                 S_edgelist = list(S.edges())
                 edges = len(S_edgelist)
                 if i_prune >= edges: continue
@@ -132,6 +105,10 @@ if __name__== "__main__":
                     edges-=1
                 if verbose:
                     print('-------------------------Iteration %s' % i)
+
+                if (filename in results_db):
+                    continue
+
                 t_start = time.time()
                 embedding = sampler.get_embedding(S_edgelist,
                                     get_new = True,
@@ -142,20 +119,4 @@ if __name__== "__main__":
                 if verbose:
                     print('--len %s' % len(embedding))
 
-                # Total qubits stats
-                # Max chain stats
-                max_chain, total = get_stats(embedding)
-
-                if total < best_embed:
-                    i_best_embed = i
-                    best_embed = total
-                if max_chain < best_chain:
-                    i_best_chain = i
-                    best_chain = max_chain
-
-                i_str = "_%s" % i
-                filename = base + i_str + '-' + str(i_prune)
                 log([t_elap, embedding],filename)
-                if verbose:
-                    print('max %s' % max_chain)
-                    print('total %s' % total)
