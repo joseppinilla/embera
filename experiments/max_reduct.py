@@ -31,25 +31,6 @@ resultsdir = "./results/"
 
 verbose = 0
 
-def embed(S):
-    sampler = self.sampler
-    S_edgelist = list(S.edges())
-
-    results = {}
-    valid = False
-    for i in range(self.tries):
-        t_start = time.time()
-        embedding = sampler.get_embedding(S_edgelist,
-                            get_new = True,
-                            verbose=verbose)
-        t_end = time.time()
-        t_elap = t_end-t_start
-
-        if bool(embedding): valid = True
-        results[i] = [ t_elap, embedding ]
-
-    return valid, results
-
 def read_log_pickle(filename):
     fp = open(filename, 'rb')
     data = pickle.load(fp)
@@ -116,71 +97,65 @@ if __name__== "__main__":
         structsampler = StructureComposite(SimulatedAnnealingSampler(), T.nodes, T.edges)
         sampler = EmbeddingComposite(structsampler, method)
 
-        sizes = [size, size-1]
 
-        for i_size in sizes:
+        best_embed = sys.maxsize
+        i_best_embed = None
+        best_chain = sys.maxsize
+        i_best_chain = None
+        if verbose: print('\n\nSize %s' % size)
+        if graph == 'complete':
+            S = nx.complete_graph(size)
+        elif graph == 'bipartite':
+            p = int(size/2)
+            S = nx.complete_bipartite_graph(p,p)
+        elif graph == 'grid2d':
+            #TEMP: Not testing grids
+            continue
+            p = int(math.sqrt(size))
+            S = nx.grid_2d_graph(p,p)
+        else:
+            print('FAILED!')
 
-            best_embed = sys.maxsize
-            i_best_embed = None
-            best_chain = sys.maxsize
-            i_best_chain = None
-            if verbose: print('\n\nSize %s' % i_size)
-            if graph == 'complete':
-                S = nx.complete_graph(i_size)
-            elif graph == 'bipartite':
-                p = int(i_size/2)
-                S = nx.complete_bipartite_graph(p,p)
-            elif graph == 'grid2d':
-                p = int(math.sqrt(i_size))
-                S = nx.grid_2d_graph(p,p)
-            else:
-                print('FAILED!')
 
+        prunes = [0,1,2,4,8,16,32,64,128,256]
 
-            prunes = [0,1]
+        for i_prune in prunes:
+            if verbose: print('\n\nPrune %s' % i_prune)
 
-            for i_prune in prunes:
-                if verbose: print('\n\nPrune %s' % i_prune)
-                for i in range(tries):
-                    #Pruning
-                    S_edgelist = list(S.edges())
-                    edges = len(S_edgelist)
-                    for val in range(i_prune):
-                        S_edgelist.pop( random.randrange(edges) )
-                        edges-=1
-                    if verbose:
-                        print('-------------------------Iteration %s' % i)
-                    t_start = time.time()
-                    embedding = sampler.get_embedding(S_edgelist,
-                                        get_new = True,
-                                        verbose=verbose)
-                    t_end = time.time()
-                    t_elap = t_end-t_start
-                    if not embedding: continue
-                    if verbose:
-                        print('--len %s' % len(embedding))
+            for i in range(tries):
+                #Pruning
+                S_edgelist = list(S.edges())
+                edges = len(S_edgelist)
+                if i_prune >= edges: continue
+                for val in range(i_prune):
+                    S_edgelist.pop( random.randrange(edges) )
+                    edges-=1
+                if verbose:
+                    print('-------------------------Iteration %s' % i)
+                t_start = time.time()
+                embedding = sampler.get_embedding(S_edgelist,
+                                    get_new = True,
+                                    verbose=verbose)
+                t_end = time.time()
+                t_elap = t_end-t_start
+                if not embedding: continue
+                if verbose:
+                    print('--len %s' % len(embedding))
 
-                    # Total qubits stats
-                    # Max chain stats
-                    max_chain, total = get_stats(embedding)
+                # Total qubits stats
+                # Max chain stats
+                max_chain, total = get_stats(embedding)
 
-                    if total < best_embed:
-                        i_best_embed = i
-                        best_embed = total
-                    if max_chain < best_chain:
-                        i_best_chain = i
-                        best_chain = max_chain
+                if total < best_embed:
+                    i_best_embed = i
+                    best_embed = total
+                if max_chain < best_chain:
+                    i_best_chain = i
+                    best_chain = max_chain
 
-                    i_str = "_%s" % i
-                    filename = base + i_str + '-' + str(i_size) + '-' + str(i_prune)
-                    result = [t_elap, embedding]
-                    log(results,filename)
-                    if verbose:
-                        print('max %s' % max_chain)
-                        print('total %s' % total)
-
-                best_filename = base + '-best-' + str(i_size) + '-' + str(i_prune)
-                best = [i_best_embed, best_embed, i_best_chain, best_chain]
-                log(best,best_filename)
-                print(best_filename)
-                print(best)
+                i_str = "_%s" % i
+                filename = base + i_str + '-' + str(i_prune)
+                log([t_elap, embedding],filename)
+                if verbose:
+                    print('max %s' % max_chain)
+                    print('total %s' % total)
