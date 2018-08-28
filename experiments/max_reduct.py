@@ -53,70 +53,74 @@ if __name__== "__main__":
 
     results_db = set(os.listdir(resultsdir))
 
-    for file in os.listdir(profilesdir):
-        filename = os.path.join(profilesdir, file)
-        base, ext = os.path.splitext(file)
-        if ext=='.pkl':
-            results = read_log_pickle(filename)
-        elif ext=='.json':
-            results = read_log_json(filename)
-        arch, graph, size_str, _ = base.split('-')
-        size = int(size_str)
-        gen, draw, specs = ARCHS[arch]
-        T = gen(*specs)
+    archs = ['C4', 'DW2X', 'DW2000Q', 'P6', 'P16']
+    faults = [0]
+    methods = [minorminer]
+    prunes = [0,1,2,4,8,16,32,64,128,256]
+    graphs = ['complete', 'bipartite', 'grid2d']
+    N = []
+    tries = 200
 
-        tries = 200
-        method = minorminer
-        gen, _, specs = ARCHS[arch]
-        T = gen(*specs)
-        structsampler = StructureComposite(SimulatedAnnealingSampler(), T.nodes, T.edges)
-        sampler = EmbeddingComposite(structsampler, method)
+    ############################################################################
+    for i_method in methods:
+    ############################################################################
+        for i_arch in archs:
+            gen, draw, specs, profile = ARCHS[i_arch]
+            T = gen(*specs)
+            structsampler = StructureComposite(SimulatedAnnealingSampler(), T.nodes, T.edges)
+            sampler = EmbeddingComposite(structsampler, i_method)
+    ############################################################################
+            for i_fault in faults:
+                #TODO: Remove nodes/couplers from target graph
+    ############################################################################
+                for i_graph in graphs:
+                    sizes = [ profile[i_graph] ] + N
+    ############################################################################
+                    for i_size in sizes:
+                        if i_graph == 'complete':
+                            S = nx.complete_graph(i_size)
+                        elif i_graph == 'bipartite':
+                            p = int(i_size/2)
+                            S = nx.complete_bipartite_graph(p,p)
+                        elif i_graph == 'grid2d':
+                            #TEMP: Not testing grids
+                            continue
+                            p = int(math.sqrt(i_size))
+                            S = nx.grid_2d_graph(p,p)
+                        else:
+                            print('FAILED!')
+    ############################################################################
+                        for i_prune in prunes:
+                            if verbose: print('\n\nPrune %s' % i_prune)
+                            # Run experiment once
+                            data = [i_arch,str(i_fault),
+                                    i_graph,str(i_size),
+                                    str(i_prune),i_method.__name__]
+                            print(data)
+                            base = '-'.join(data)
+                            filename = base + '.pkl'
+                            if (filename in results_db): continue
+                            results = {}
+    ############################################################################
+                            # Pruning
+                            S_edgelist = list(S.edges())
+                            edges = len(S_edgelist)
+                            if i_prune >= edges: continue
+                            for i in range(tries):
+                                for val in range(i_prune):
+                                    S_edgelist.pop( random.randrange(edges) )
+                                    edges-=1
+                                if verbose:
+                                    print('-------------------------Iteration %s' % i)
 
-
-        if verbose: print('\n\nSize %s' % size)
-        if graph == 'complete':
-            S = nx.complete_graph(size)
-        elif graph == 'bipartite':
-            p = int(size/2)
-            S = nx.complete_bipartite_graph(p,p)
-        elif graph == 'grid2d':
-            #TEMP: Not testing grids
-            continue
-            p = int(math.sqrt(size))
-            S = nx.grid_2d_graph(p,p)
-        else:
-            print('FAILED!')
-
-
-        prunes = [0,1,2,4,8,16,32,64,128,256]
-
-        for i_prune in prunes:
-            if verbose: print('\n\nPrune %s' % i_prune)
-            for i in range(tries):
-                i_str = "_%s" % i
-                filename = base + i_str + '-' + str(i_prune)
-
-                # Pruning
-                S_edgelist = list(S.edges())
-                edges = len(S_edgelist)
-                if i_prune >= edges: continue
-                for val in range(i_prune):
-                    S_edgelist.pop( random.randrange(edges) )
-                    edges-=1
-                if verbose:
-                    print('-------------------------Iteration %s' % i)
-
-                if (filename in results_db):
-                    continue
-
-                t_start = time.time()
-                embedding = sampler.get_embedding(S_edgelist,
-                                    get_new = True,
-                                    verbose=verbose)
-                t_end = time.time()
-                t_elap = t_end-t_start
-                if not embedding: continue
-                if verbose:
-                    print('--len %s' % len(embedding))
-
-                log([t_elap, embedding],filename)
+                                t_start = time.time()
+                                embedding = sampler.get_embedding(S_edgelist,
+                                                    get_new = True,
+                                                    verbose=verbose)
+                                t_end = time.time()
+                                t_elap = t_end-t_start
+                                results[i] = [t_elap, embedding]
+                                if verbose:
+                                    print('--len %s' % len(embedding))
+    ############################################################################
+                            log(results,filename)

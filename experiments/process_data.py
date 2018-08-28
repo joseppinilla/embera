@@ -76,15 +76,20 @@ def read_logs(filedir):
     for file in os.listdir(filedir):
         filename = os.path.join(filedir, file)
         base, ext = os.path.splitext(file)
-        result = read_log_pickle(filename)
-        setup, experiment = base.split('_')
-        arch, graph, size, method = setup.split('-')
-        try:
-            i, i_prune = experiment.split('-')
-        except:
-            continue
+        results = read_log_pickle(filename)
+        arch, fault, graph, size, prune, method = base.split('-')
 
-        yield base, arch, graph, size, method, i, int(i_prune), result
+        yield file, arch, fault, graph, size, prune, method, results
+
+# for log in read_logs(resultsdir):
+#     file, arch, fault, graph, size, prune, method, results = log
+#     for i in range(200):
+#         if str(i) not in results:
+#             results[i] = [0.0, {}]
+#             with open(file, 'wb') as fp:
+#                 pickle.dump(results, fp)
+
+
 
 if __name__== "__main__":
 
@@ -96,40 +101,43 @@ if __name__== "__main__":
         os.makedirs(figsdir)
 
 
-    results = {}
+    stats = {}
 
     for log in read_logs(resultsdir):
-        base, arch, graph, size, method, i, prune, result = log
+        file, arch, fault, graph, size, prune, method, results = log
+        if arch not in stats:
+            stats[arch] = {}
+        if graph not in stats[arch]:
+            stats[arch][graph] = {}
+        if size not in stats[arch][graph]:
+            stats[arch][graph][size] = {}
+        if prune not in stats[arch][graph][size]:
+            stats[arch][graph][size][prune] = {}
+            stats[arch][graph][size][prune]['total'] = []
+            stats[arch][graph][size][prune]['time'] = []
+            stats[arch][graph][size][prune]['max'] = []
+            stats[arch][graph][size][prune]['avg'] = []
+            stats[arch][graph][size][prune]['stdev'] = []
+            stats[arch][graph][size][prune]['min'] = []
 
-        if arch not in results:
-            results[arch] = {}
-        if graph not in results[arch]:
-            results[arch][graph] = {}
-        if size not in results[arch][graph]:
-            results[arch][graph][size] = {}
-        if prune not in results[arch][graph][size]:
-            results[arch][graph][size][prune] = {}
-            results[arch][graph][size][prune]['total'] = []
-            results[arch][graph][size][prune]['time'] = []
-            results[arch][graph][size][prune]['max'] = []
-            results[arch][graph][size][prune]['avg'] = []
-            results[arch][graph][size][prune]['stdev'] = []
-            results[arch][graph][size][prune]['min'] = []
-
-        t_elap, embedding = result
-        max_chain, min_chain, total, avg_chain, std_dev = get_stats(embedding)
-        if total != 0:
-            results[arch][graph][size][prune]['total'].append(total)
-            results[arch][graph][size][prune]['time'].append(t_elap)
-            results[arch][graph][size][prune]['max'].append(max_chain)
-            results[arch][graph][size][prune]['avg'].append(avg_chain)
-            results[arch][graph][size][prune]['stdev'].append(std_dev)
-            results[arch][graph][size][prune]['min'].append(min_chain)
+        valid = 0
+        for key, result in results.items():
+            t_elap, embedding = result
+            if embedding:
+                max_chain, min_chain, total, avg_chain, std_dev = get_stats(embedding)
+                stats[arch][graph][size][prune]['total'].append(total)
+                stats[arch][graph][size][prune]['time'].append(t_elap)
+                stats[arch][graph][size][prune]['max'].append(max_chain)
+                stats[arch][graph][size][prune]['avg'].append(avg_chain)
+                stats[arch][graph][size][prune]['stdev'].append(std_dev)
+                stats[arch][graph][size][prune]['min'].append(min_chain)
+                valid+=1
+        stats[arch][graph][size][prune]['success'] = valid/len(results)
 
 
-    for i_arch, results_graph in results.items():
-        for i_graph, results_size in results_graph.items():
-            for i_size, results_prune in results_size.items():
+    for i_arch, stats_graph in stats.items():
+        for i_graph, stats_size in stats_graph.items():
+            for i_size, stats_prune in stats_size.items():
 
                 n = int(i_size)
                 if i_graph=='complete':
@@ -141,10 +149,10 @@ if __name__== "__main__":
 
                 prune_labels = ['']
                 prune_ordered = ['']
-                for i_prune in sorted(results_prune.keys()):
+                for i_prune in sorted(stats_prune.keys(), key=lambda x: int(x)):
                     prune_ordered.append(i_prune)
-                    pct = int(i_prune)/edges*100
-                    prune_labels.append("%.1f%%" % pct)
+                    pct = int(i_prune)/edges
+                    prune_labels.append("%.3f" % pct)
 
                 ticks = list(range(len(prune_labels)+1))
 
@@ -154,7 +162,7 @@ if __name__== "__main__":
                     figname = i_arch + '_' + i_graph + '_' + i_size + '_' + metric
                     data_points = []
                     for prune in prune_ordered[1:]:
-                        data_points.append(results_prune[prune][metric])
+                        data_points.append(stats_prune[prune][metric])
                     plt.boxplot(data_points)
                     plt.xticks(ticks, prune_labels, rotation='vertical')
                     plt.title(figname)
