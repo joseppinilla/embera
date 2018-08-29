@@ -375,24 +375,12 @@ def _init_graphs(Sg, Tg, tiling, opts):
         node_tile = node['tile']
         node['degree'] = Sg.degree(name)
         node['candidates'] = tiling.tiles[node_tile].qubits #TODO: Granularity
-        # Mapping
-        node['assigned'] = set()
 
     for name, qubit in Tg.nodes(data=True):
         # Fixed cost
         qubit['degree'] = 1.0 - ( Tg.degree(name)/tiling.max_degree )
         # BFS
         qubit['history'] =  1.0
-        qubit['sharing'] = 0.0
-
-def _rip_up(Sg, Tg):
-
-    for name,node in Sg.nodes(data=True):
-        # No qubits are assigned to the source graph node
-        node['assigned'] = set()
-
-    for name, qubit  in Tg.nodes(data=True):
-        # BFS
         qubit['sharing'] = 0.0
 
 def _get_cost(node_tile, neighbor_name, Tg):
@@ -425,7 +413,7 @@ def _pre_search(target_set, queue, visited, visiting):
             heappush(queue, (tgt_cost-1.0, tgt))
             visiting[tgt] = tgt_cost-1.0, tgt_parent, tgt_dist
 
-def _bfs(target_set, visited, visiting, queue, Sg, Tg):
+def _bfs(target_set, visited, visiting, queue, Tg):
     """ Breadth-First Search
         Args:
             queue: Breadth-First Search Priority Queue
@@ -470,34 +458,27 @@ def _bfs(target_set, visited, visiting, queue, Sg, Tg):
     visited[node] = node_cost, node_parent, node_dist
     return node
 
-def _traceback(source, target, reached, visited, unassigned, mapped, Sg, Tg):
+def _traceback(source, target, reached, visited, unassigned, mapped, Tg):
 
     node_cost, node_parent, node_dist = visited[reached]
 
-    source_node = Sg.nodes[source]
-    target_node = Sg.nodes[target]
-
-    if reached not in target_node['assigned']:
-        target_node['assigned'].add(reached)
+    if target not in mapped:
         mapped[target] = set([reached])
         Tg.nodes[reached]['sharing'] += 1.0
         visited[reached] = node_cost + 1.0, node_parent, node_dist
 
-
     path = [reached]
     node = node_parent
-    while(node not in source_node['assigned']):
+    while(node not in mapped[source]):
         print('Node:' + str(node))
         path.append(node)
 
         if node in unassigned:
             if source in unassigned[node]:
                 del unassigned[node]
-                Sg.nodes[source]['assigned'].add(node)
                 mapped[source].add(node)
             elif target in unassigned[node]:
                 del unassigned[node]
-                Sg.nodes[target]['assigned'].add(node)
                 mapped[target].add(node)
             else:
                 unassigned[node].add(source)
@@ -515,9 +496,9 @@ def _traceback(source, target, reached, visited, unassigned, mapped, Sg, Tg):
     return path
 
 
-def _init_queue(source, visiting, queue, Sg):
+def _init_queue(source, visiting, queue, mapped, Sg):
     source_node = Sg.nodes[source]
-    for node in source_node['assigned']:
+    for node in mapped[source]:
         node_cost = 0.0
         node_parent = source
         node_dist =  1 if node in source_node['candidates'] else 2
@@ -528,11 +509,10 @@ def _init_queue(source, visiting, queue, Sg):
         queue_str = str(["%0.3f %s" % (c,str(n)) for c,n in queue])
         print('Init Queue:' + queue_str)
 
-def _get_targets(target, Sg):
+def _get_target_set(target, mapped, Sg):
     target_node = Sg.nodes[target]
-    target_assigned = target_node['assigned']
     target_candidates = target_node['candidates']
-    return target_candidates if not target_assigned else target_assigned
+    return target_candidates if target not in mapped else mapped[target]
 
 def _steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
     """ Steiner Tree Search
@@ -547,17 +527,17 @@ def _steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
     queue = []
 
     # Start search using previously-assigned nodes
-    _init_queue(source, visiting, queue, Sg)
+    _init_queue(source, visiting, queue, mapped, Sg)
 
     # Breadth-First Search
     for target in targets:
         print('Target:' + str(target))
         # Search for target candidates, or nodes assigned to target
-        target_set = _get_targets(target, Sg)
+        target_set = _get_target_set(target, mapped, Sg)
         # Incremental BFS graph traversal
-        reached = _bfs(target_set, visited, visiting, queue, Sg, Tg)
+        reached = _bfs(target_set, visited, visiting, queue, Tg)
         # Retrace steps from target to source
-        path = _traceback(source, target, reached, visited, unassigned, mapped, Sg, Tg)
+        path = _traceback(source, target, reached, visited, unassigned, mapped, Tg)
         # Update tree
         edge = frozenset((source,target))
         tree[edge] = path
@@ -579,10 +559,10 @@ def _update_costs(paths, Sg, Tg):
 
     return legal
 
-def _get_node(node_list, mapped, opts):
-    # Next non-mapped node
+def _get_node(node_list, opts, done={}):
+    # Next node not done
     for node in node_list:
-        if node not in mapped:
+        if node not in done:
             return node
     # If list is empty
     return None
@@ -591,7 +571,7 @@ def _embed_node(node_name, mapped, Sg, Tg, opts):
 
     node = Sg.nodes[node_name]
 
-    if node['assigned']: return
+    if node_name in mapped: return
 
     # Get best candidate
     candidates = node['candidates']
@@ -601,39 +581,43 @@ def _embed_node(node_name, mapped, Sg, Tg, opts):
     qubit = Tg.nodes[q_index]
     qubit['sharing'] += 1.0
     # Assign qubit to node
-    node['assigned'].add(q_index)
     mapped[node_name] = set([q_index])
+
+def _rip_up(Tg, paths={}, mapped={}, unassigned={}):
+    """
+    Search Structures
+        paths = { Sg edge : Tg nodes path }
+        mapped = { Sg node: set(Tg nodes) }
+        unassigned = { Tg node : set(Sg nodes) }
+    """
+
+    for name, qubit  in Tg.nodes(data=True):
+        # BFS
+        qubit['sharing'] = 0.0
+
+    return paths, mapped, unassigned
 
 def _route(Sg, Tg, opts):
     """ Negotiated Congestion algorithm
 
     """
 
-    # Search Structures
-    paths = {} # { Sg edge : Tg nodes path }
-    mapped = {} # { node: len(nodes_assigned) }
-    assigned = {} # { Sg node : set(Tg nodes) }
-    unassigned = {} # { Tg node : set(Sg nodes) }
-
-    # Operator getting unrouted problem nodes
-    unrouted = lambda u: [v for v in Sg[u] if frozenset((u,v)) not in paths]
-
     # Termination criteria
     legal = False
     tries = opts.tries
-    source = _get_node(list(Sg.nodes()), mapped, opts)
+    source = _get_node(list(Sg.nodes()), opts)
     #node_list = list(Sg.nodes())
     #source = node_list.pop()
     done = set()
     while (not legal) and (tries > 0):
-        _rip_up(Sg, Tg)
+        paths, mapped, unassigned = _rip_up(Tg)
         _embed_node(source, mapped, Sg, Tg, opts)
         while source is not None:
-            targets = unrouted(source)
+            targets = [v for v in Sg[source] if frozenset((source,v)) not in paths]
             tree = _steiner_tree(source, targets, mapped, unassigned, Sg, Tg)
             paths.update(tree)
             done.add(source)
-            source = _get_node(targets, done, opts)
+            source = _get_node(targets, opts, done)
         legal = _update_costs(paths, Sg, Tg)
         tries -= 1
     return paths, mapped, unassigned
@@ -644,7 +628,7 @@ def _route(Sg, Tg, opts):
     Constraints for all edges:
         var<source><source><target> + var<target><source><target> = |path|
     Constraints for all nodes:
-        Z - All( var<node><source><target> ) >= |<node['assigned']>|
+        Z - All( var<node><source><target> ) >= |<mapped['node']>|
     Goal:
         min(Z)
 """
