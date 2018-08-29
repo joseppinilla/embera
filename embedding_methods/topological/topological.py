@@ -371,25 +371,19 @@ def _simulated_annealing(Sg, tiling, opts):
 def _init_graphs(Sg, Tg, tiling, opts):
 
     for name, node in Sg.nodes(data=True):
-        # Candidate Qubits
+        # Fixed data
         node_tile = node['tile']
-        #TODO: Consider granularity using opts
-        node['candidates'] = tiling.tiles[node_tile].qubits
-        # BFS. Dummy values to calculate costs
         node['degree'] = Sg.degree(name)
-        node['sharing'] = 0.0
-        node['history'] = 1.0
+        node['candidates'] = tiling.tiles[node_tile].qubits #TODO: Granularity
         # Mapping
         node['assigned'] = set()
 
     for name, qubit in Tg.nodes(data=True):
+        # Fixed cost
+        qubit['degree'] = 1.0 - ( Tg.degree(name)/tiling.max_degree )
         # BFS
         qubit['history'] =  1.0
-        qubit['degree'] = 1.0 - ( Tg.degree(name)/tiling.max_degree )
         qubit['sharing'] = 0.0
-        # Mapping
-        qubit['nodes'] = set()
-        qubit['paths'] = set()
 
 def _rip_up(Sg, Tg):
 
@@ -397,12 +391,9 @@ def _rip_up(Sg, Tg):
         # No qubits are assigned to the source graph node
         node['assigned'] = set()
 
-
     for name, qubit  in Tg.nodes(data=True):
+        # BFS
         qubit['sharing'] = 0.0
-
-        qubit['nodes'].clear()
-        qubit['paths'].clear()
 
 def _get_cost(node_tile, neighbor_name, Tg):
 
@@ -489,7 +480,6 @@ def _traceback(source, target, reached, visited, unassigned, Sg, Tg):
     if reached not in target_node['assigned']:
         target_node['assigned'].add(reached)
         Tg.nodes[reached]['sharing'] += 1.0
-        Tg.nodes[reached]['nodes'].add(target)
         visited[reached] = node_cost + 1.0, node_parent, node_dist
 
 
@@ -503,20 +493,14 @@ def _traceback(source, target, reached, visited, unassigned, Sg, Tg):
             if source in unassigned[node]:
                 del unassigned[node]
                 Sg.nodes[source]['assigned'].add(node)
-                Tg.nodes[node]['nodes'].add(source)
             elif target in unassigned[node]:
                 del unassigned[node]
                 Sg.nodes[target]['assigned'].add(node)
-                Tg.nodes[node]['nodes'].add(target)
             else:
                 unassigned[node].add(source)
                 unassigned[node].add(target)
-                Tg.nodes[node]['nodes'].add(source)
-                Tg.nodes[node]['nodes'].add(target)
         else:
             unassigned[node] = set([source, target])
-            Tg.nodes[node]['nodes'].add(source)
-            Tg.nodes[node]['nodes'].add(target)
 
         Tg.nodes[node]['sharing'] += 1.0
         node_cost, node_parent, node_dist = visited[node]
@@ -547,7 +531,7 @@ def _get_targets(target, Sg):
     target_candidates = target_node['candidates']
     return target_candidates if not target_assigned else target_assigned
 
-def _steiner_tree(source, targets, mapped, unassigned, routed, Sg, Tg):
+def _steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
     """ Steiner Tree Search
     """
     print('\n New Source:' + str(source))
@@ -572,9 +556,8 @@ def _steiner_tree(source, targets, mapped, unassigned, routed, Sg, Tg):
         # Retrace steps from target to source
         path = _traceback(source, target, reached, visited, unassigned, Sg, Tg)
         # Update tree
-        edge = (source,target)
-        tree.update({edge:path})
-        routed[frozenset(edge)] = len(path)
+        edge = frozenset((source,target))
+        tree[edge] = path
 
     mapped[source] = len(Sg.nodes[source]['assigned'])
 
@@ -585,12 +568,6 @@ def _update_costs(paths, Sg, Tg):
 
     """
     legal = True
-    print("Update Costs:")
-    for name, node in Tg.nodes(data=True):
-        if 'nodes' in node:
-            nodes = node['nodes']
-            print(nodes)
-
     print("Paths:")
     for (u,v), path in paths.items():
         print(u,v,path)
@@ -622,7 +599,6 @@ def _embed_node(node_name, Sg, Tg, opts):
     # Populate qubit
     qubit = Tg.nodes[q_index]
     qubit['sharing'] += 1.0
-    qubit['nodes'].add(node_name)
     # Assign qubit to node
     node['assigned'].add(q_index)
 
@@ -633,12 +609,12 @@ def _route(Sg, Tg, opts):
 
     # Search Structures
     paths = {} # { Sg edge : Tg nodes path }
-    mapped = {} # { node: len(nodes_assigned)}
-    routed = {} # {frozenset(u,v) : len(path)}
-    unassigned = {} # {Tg node : set(nodes)}
+    mapped = {} # { node: len(nodes_assigned) }
+    assigned = {} # { Sg node : set(Tg nodes) }
+    unassigned = {} # { Tg node : set(Sg nodes) }
 
     # Operator getting unrouted problem nodes
-    unrouted = lambda u: [v for v in Sg[u] if frozenset((u,v)) not in routed]
+    unrouted = lambda u: [v for v in Sg[u] if frozenset((u,v)) not in paths]
 
     # Termination criteria
     legal = False
@@ -651,7 +627,7 @@ def _route(Sg, Tg, opts):
         _embed_node(source, Sg, Tg, opts)
         while source is not None:
             targets = unrouted(source)
-            tree = _steiner_tree(source, targets, mapped, unassigned, routed, Sg, Tg)
+            tree = _steiner_tree(source, targets, mapped, unassigned, Sg, Tg)
             paths.update(tree)
             source = _get_node(targets, mapped, opts)
         legal = _update_costs(paths, Sg, Tg)
@@ -881,7 +857,7 @@ if __name__== "__main__":
 
     verbose = 3
 
-    p = 4
+    p = 2
     S = nx.grid_2d_graph(p,p)
     topology = {v:v for v in S}
 
@@ -892,7 +868,7 @@ if __name__== "__main__":
     #S = nx.relabel_nodes(S, {0:'A',1:'B',2:'C'})
     #topology = nx.spring_layout(S)
 
-    m = 4
+    m = 2
     T = dnx.chimera_graph(m, coordinates=True)
     #T = dnx.pegasus_graph(m, coordinates=True)
 
@@ -907,6 +883,7 @@ if __name__== "__main__":
         traceback.print_exc()
 
     print('Embedding:' + str(embedding))
+    plt.clf()
     dnx.draw_chimera_embedding(T, embedding)
     #dnx.draw_pegasus_embedding(T, embedding)
     plt.show()
