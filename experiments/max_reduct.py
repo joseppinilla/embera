@@ -104,9 +104,9 @@ if __name__== "__main__":
     ############################################################################
                             # Pruning
                             S_edgelist = list(S.edges())
-                            edges = len(S_edgelist)
-                            if i_prune >= edges: continue
                             for i in range(tries):
+                                edges = len(S_edgelist)
+                                if i_prune >= edges: break
                                 for val in range(i_prune):
                                     S_edgelist.pop( random.randrange(edges) )
                                     edges-=1
@@ -116,6 +116,7 @@ if __name__== "__main__":
                                 t_start = time.time()
                                 embedding = sampler.get_embedding(S_edgelist,
                                                     get_new = True,
+                                                    tries=1,
                                                     verbose=verbose)
                                 t_end = time.time()
                                 t_elap = t_end-t_start
