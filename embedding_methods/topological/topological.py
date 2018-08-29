@@ -470,7 +470,7 @@ def _bfs(target_set, visited, visiting, queue, Sg, Tg):
     visited[node] = node_cost, node_parent, node_dist
     return node
 
-def _traceback(source, target, reached, visited, unassigned, Sg, Tg):
+def _traceback(source, target, reached, visited, unassigned, mapped, Sg, Tg):
 
     node_cost, node_parent, node_dist = visited[reached]
 
@@ -479,6 +479,7 @@ def _traceback(source, target, reached, visited, unassigned, Sg, Tg):
 
     if reached not in target_node['assigned']:
         target_node['assigned'].add(reached)
+        mapped[target] = set([reached])
         Tg.nodes[reached]['sharing'] += 1.0
         visited[reached] = node_cost + 1.0, node_parent, node_dist
 
@@ -493,9 +494,11 @@ def _traceback(source, target, reached, visited, unassigned, Sg, Tg):
             if source in unassigned[node]:
                 del unassigned[node]
                 Sg.nodes[source]['assigned'].add(node)
+                mapped[source].add(node)
             elif target in unassigned[node]:
                 del unassigned[node]
                 Sg.nodes[target]['assigned'].add(node)
+                mapped[target].add(node)
             else:
                 unassigned[node].add(source)
                 unassigned[node].add(target)
@@ -554,12 +557,10 @@ def _steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
         # Incremental BFS graph traversal
         reached = _bfs(target_set, visited, visiting, queue, Sg, Tg)
         # Retrace steps from target to source
-        path = _traceback(source, target, reached, visited, unassigned, Sg, Tg)
+        path = _traceback(source, target, reached, visited, unassigned, mapped, Sg, Tg)
         # Update tree
         edge = frozenset((source,target))
         tree[edge] = path
-
-    mapped[source] = len(Sg.nodes[source]['assigned'])
 
     return tree
 
@@ -586,7 +587,7 @@ def _get_node(node_list, mapped, opts):
     # If list is empty
     return None
 
-def _embed_node(node_name, Sg, Tg, opts):
+def _embed_node(node_name, mapped, Sg, Tg, opts):
 
     node = Sg.nodes[node_name]
 
@@ -601,6 +602,7 @@ def _embed_node(node_name, Sg, Tg, opts):
     qubit['sharing'] += 1.0
     # Assign qubit to node
     node['assigned'].add(q_index)
+    mapped[node_name] = set([q_index])
 
 def _route(Sg, Tg, opts):
     """ Negotiated Congestion algorithm
@@ -622,17 +624,19 @@ def _route(Sg, Tg, opts):
     source = _get_node(list(Sg.nodes()), mapped, opts)
     #node_list = list(Sg.nodes())
     #source = node_list.pop()
+    done = set()
     while (not legal) and (tries > 0):
         _rip_up(Sg, Tg)
-        _embed_node(source, Sg, Tg, opts)
+        _embed_node(source, mapped, Sg, Tg, opts)
         while source is not None:
             targets = unrouted(source)
             tree = _steiner_tree(source, targets, mapped, unassigned, Sg, Tg)
             paths.update(tree)
-            source = _get_node(targets, mapped, opts)
+            done.add(source)
+            source = _get_node(targets, done, opts)
         legal = _update_costs(paths, Sg, Tg)
         tries -= 1
-    return paths, unassigned
+    return paths, mapped, unassigned
 
 
 """ Linear Programming formulation to solve unassigned nodes.
@@ -645,7 +649,7 @@ def _route(Sg, Tg, opts):
         min(Z)
 """
 
-def _setup_lp(paths, unassigned, Sg):
+def _setup_lp(paths, unassigned, mapped):
     """ Setup linear Programming Problem
         Goal: Minimize
 
@@ -659,9 +663,9 @@ def _setup_lp(paths, unassigned, Sg):
     Lpvars = {}
     chain = {}
 
-    for node in Sg.nodes():
+    for node, assigned in mapped.items():
         node_name = str(node).replace(" ","")
-        lp += Z >= len(Sg.nodes[node]['assigned']), node_name
+        lp += Z >= len(assigned), node_name
 
     for edge, path in paths.items():
         # Nodes in path excluding source and target
@@ -688,14 +692,21 @@ def _setup_lp(paths, unassigned, Sg):
 
     return lp, var_map
 
-def _assign_nodes(paths, lp_sol, var_map, Sg):
+def _assign_nodes(paths, lp_sol, var_map, mapped):
 
     for edge, path in paths.items():
         # Nodes in path excluding source and target
         shared = len(path) - 2
         if shared>0:
+            u,v = edge
+            head = path[0]
+            if head in mapped[u]:
+                source = v
+                target = u
+            else:
+                source = u
+                target = v
 
-            source, target = edge
             var_s = var_map[edge][str(source).replace(" ","")]
             var_t = var_map[edge][str(target).replace(" ","")]
 
@@ -704,22 +715,22 @@ def _assign_nodes(paths, lp_sol, var_map, Sg):
             # Path from traceback starts from target
             for i in range(1,shared+1):
                 if i > num_t:
-                    Sg.nodes[source]['assigned'].add(path[i])
+                    mapped[source].add(path[i])
                 else:
-                    Sg.nodes[target]['assigned'].add(path[i])
+                    mapped[target].add(path[i])
 
 
-def _paths_to_chains(paths, unassigned, Sg):
+def _paths_to_chains(paths, unassigned, mapped):
 
     print('Assigned')
-    for name, node in Sg.nodes(data=True):
-        print(str(name) + str(node['assigned']))
+    for node, fixed in mapped.items():
+        print(str(node) + str(fixed))
 
     print('Unassigned')
     for node, shared in unassigned.items():
         print(str(node) + str(shared))
 
-    lp, var_map = _setup_lp(paths, unassigned, Sg)
+    lp, var_map = _setup_lp(paths, unassigned, mapped)
 
     if verbose>0: lp.writeLP("SHARING.lp") #TEMP change to verbose 3
 
@@ -732,15 +743,9 @@ def _paths_to_chains(paths, unassigned, Sg):
 
     print(lp_sol)
 
-    embedding = _assign_nodes(paths, lp_sol, var_map, Sg)
+    _assign_nodes(paths, lp_sol, var_map, mapped)
 
-    print('Assigned')
-    embedding = {}
-    for name, node in Sg.nodes(data=True):
-        print(str(name) + str(node['assigned']))
-        embedding[name] = node['assigned']
-
-    return embedding
+    return mapped
 
 """
 
@@ -845,9 +850,9 @@ def find_embedding(S, T, **params):
 
     _init_graphs(Sg, Tg, tiling, opts)
 
-    paths, unassigned = _route(Sg, Tg, opts)
+    paths, mapped, unassigned = _route(Sg, Tg, opts)
 
-    embedding = _paths_to_chains(paths, unassigned, Sg)
+    embedding = _paths_to_chains(paths, unassigned, mapped)
 
     return embedding
 
