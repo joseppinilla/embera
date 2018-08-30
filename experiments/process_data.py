@@ -81,16 +81,6 @@ def read_logs(filedir):
 
         yield file, arch, fault, graph, size, prune, method, results
 
-# for log in read_logs(resultsdir):
-#     file, arch, fault, graph, size, prune, method, results = log
-#     for i in range(200):
-#         if str(i) not in results:
-#             results[i] = [0.0, {}]
-#             with open(file, 'wb') as fp:
-#                 pickle.dump(results, fp)
-
-
-
 if __name__== "__main__":
 
     if not os.path.exists(resultsdir):
@@ -122,7 +112,7 @@ if __name__== "__main__":
 
         valid = 0
         for key, result in results.items():
-            t_elap, embedding = result
+            t_elap, _, embedding = result
             if embedding:
                 max_chain, min_chain, total, avg_chain, std_dev = get_stats(embedding)
                 stats[arch][graph][size][prune]['total'].append(total)
@@ -132,6 +122,7 @@ if __name__== "__main__":
                 stats[arch][graph][size][prune]['stdev'].append(std_dev)
                 stats[arch][graph][size][prune]['min'].append(min_chain)
                 valid+=1
+
         stats[arch][graph][size][prune]['success'] = valid/len(results)
 
 
@@ -157,6 +148,7 @@ if __name__== "__main__":
                 ticks = list(range(len(prune_labels)+1))
 
                 for i, metric in enumerate(['max','total','time','avg','stdev','min']):
+                #for i, metric in enumerate(['time', 'total']):
                     plt.clf()
                     plt.figure(i)
                     figname = i_arch + '_' + i_graph + '_' + i_size + '_' + metric
@@ -168,4 +160,4 @@ if __name__== "__main__":
                     plt.title(figname)
                     plt.tight_layout()
                     plt.savefig(figsdir + figname + '.png')
-                    plt.show()
+                    #plt.show()

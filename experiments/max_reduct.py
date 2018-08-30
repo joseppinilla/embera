@@ -7,6 +7,7 @@ import numpy
 import pickle
 import random
 import unittest
+import traceback
 import minorminer
 import networkx as nx
 import dwave_networkx as dnx
@@ -51,77 +52,83 @@ def log(obj, filename):
 
 if __name__== "__main__":
 
+
     results_db = set(os.listdir(resultsdir))
 
-    archs = ['C4', 'DW2X', 'DW2000Q', 'P6', 'P16']
+    archs = ['P6'] #['C4', 'DW2X', 'DW2000Q', 'P6', 'P16']
     faults = [0]
     methods = [minorminer]
-    prunes = [0,1,2,4,8,16,32,64,128,256]
-    graphs = ['complete', 'bipartite', 'grid2d']
-    N = []
+    prunes = [ int(x) for x in sys.argv[1:] ]
+    #prunes = [0,8,16] #[0,1,2,4,8,16,32,64,128,256]
+    graphs = ['complete'] #['complete', 'bipartite', 'grid2d']
+    s_sizes = [] #[50]
     tries = 200
 
-    ############################################################################
-    for i_method in methods:
-    ############################################################################
-        for i_arch in archs:
-            gen, draw, specs, profile = ARCHS[i_arch]
-            T = gen(*specs)
-            structsampler = StructureComposite(SimulatedAnnealingSampler(), T.nodes, T.edges)
-            sampler = EmbeddingComposite(structsampler, i_method)
-    ############################################################################
-            for i_fault in faults:
-                #TODO: Remove nodes/couplers from target graph
-    ############################################################################
-                for i_graph in graphs:
-                    sizes = [ profile[i_graph] ] + N
-    ############################################################################
-                    for i_size in sizes:
-                        if i_graph == 'complete':
-                            S = nx.complete_graph(i_size)
-                        elif i_graph == 'bipartite':
-                            p = int(i_size/2)
-                            S = nx.complete_bipartite_graph(p,p)
-                        elif i_graph == 'grid2d':
-                            #TEMP: Not testing grids
-                            continue
-                            p = int(math.sqrt(i_size))
-                            S = nx.grid_2d_graph(p,p)
-                        else:
-                            print('FAILED!')
-    ############################################################################
-                        for i_prune in prunes:
-                            if verbose: print('\n\nPrune %s' % i_prune)
-                            # Run experiment once
-                            data = [i_arch,str(i_fault),
-                                    i_graph,str(i_size),
-                                    str(i_prune),i_method.__name__]
-                            print(data)
-                            base = '-'.join(data)
-                            filename = base + '.pkl'
-                            if (filename in results_db): continue
-                            results = {}
-    ############################################################################
-                            # Pruning
-                            S_edgelist = list(S.edges())
-                            for i in range(tries):
-                                edges = len(S_edgelist)
-                                if i_prune >= edges: break
-                                for val in range(i_prune):
-                                    S_edgelist.pop( random.randrange(edges) )
-                                    edges-=1
-                                if verbose:
-                                    print('-------------------------Iteration %s' % i)
+    try:
+        ############################################################################
+        for i_method in methods:
+        ############################################################################
+            for i_arch in archs:
+                gen, draw, specs, profile = ARCHS[i_arch]
+                T = gen(*specs)
+                structsampler = StructureComposite(SimulatedAnnealingSampler(), T.nodes, T.edges)
+                sampler = EmbeddingComposite(structsampler, i_method)
+        ############################################################################
+                for i_fault in faults:
+                    #TODO: Remove nodes/couplers from target graph
+        ############################################################################
+                    for i_graph in graphs:
+                        sizes = [ profile[i_graph] ] + s_sizes
+        ############################################################################
+                        for i_size in sizes:
+                            if i_graph == 'complete':
+                                S = nx.complete_graph(i_size)
+                            elif i_graph == 'bipartite':
+                                p = int(i_size/2)
+                                S = nx.complete_bipartite_graph(p,p)
+                            elif i_graph == 'grid2d':
+                                #TEMP: Not testing grids
+                                continue
+                                p = int(math.sqrt(i_size))
+                                S = nx.grid_2d_graph(p,p)
+                            else:
+                                print('FAILED!')
+        ############################################################################
+                            for i_prune in prunes:
+                                if verbose: print('\n\nPrune %s' % i_prune)
+                                # Run experiment once
+                                data = [i_arch,str(i_fault),
+                                        i_graph,str(i_size),
+                                        str(i_prune),i_method.__name__]
+                                print(data)
+                                base = '-'.join(data)
+                                filename = base + '.pkl'
+                                if (filename in results_db): continue
+                                results = {}
+        ############################################################################
+                                for i in range(tries):
+                                    S_edgelist = list(S.edges())
+                                    edges = len(S_edgelist)
+                                    if i_prune >= edges: break
+                                    for val in range(i_prune):
+                                        S_edgelist.pop( random.randrange(edges) )
+                                        edges-=1
+                                    if verbose:
+                                        print('-------------------------Iteration %s' % i)
 
-                                t_start = time.time()
-                                embedding = sampler.get_embedding(S_edgelist,
-                                                    get_new = True,
-                                                    tries=1,
-                                                    verbose=verbose)
-                                t_end = time.time()
-                                t_elap = t_end-t_start
-                                results[i] = [t_elap, embedding]
-                                if verbose:
-                                    print('--len %s' % len(embedding))
-    ############################################################################
-                            log(results,filename)
+                                    t_start = time.time()
+                                    embedding = sampler.get_embedding(S_edgelist,
+                                                        get_new = True,
+                                                        tries=1,
+                                                        verbose=verbose)
+                                    t_end = time.time()
+                                    t_elap = t_end-t_start
+                                    results[i] = [t_elap, S_edgelist, embedding]
+                                    if verbose:
+                                        print('--len %s' % len(embedding))
+        ############################################################################
+                                log(results,filename)
+    except:
+        traceback.print_exc()
+        print('Current log %s may be corrupted' % filename)
+        log(results,filename)

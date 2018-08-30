@@ -2,44 +2,13 @@ import pulp
 import traceback
 import networkx as nx
 import dwave_networkx as dnx
-from heapq import heapify, heappop, heappush
-from math import floor, sqrt
 import matplotlib.pyplot as plt
+
+from math import floor, sqrt
 from embedding_methods.utilities import *
-
-
-# Concentration limit
-__d_lim__ = 0.75
+from heapq import heapify, heappop, heappush
 
 __all__ = ["find_embedding"]
-
-def _get_neighbors(i, j, n, m, index):
-    """ Calculate indices and names of negihbouring tiles to use recurrently
-        during migration and routing.
-        The vicinity parameter is later used to prune out the neighbors of
-        interest.
-        Uses cardinal notation north, south, ...
-    """
-    north = i2c(index - n, n)     if (j > 0)      else   None
-    south = i2c(index + n, n)     if (j < m-1)    else   None
-    west =  i2c(index - 1, n)     if (i > 0)      else   None
-    east =  i2c(index + 1, n)     if (i < n-1)    else   None
-
-    nw = i2c(index - n - 1, n)  if (j > 0    and i > 0)    else None
-    ne = i2c(index - n + 1, n)  if (j > 0    and i < n-1)  else None
-    se = i2c(index + n + 1, n)  if (j < m-1  and i < n-1)  else None
-    sw = i2c(index + n - 1, n)  if (j < m-1  and i > 0)    else None
-
-    return (north,south,west,east,nw,ne,se,sw)
-
-class DummyTile:
-    def __init__(self):
-        # Keyed in tile dictionary as None
-        self.name = None
-        # Treat as a fully occupied tile
-        self.concentration = 1.0
-        # Dummy empty set to skip calculations
-        self.nodes = set()
 
 class Tile:
     """ Tile for migration stage
@@ -54,7 +23,7 @@ class Tile:
         self.name = (i,j)
         self.index = index
         self.nodes = set()
-        self.neighbors = _get_neighbors(i, j, n, m, index)
+        self.neighbors = self._get_neighbors(i, j, n, m, index)
 
         if family=='chimera':
             self.supply = self._get_chimera_qubits(Tg, t, i, j)
@@ -71,6 +40,25 @@ class Tile:
 
     def remove_node(self, node):
         self.nodes.remove(node)
+
+    def _get_neighbors(self, i, j, n, m, index):
+        """ Calculate indices and names of negihbouring tiles to use recurrently
+            during migration and routing.
+            The vicinity parameter is later used to prune out the neighbors of
+            interest.
+            Uses cardinal notation north, south, ...
+        """
+        north = i2c(index - n, n)     if (j > 0)      else   None
+        south = i2c(index + n, n)     if (j < m-1)    else   None
+        west =  i2c(index - 1, n)     if (i > 0)      else   None
+        east =  i2c(index + 1, n)     if (i < n-1)    else   None
+
+        nw = i2c(index - n - 1, n)  if (j > 0    and i > 0)    else None
+        ne = i2c(index - n + 1, n)  if (j > 0    and i < n-1)  else None
+        se = i2c(index + n + 1, n)  if (j < m-1  and i < n-1)  else None
+        sw = i2c(index + n - 1, n)  if (j < m-1  and i > 0)    else None
+
+        return (north,south,west,east,nw,ne,se,sw)
 
     def _get_chimera_qubits(self, Tg, t, i, j):
         """ Finds the available qubits associated to tile (i,j) of the Chimera
@@ -115,6 +103,15 @@ class Tile:
                     Tg.nodes[pegasus_index]['tile'] = (i,j)
                     v += 1.0
         return v
+
+class DummyTile:
+    def __init__(self):
+        # Keyed in tile dictionary as None
+        self.name = None
+        # Treat as a fully occupied tile
+        self.concentration = 1.0
+        # Dummy empty set to skip calculations
+        self.nodes = set()
 
 class Tiling:
     """Tiling for migration stage
@@ -206,7 +203,8 @@ def _get_attractors(tiling, i, j):
         if (lv):    return e,n,ne
         else:       return e,s,se
 
-def _get_gradient(tile, tiling):
+def _get_gradient(tile, tiling, opts):
+    d_lim = opts.d_lim
 
     d_ij = tile.concentration
     if d_ij == 0.0 or tile.name==None: return 0.0, 0.0
@@ -214,8 +212,8 @@ def _get_gradient(tile, tiling):
     d_h = tiling.tiles[h].concentration
     d_v = tiling.tiles[v].concentration
     d_hv = tiling.tiles[hv].concentration
-    del_x = - (__d_lim__ - (d_h + 0.5*d_hv)) / (2.0 * d_ij)
-    del_y = - (__d_lim__ - (d_v + 0.5*d_hv)) / (2.0 * d_ij)
+    del_x = - (d_lim - (d_h + 0.5*d_hv)) / (2.0 * d_ij)
+    del_y = - (d_lim - (d_v + 0.5*d_hv)) / (2.0 * d_ij)
     return del_x, del_y
 
 
@@ -239,7 +237,7 @@ def _step(Sg, tiling, opts):
     # Iterate over tiles
     for name, tile in tiling.tiles.items():
 
-        del_x, del_y = _get_gradient(tile, tiling)
+        del_x, del_y = _get_gradient(tile, tiling, opts)
         # Iterate over nodes in tile and migrate
         for node in tile.nodes:
             x, y = Sg.nodes[node]['coordinate']
@@ -302,8 +300,6 @@ def _condition(tiling, dispersion):
     variance = (diff_accum/3.0)
     spread = variance > 0.01
     return spread and not increasing
-
-
 
 def _migrate(Sg, tiling, opts):
     """
@@ -454,7 +450,7 @@ def _bfs(target_set, visited, visiting, queue, Tg):
         _, node_parent, node_dist = visiting[node]
         found = (node in target_set) and (node_dist >= 2)
 
-    print('Found target' + str(node) + str(node_dist))
+    print( 'Found target %s at %s' % (str(node), str(node_dist)) )
     visited[node] = node_cost, node_parent, node_dist
     return node
 
@@ -496,23 +492,23 @@ def _traceback(source, target, reached, visited, unassigned, mapped, Tg):
     return path
 
 
+def _get_target_set(target, mapped, Sg):
+    target_node = Sg.nodes[target]
+    target_candidates = target_node['candidates']
+    return target_candidates if target not in mapped else mapped[target]
+
 def _init_queue(source, visiting, queue, mapped, Sg):
     source_node = Sg.nodes[source]
     for node in mapped[source]:
         node_cost = 0.0
         node_parent = source
-        node_dist =  1 if node in source_node['candidates'] else 2
+        node_dist =  1
         visiting[node] = (node_cost, node_parent, node_dist)
         heappush(queue, (node_cost, node))
 
     if verbose:
         queue_str = str(["%0.3f %s" % (c,str(n)) for c,n in queue])
         print('Init Queue:' + queue_str)
-
-def _get_target_set(target, mapped, Sg):
-    target_node = Sg.nodes[target]
-    target_candidates = target_node['candidates']
-    return target_candidates if target not in mapped else mapped[target]
 
 def _steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
     """ Steiner Tree Search
@@ -539,7 +535,7 @@ def _steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
         # Retrace steps from target to source
         path = _traceback(source, target, reached, visited, unassigned, mapped, Tg)
         # Update tree
-        edge = frozenset((source,target))
+        edge = (source,target)
         tree[edge] = path
 
     return tree
@@ -550,8 +546,8 @@ def _update_costs(paths, Sg, Tg):
     """
     legal = True
     print("Paths:")
-    for (u,v), path in paths.items():
-        print(u,v,path)
+    for (source,target), path in paths.items():
+        print(source, target, path)
         for qubit in path:
             print(Tg.nodes[qubit]['sharing'])
             if Tg.nodes[qubit]['sharing'] > 1:
@@ -559,19 +555,11 @@ def _update_costs(paths, Sg, Tg):
 
     return legal
 
-def _get_node(node_list, opts, done={}):
-    # Next node not done
-    for node in node_list:
-        if node not in done:
-            return node
-    # If list is empty
-    return None
+def _embed_node(source, mapped, Sg, Tg, opts):
 
-def _embed_node(node_name, mapped, Sg, Tg, opts):
+    if source in mapped: return
 
-    node = Sg.nodes[node_name]
-
-    if node_name in mapped: return
+    node = Sg.nodes[source]
 
     # Get best candidate
     candidates = node['candidates']
@@ -581,7 +569,7 @@ def _embed_node(node_name, mapped, Sg, Tg, opts):
     qubit = Tg.nodes[q_index]
     qubit['sharing'] += 1.0
     # Assign qubit to node
-    mapped[node_name] = set([q_index])
+    mapped[source] = set([q_index])
 
 def _rip_up(Tg, paths={}, mapped={}, unassigned={}):
     """
@@ -597,6 +585,15 @@ def _rip_up(Tg, paths={}, mapped={}, unassigned={}):
 
     return paths, mapped, unassigned
 
+def _get_node(pending_set, pre_sel=[], opts={}):
+    # Next node preferably in pre-selected nodes
+    for node in pre_sel:
+        if node in pending_set:
+            pending_set.remove(node)
+            return node
+    # Random if not
+    return pending_set.pop()
+
 def _route(Sg, Tg, opts):
     """ Negotiated Congestion algorithm
 
@@ -605,19 +602,18 @@ def _route(Sg, Tg, opts):
     # Termination criteria
     legal = False
     tries = opts.tries
-    source = _get_node(list(Sg.nodes()), opts)
-    #node_list = list(Sg.nodes())
-    #source = node_list.pop()
-    done = set()
+    # First node selection
+    pending_set = set(Sg)
+    source = _get_node(pending_set)
+    # Negotiated Congestion
     while (not legal) and (tries > 0):
         paths, mapped, unassigned = _rip_up(Tg)
         _embed_node(source, mapped, Sg, Tg, opts)
-        while source is not None:
-            targets = [v for v in Sg[source] if frozenset((source,v)) not in paths]
+        while pending_set:
+            targets = [target for target in Sg[source] if target in pending_set]
             tree = _steiner_tree(source, targets, mapped, unassigned, Sg, Tg)
             paths.update(tree)
-            done.add(source)
-            source = _get_node(targets, opts, done)
+            source = _get_node(pending_set, pre_sel=targets)
         legal = _update_costs(paths, Sg, Tg)
         tries -= 1
     return paths, mapped, unassigned
@@ -633,7 +629,7 @@ def _route(Sg, Tg, opts):
         min(Z)
 """
 
-def _setup_lp(paths, unassigned, mapped):
+def _setup_lp(paths, mapped, unassigned):
     """ Setup linear Programming Problem
         Goal: Minimize
 
@@ -654,7 +650,7 @@ def _setup_lp(paths, unassigned, mapped):
     for edge, path in paths.items():
         # Nodes in path excluding source and target
         shared = len(path) - 2
-        if shared>0:
+        if shared > 0:
             # PuLP variable names do not support spaces
             s_name, t_name = (str(x).replace(" ","") for x in edge)
             # Name of variables are var<source><edge> and var<target><edge>
@@ -682,14 +678,7 @@ def _assign_nodes(paths, lp_sol, var_map, mapped):
         # Nodes in path excluding source and target
         shared = len(path) - 2
         if shared>0:
-            u,v = edge
-            head = path[0]
-            if head in mapped[u]:
-                source = v
-                target = u
-            else:
-                source = u
-                target = v
+            source, target = edge
 
             var_s = var_map[edge][str(source).replace(" ","")]
             var_t = var_map[edge][str(target).replace(" ","")]
@@ -704,7 +693,7 @@ def _assign_nodes(paths, lp_sol, var_map, mapped):
                     mapped[target].add(path[i])
 
 
-def _paths_to_chains(paths, unassigned, mapped):
+def _paths_to_chains(paths, mapped, unassigned):
 
     print('Assigned')
     for node, fixed in mapped.items():
@@ -714,7 +703,7 @@ def _paths_to_chains(paths, unassigned, mapped):
     for node, shared in unassigned.items():
         print(str(node) + str(shared))
 
-    lp, var_map = _setup_lp(paths, unassigned, mapped)
+    lp, var_map = _setup_lp(paths, mapped, unassigned)
 
     if verbose>0: lp.writeLP("SHARING.lp") #TEMP change to verbose 3
 
@@ -763,11 +752,15 @@ class TopologicalOptions(EmbedderOptions):
         try: self.delta_t = params['delta_t']
         except: self.delta_t = 0.2
 
+        try: self.d_lim = params['d_lim']
+        except: self.d_lim = 0.75
+
         try: self.viscosity = params['viscosity']
         except: self.viscosity = 0.0
 
         try: self.verbose = params['verbose']
         except: self.verbose = 0
+
 
 def find_embedding(S, T, **params):
     """
@@ -793,13 +786,11 @@ def find_embedding(S, T, **params):
         topology ({<node>:(<x>,<y>),...}):
             Dict of 2D positions assigned to the source graph nodes.
 
-        vicinity (int): Configuration of the set of tiles that will provide the
-            candidate qubits.
+        vicinity (int): Granularity of the candidate qubits.
             0: Single tile
-            1: Immediate neighbors (north, south, east, west)
-            2: Extended neighbors (Immediate) + diagonals
-            3: Directed (Single) + 3 tiles closest to the node
-
+            1: Immediate neighbors = (north, south, east, west)
+            2: Extended neighbors = (Immediate) + diagonals
+            3: Directed  = (Single) + 3 tiles closest to the node
 
         random_seed (int):
 
@@ -836,7 +827,7 @@ def find_embedding(S, T, **params):
 
     paths, mapped, unassigned = _route(Sg, Tg, opts)
 
-    embedding = _paths_to_chains(paths, unassigned, mapped)
+    embedding = _paths_to_chains(paths, mapped, unassigned)
 
     return embedding
 
@@ -846,7 +837,7 @@ if __name__== "__main__":
 
     verbose = 3
 
-    p = 2
+    p = 4
     S = nx.grid_2d_graph(p,p)
     topology = {v:v for v in S}
 
@@ -857,7 +848,7 @@ if __name__== "__main__":
     #S = nx.relabel_nodes(S, {0:'A',1:'B',2:'C'})
     #topology = nx.spring_layout(S)
 
-    m = 2
+    m = 4
     T = dnx.chimera_graph(m, coordinates=True)
     #T = dnx.pegasus_graph(m, coordinates=True)
 
