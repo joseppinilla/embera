@@ -29,8 +29,8 @@ from dimod.reference.samplers.random_sampler import RandomSampler
 from dimod.reference.composites.structure import StructureComposite
 from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampler
 
-verbose = 0
-tries = 3
+verbose = 1
+tries = 4
 
 filedir = "./results/"
 
@@ -41,7 +41,7 @@ class CharacterizeEmbedding(unittest.TestCase):
         self.tries = tries
         self.target = 'C4'
         self.method = minorminer
-        gen, _, specs = ARCHS['C4']
+        gen, _, specs, _ = ARCHS['C4']
         T = gen(*specs)
         self.structsampler = StructureComposite(SimulatedAnnealingSampler(), T.nodes, T.edges)
         self.sampler = EmbeddingComposite(self.structsampler, self.method)
@@ -55,6 +55,7 @@ class CharacterizeEmbedding(unittest.TestCase):
         if not os.path.exists(filedir):
             os.makedirs(filedir)
         filename = self.target + graphstr + sizestr + methodstr + ".pkl"
+        if verbose: print(filename)
         self.log_pickle(obj, filedir + filename)
         #filename = self.target + graphstr + sizestr + methodstr + ".json"
         #self.log_json(obj, filedir + filename)
@@ -76,14 +77,16 @@ class CharacterizeEmbedding(unittest.TestCase):
         results = {}
         valid = False
         for i in range(self.tries):
+            print('-------------------------Iteration %s' % i)
             t_start = time.time()
             embedding = sampler.get_embedding(S_edgelist,
                                 get_new = True,
+                                timeout = 30,
                                 verbose=verbose)
             t_end = time.time()
             t_elap = t_end-t_start
 
-            if bool(embedding): valid = True
+            valid = bool(embedding)
             results[i] = [ t_elap, embedding ]
 
         return valid, results
@@ -92,7 +95,6 @@ class CharacterizeEmbedding(unittest.TestCase):
 
         sampler = self.sampler
         T_size = len(self.structsampler.nodelist)
-
         # Expect maximum size to embed is equal to size of target
         S_max = T_size
         S_size = math.ceil(T_size/2)
@@ -128,43 +130,85 @@ class CharacterizeEmbedding(unittest.TestCase):
         G.name = 'grid2d'
         return G
 
-    def test_complete(self):
+    def hypercube_generator(self, size):
+        n = int(math.log(size,2))
+        G = nx.hypercube_graph(n)
+        G.name = 'hypercube'
+        return G
+
+    def rooks_generator(self, size):
+        m = n = int(math.sqrt(size))
+        G = nx.complete_graph(n)
+        H = nx.complete_graph(m)
+        F = nx.cartesian_product(G,H)
+        print(len(F))
+        F.name = 'rooks'
+        return F
+
+    def complete(self):
         self.size_bisection(self.complete_generator)
 
-    def test_bipartite(self):
+    def bipartite(self):
         self.size_bisection(self.complete_bipartite_generator)
 
-    def test_grid(self):
+    def grid(self):
         self.size_bisection(self.grid_2d_generator)
 
+    def hypercube(self):
+        self.size_bisection(self.hypercube_generator)
+
+    def rooks(self):
+        self.size_bisection(self.rooks_generator)
 
 
 class CharacterizeArchitecture(CharacterizeEmbedding):
 
-    def all_tests(self):
-        gen, _, specs = ARCHS[self.target]
+    def all_graphs(self):
+        gen, _, specs, _ = ARCHS[self.target]
         T = gen(*specs)
         self.structsampler = StructureComposite(SimulatedAnnealingSampler(), T.nodes, T.edges)
-        self.test_grid()
-        self.test_bipartite()
-        self.test_complete()
+        self.grid()
+        self.bipartite()
+        self.complete()
+        self.hypercube()
+
+    def all_archs(self):
+        for arch, (gen, _, specs, _) in ARCHS.items():
+            print('ARCH %s' % arch)
+            self.target = arch
+            T = gen(*specs)
+            self.structsampler = StructureComposite(SimulatedAnnealingSampler(), T.nodes, T.edges)
+            self.sampler = EmbeddingComposite(self.structsampler, self.method)
+            self.graph()
+
+    def test_hypercube(self):
+        self.graph = self.hypercube
+        self.all_archs()
+
+    def test_rooks(self):
+        self.graph = self.rooks
+        self.all_archs()
+
+    def test_complete(self):
+        self.graph = self.complete
+        self.all_archs()
 
     def test_dw2000q(self):
         """ D-Wave 2000Q """
         self.target = 'DW2000Q'
-        all_tests()
+        self.all_graphs()
 
     def test_dw2x(self):
         """ D-Wave 2X """
         self.target = 'DW2X'
-        all_tests()
+        self.all_graphs()
 
     def test_p6(self):
         """ D-Wave P6 """
         self.target = 'P6'
-        all_tests()
+        self.all_graphs()
 
     def test_p16(self):
         """ D-Wave P16 """
         self.target = 'P16'
-        all_tests()
+        self.all_graphs()

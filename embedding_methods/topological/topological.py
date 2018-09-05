@@ -540,6 +540,10 @@ def _steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
 
     return tree
 
+def simultaneous_steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
+    #TODO: Implement
+    pass
+
 def _update_costs(paths, Sg, Tg):
     """ Update present-sharing and history-sharing costs
 
