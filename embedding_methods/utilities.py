@@ -31,7 +31,7 @@ class EmbedderOptions:
         self.rng = random.Random(self.random_seed)
 
         try: self.tries = params['tries']
-        except: self.tries = 1
+        except: self.tries = 10
 
         try: self.construction = params['construction']
         except: self.construction = __default_construction__

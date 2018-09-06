@@ -395,29 +395,12 @@ def _get_cost(node_tile, neighbor_name, Tg):
 
     return base_cost * sharing_cost * history_cost
 
-def _pre_search(target_set, queue, visited, visiting):
-
-    for tgt in target_set:
-        if tgt in visited:
-            tgt_cost, tgt_parent, tgt_dist = visited[tgt]
-            # If newly occupied, node cost has been increased
-            heappush(queue, (tgt_cost, tgt))
-            visiting[tgt] = tgt_cost, tgt_parent, tgt_dist
-        elif tgt in visiting:
-            tgt_cost, tgt_parent, tgt_dist = visiting[tgt]
-            # Decrease cost in PQ
-            heappush(queue, (tgt_cost-1.0, tgt))
-            visiting[tgt] = tgt_cost-1.0, tgt_parent, tgt_dist
-
 def _bfs(target_set, visited, visiting, queue, Tg):
     """ Breadth-First Search
         Args:
             queue: Breadth-First Search Priority Queue
 
     """
-
-    # If target has been reached in current tree search
-    _pre_search(target_set, queue, visited, visiting)
 
     # Pop node out of Priority queue and its cost, parent, and distance.
     node_cost, node = heappop(queue)
@@ -456,12 +439,11 @@ def _bfs(target_set, visited, visiting, queue, Tg):
 
 def _traceback(source, target, reached, visited, unassigned, mapped, Tg):
 
-    node_cost, node_parent, node_dist = visited[reached]
+    _, node_parent, _ = visited[reached]
 
     if target not in mapped:
         mapped[target] = set([reached])
         Tg.nodes[reached]['sharing'] += 1.0
-        visited[reached] = node_cost + 1.0, node_parent, node_dist
 
     path = [reached]
     node = node_parent
@@ -483,8 +465,7 @@ def _traceback(source, target, reached, visited, unassigned, mapped, Tg):
             unassigned[node] = set([source, target])
 
         Tg.nodes[node]['sharing'] += 1.0
-        node_cost, node_parent, node_dist = visited[node]
-        visited[node] = node_cost + 1.0, node_parent, node_dist
+        _, node_parent, _ = visited[node]
         node = node_parent
     path.append(node)
 
@@ -496,6 +477,20 @@ def _get_target_set(target, mapped, Sg):
     target_node = Sg.nodes[target]
     target_candidates = target_node['candidates']
     return target_candidates if target not in mapped else mapped[target]
+
+def _get_target_dict(targets, mapped, Sg):
+    target_dict = {}
+    for target in targets:
+        target_node = Sg.nodes[target]
+        target_candts = target_node['candidates']
+        target_set = target_candts if target not in mapped else mapped[target]
+        for t_node in target_set:
+            if t_node not in target_dict:
+                target_dict[t_node] = set([target])
+            else:
+                target_dict[t_node].add(target)
+
+    return target_dict
 
 def _init_queue(source, visiting, queue, mapped, Sg):
     source_node = Sg.nodes[source]
@@ -516,21 +511,21 @@ def _steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
     print('\n New Source:' + str(source))
     # Resulting tree dictionary keyed by edges and path values.
     tree = {}
-    # Breadth-First Search structures.
-    visiting = {} # (cost, parent, distance) during search
-    visited = {} # (parent, distance) after popped from queue
-    # Priority Queue (cost, name)
-    queue = []
-
-    # Start search using previously-assigned nodes
-    _init_queue(source, visiting, queue, mapped, Sg)
 
     # Breadth-First Search
     for target in targets:
         print('Target:' + str(target))
+        # Breadth-First Search structures.
+        visiting = {} # (cost, parent, distance) during search
+        visited = {} # (parent, distance) after popped from queue
+        # Priority Queue (cost, name)
+        queue = []
+        # Start search using previously-assigned nodes
+        _init_queue(source, visiting, queue, mapped, Sg)
         # Search for target candidates, or nodes assigned to target
         target_set = _get_target_set(target, mapped, Sg)
-        # Incremental BFS graph traversal
+        print('Target Dict: %s' % _get_target_dict(targets, mapped, Sg))
+        # BFS graph traversal
         reached = _bfs(target_set, visited, visiting, queue, Tg)
         # Retrace steps from target to source
         path = _traceback(source, target, reached, visited, unassigned, mapped, Tg)
@@ -540,9 +535,38 @@ def _steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
 
     return tree
 
-def simultaneous_steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
-    #TODO: Implement
-    pass
+def _simultaneous_steiner(source, targets, mapped, unassigned, Sg, Tg):
+    #TODO: Implement a simultaneous tree search.
+    # Traceback when any target is hit.
+    """ Simultaneous Steiner Tree Search
+    """
+    print('\n New Source:' + str(source))
+    # Resulting tree dictionary keyed by edges and path values.
+    tree = {}
+
+    # Breadth-First Search structures.
+    visiting = {} # (cost, parent, distance) during search
+    visited = {} # (parent, distance) after popped from queue
+    # Priority Queue (cost, name)
+    queue = []
+    # Start search using previously-assigned nodes
+    _init_queue(source, visiting, queue, mapped, Sg)
+    # Search for target candidates, or nodes assigned to target
+    target_dict = _get_target_dict(targets, mapped, Sg)
+    # Breadth-First Search
+    while target_dict:
+        # BFS graph traversal
+        reached = _bfs(target_set, visited, visiting, queue, Tg)
+        # Pop source node assigned to target node
+        target = target_dict[reached].pop()
+        # Retrace steps from target to source
+        path = _traceback(source, target, reached, visited, unassigned, mapped, Tg)
+        # Update tree
+        edge = (source,target)
+        tree[edge] = path
+        del target_dict[reached]
+
+    return tree
 
 def _update_costs(paths, Sg, Tg):
     """ Update present-sharing and history-sharing costs
@@ -620,7 +644,7 @@ def _route(Sg, Tg, opts):
             source = _get_node(pending_set, pre_sel=targets)
         legal = _update_costs(paths, Sg, Tg)
         tries -= 1
-    return paths, mapped, unassigned
+    return legal, paths, mapped, unassigned
 
 
 """ Linear Programming formulation to solve unassigned nodes.
@@ -697,7 +721,9 @@ def _assign_nodes(paths, lp_sol, var_map, mapped):
                     mapped[target].add(path[i])
 
 
-def _paths_to_chains(paths, mapped, unassigned):
+def _paths_to_chains(legal, paths, mapped, unassigned):
+
+    if not legal: return {}
 
     print('Assigned')
     for node, fixed in mapped.items():
@@ -829,19 +855,18 @@ def find_embedding(S, T, **params):
 
     _init_graphs(Sg, Tg, tiling, opts)
 
-    paths, mapped, unassigned = _route(Sg, Tg, opts)
+    legal, paths, mapped, unassigned = _route(Sg, Tg, opts)
 
-    embedding = _paths_to_chains(paths, mapped, unassigned)
+    embedding = _paths_to_chains(legal, paths, mapped, unassigned)
 
     return embedding
-
 
 #TEMP: standalone test
 if __name__== "__main__":
 
     verbose = 3
 
-    p = 4
+    p = 2
     S = nx.grid_2d_graph(p,p)
     topology = {v:v for v in S}
 
@@ -852,7 +877,7 @@ if __name__== "__main__":
     #S = nx.relabel_nodes(S, {0:'A',1:'B',2:'C'})
     #topology = nx.spring_layout(S)
 
-    m = 4
+    m = 1
     T = dnx.chimera_graph(m, coordinates=True)
     #T = dnx.pegasus_graph(m, coordinates=True)
 
