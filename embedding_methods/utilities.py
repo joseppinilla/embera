@@ -84,9 +84,6 @@ def _read_chimera_graph(T, opts):
 def _read_pegasus_graph(T, opts):
 
     m = opts.construction['rows']
-    n = opts.construction['columns']
-    t = opts.construction['tile']
-    data = opts.construction['data']
     vertical_offsets = opts.construction['vertical_offsets']
     horizontal_offsets = opts.construction['horizontal_offsets']
     coordinates = opts.construction['labels'] == 'coordinate'

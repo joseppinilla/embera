@@ -4,9 +4,11 @@ import networkx as nx
 import dwave_networkx as dnx
 import matplotlib.pyplot as plt
 
-from math import floor, sqrt
-from embedding_methods.utilities import *
-from heapq import heapify, heappop, heappush
+from math import floor
+from embedding_methods.utilities import draw_tiled_graph
+from embedding_methods.utilities import EmbedderOptions, i2c
+from embedding_methods.utilities import read_source_graph, read_target_graph
+from heapq import heappop, heappush
 
 __all__ = ["find_embedding"]
 
@@ -184,7 +186,7 @@ def _scale(Sg, tiling, opts):
         tile = min(floor(scaled_x), n-1), min(floor(scaled_y), m-1)
         node['tile'] = tile
         tiling.tiles[tile].nodes.add(name)
-        dist_accum += (scaled_x-center_x)**2 + (scaled_y-center_x)**2
+        dist_accum += (scaled_x-center_x)**2 + (scaled_y-center_y)**2
 
     # Initial dispersion
     dispersion = dist_accum/P
@@ -192,22 +194,21 @@ def _scale(Sg, tiling, opts):
 
 def _get_attractors(tiling, i, j):
 
-    n,s,w,e,nw,ne,se,sw = tiling.tiles[(i,j)].neighbors
+    n, s, w, e, nw, ne, se, sw = tiling.tiles[(i,j)].neighbors
     lh = (i >= 0.5*tiling.n)
     lv = (j >= 0.5*tiling.m)
 
-    if (lh):
-        if (lv):    return w,n,nw
-        else:       return w,s,sw
-    else:
-        if (lv):    return e,n,ne
-        else:       return e,s,se
+    if lh:
+        return (w, n, nw) if lv else (w, s, sw)
+    # else
+    return (e, n, ne) if lv else (e, s, se)
 
 def _get_gradient(tile, tiling, opts):
     d_lim = opts.d_lim
 
     d_ij = tile.concentration
-    if d_ij == 0.0 or tile.name==None: return 0.0, 0.0
+    if d_ij == 0.0 or tile.name == None:
+        return 0.0, 0.0
     h, v, hv = _get_attractors(tiling, *tile.name)
     d_h = tiling.tiles[h].concentration
     d_v = tiling.tiles[v].concentration
@@ -235,7 +236,7 @@ def _step(Sg, tiling, opts):
     D = min( (viscosity*P) / Q, 1.0)
 
     # Iterate over tiles
-    for name, tile in tiling.tiles.items():
+    for tile in tiling.tiles.values():
 
         del_x, del_y = _get_gradient(tile, tiling, opts)
         # Iterate over nodes in tile and migrate
@@ -456,7 +457,7 @@ def _traceback(source, target, reached, visited, unassigned, mapped, Tg):
             unassigned[node] = set([source, target])
 
         Tg.nodes[node]['sharing'] += 1.0
-        node_cost, node_parent, node_dist = visited[node]
+        _, node_parent, _ = visited[node]
         node = node_parent
     path.append(node)
 
@@ -531,7 +532,7 @@ def _update_costs(paths, mapped, unassigned, Sg, Tg):
 
     legal = True
     print("Mapped")
-    for s_node, t_nodes in mapped.items():
+    for t_nodes in mapped.values():
         for t_node in t_nodes:
             Tg.nodes[t_node]['history'] += 1.0
             sharing =  Tg.nodes[t_node]['sharing']
@@ -626,7 +627,7 @@ def _setup_lp(paths, mapped, unassigned):
             -Constraint names need to start with letters
 
         Example: K3 embedding requiring a 2-length Chain
-            >>  \* Solve Chains *\
+            >>  Solve Chains
             >>  Minimize
             >>  OBJ: Z
             >>  Subject To
@@ -651,7 +652,6 @@ def _setup_lp(paths, mapped, unassigned):
 
     var_map = {}
     Lpvars = {}
-    chain = {}
 
     # Create constraints per source node
     for node, assigned in mapped.items():
@@ -692,10 +692,8 @@ def _assign_nodes(paths, lp_sol, var_map, mapped):
         if shared>0:
             source, target = edge
 
-            var_s = var_map[edge][str(source).replace(" ","")]
             var_t = var_map[edge][str(target).replace(" ","")]
 
-            num_s = lp_sol[var_s]
             num_t = lp_sol[var_t]
             # Path from traceback starts from target
             for i in range(1,shared+1):
@@ -851,16 +849,16 @@ if __name__== "__main__":
     verbose = 3
 
     p = 4
-    #S = nx.grid_2d_graph(p,p)
-    #topology = {v:v for v in S}
+    S = nx.grid_2d_graph(p, p)
+    topology = {v:v for v in S}
 
     #S = nx.cycle_graph(p)
     #topology = nx.circular_layout(S)
 
-    S = nx.complete_graph(p)
-    topology = nx.spring_layout(S)
+    #S = nx.complete_graph(p)
+    #topology = nx.spring_layout(S)
 
-    m = 2
+    m = 4
     T = dnx.chimera_graph(m, coordinates=True)
     #T = dnx.pegasus_graph(m, coordinates=True)
 

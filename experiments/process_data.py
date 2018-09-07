@@ -11,7 +11,7 @@ matplotlib.rcParams['axes.formatter.useoffset'] = False
 
 from collections import Counter, OrderedDict
 
-from embedding_methods.architectures import *
+from embedding_methods.architectures import ARCHS
 
 
 resultsdir = "./results/"
@@ -43,7 +43,7 @@ def get_stats(embedding):
     min_chain = sys.maxsize
     total = 0
     N = len(embedding)
-    for node, chain in embedding.items():
+    for chain in embedding.values():
         chain_len = len(chain)
         total += chain_len
         if chain_len > max_chain:
@@ -52,7 +52,7 @@ def get_stats(embedding):
             min_chain =  chain_len
     avg_chain = total/N
     sum_deviations = 0
-    for node, chain in embedding.items():
+    for chain in embedding.values():
         chain_len = len(chain)
         deviation = (chain_len - avg_chain)**2
         sum_deviations += deviation
@@ -60,22 +60,10 @@ def get_stats(embedding):
 
     return max_chain, min_chain, total, avg_chain, std_dev
 
-def plot_histo(title, result):
-    for i, result in results.items():
-        time, embedding = result
-        if embedding:
-            histo = chain_length_histo(embedding)
-            plt.bar(list(histo.keys()), histo.values())
-            plt.xticks(list(histo.keys()))
-            plt.title(title)
-            plt.show()
-            #draw(T, embedding)
-            #plt.show()
-
 def read_logs(filedir):
     for file in os.listdir(filedir):
         filename = os.path.join(filedir, file)
-        base, ext = os.path.splitext(file)
+        base, _ = os.path.splitext(file)
         results = read_log_pickle(filename)
         arch, fault, graph, size, prune, method = base.split('-')
 

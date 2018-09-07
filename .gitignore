@@ -105,6 +105,9 @@ venv.bak/
 
 # JSON and Pickled data
 results/
+figs/
+*.zip
 
 # Visual Studio Code project settings
 .vscode/
+
