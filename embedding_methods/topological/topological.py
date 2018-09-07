@@ -1,5 +1,9 @@
 import pulp
 import traceback
+
+import matplotlib
+matplotlib.use('Qt4Agg')
+
 import networkx as nx
 import dwave_networkx as dnx
 import matplotlib.pyplot as plt
@@ -525,7 +529,7 @@ def _steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
 
     return tree
 
-def _update_costs(paths, mapped, unassigned, Sg, Tg):
+def _update_costs(mapped, Tg):
     """ Update present-sharing and history-sharing costs
 
     """
@@ -585,7 +589,7 @@ def _get_node(pending_set, pre_sel=[], opts={}):
     return pending_set.pop()
 
 def _route(Sg, Tg, opts):
-    """ Negotiated Congestion algorithm
+    """ Negotiated Congestion
 
     """
 
@@ -606,7 +610,7 @@ def _route(Sg, Tg, opts):
             tree = _steiner_tree(source, targets, mapped, unassigned, Sg, Tg)
             paths.update(tree)
             source = _get_node(pending_set, pre_sel=targets)
-        legal = _update_costs(paths, mapped, unassigned, Sg, Tg)
+        legal = _update_costs(mapped, Tg)
         tries -= 1
     return legal, paths, mapped, unassigned
 
@@ -849,16 +853,16 @@ if __name__== "__main__":
     verbose = 3
 
     p = 4
-    S = nx.grid_2d_graph(p, p)
-    topology = {v:v for v in S}
+    #S = nx.grid_2d_graph(p, p)
+    #topology = {v:v for v in S}
 
     #S = nx.cycle_graph(p)
     #topology = nx.circular_layout(S)
 
-    #S = nx.complete_graph(p)
-    #topology = nx.spring_layout(S)
+    S = nx.complete_graph(p)
+    topology = nx.spring_layout(S)
 
-    m = 4
+    m = 2
     T = dnx.chimera_graph(m, coordinates=True)
     #T = dnx.pegasus_graph(m, coordinates=True)
 
