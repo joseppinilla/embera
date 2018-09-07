@@ -304,10 +304,6 @@ def _condition(tiling, dispersion):
 def _migrate(Sg, tiling, opts):
     """
     """
-    m = opts.construction['rows']
-    n = opts.construction['columns']
-    familiy = opts.construction['family']
-
     migrating = opts.enable_migration
     while migrating:
         _get_demand(Sg, tiling, opts)
@@ -342,7 +338,6 @@ def _simulated_annealing(Sg, tiling, opts):
     rng = opts.rng
     m = opts.construction['rows']
     n = opts.construction['columns']
-    family = opts.construction['family']
 
     init_loc = {}
     for node in S:
@@ -383,7 +378,7 @@ def _get_cost(node_tile, neighbor_name, Tg):
 
     next_node = Tg.nodes[neighbor_name]
 
-    sharing_cost = 1.0 + next_node['sharing']
+    sharing_cost = 1.0 + next_node['sharing'] * 0.4
 
     scope_cost = 0.0 if node_tile==next_node['tile'] else 1.0
 
@@ -413,11 +408,7 @@ def _bfs(target_set, visited, visiting, queue, Tg):
         neighbor_parent = node
         for neighbor in Tg[node]:
             if neighbor not in visited:
-                if neighbor in target_set:
-                    # Queue target without added cost
-                    neighbor_cost = node_cost
-                else:
-                    neighbor_cost = node_cost + _get_cost(node_tile, neighbor, Tg)
+                neighbor_cost = node_cost + _get_cost(node_tile, neighbor, Tg)
 
                 heappush(queue, (neighbor_cost, neighbor))
                 neighbor_data = neighbor_cost, neighbor_parent, neighbor_dist
@@ -433,7 +424,7 @@ def _bfs(target_set, visited, visiting, queue, Tg):
         _, node_parent, node_dist = visiting[node]
         found = (node in target_set) and (node_dist >= 2)
 
-    print( 'Found target %s at %s' % (str(node), str(node_dist)) )
+    print( 'Found target %s at %s cost %s' % (str(node), str(node_dist), str(node_cost)) )
     visited[node] = node_cost, node_parent, node_dist
     return node
 
@@ -465,7 +456,7 @@ def _traceback(source, target, reached, visited, unassigned, mapped, Tg):
             unassigned[node] = set([source, target])
 
         Tg.nodes[node]['sharing'] += 1.0
-        _, node_parent, _ = visited[node]
+        node_cost, node_parent, node_dist = visited[node]
         node = node_parent
     path.append(node)
 
@@ -493,7 +484,6 @@ def _get_target_dict(targets, mapped, Sg):
     return target_dict
 
 def _init_queue(source, visiting, queue, mapped, Sg):
-    source_node = Sg.nodes[source]
     for node in mapped[source]:
         node_cost = 0.0
         node_parent = source
@@ -524,7 +514,6 @@ def _steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
         _init_queue(source, visiting, queue, mapped, Sg)
         # Search for target candidates, or nodes assigned to target
         target_set = _get_target_set(target, mapped, Sg)
-        print('Target Dict: %s' % _get_target_dict(targets, mapped, Sg))
         # BFS graph traversal
         reached = _bfs(target_set, visited, visiting, queue, Tg)
         # Retrace steps from target to source
@@ -535,51 +524,20 @@ def _steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
 
     return tree
 
-def _simultaneous_steiner(source, targets, mapped, unassigned, Sg, Tg):
-    #TODO: Implement a simultaneous tree search.
-    # Traceback when any target is hit.
-    """ Simultaneous Steiner Tree Search
-    """
-    print('\n New Source:' + str(source))
-    # Resulting tree dictionary keyed by edges and path values.
-    tree = {}
-
-    # Breadth-First Search structures.
-    visiting = {} # (cost, parent, distance) during search
-    visited = {} # (parent, distance) after popped from queue
-    # Priority Queue (cost, name)
-    queue = []
-    # Start search using previously-assigned nodes
-    _init_queue(source, visiting, queue, mapped, Sg)
-    # Search for target candidates, or nodes assigned to target
-    target_dict = _get_target_dict(targets, mapped, Sg)
-    # Breadth-First Search
-    while target_dict:
-        # BFS graph traversal
-        reached = _bfs(target_set, visited, visiting, queue, Tg)
-        # Pop source node assigned to target node
-        target = target_dict[reached].pop()
-        # Retrace steps from target to source
-        path = _traceback(source, target, reached, visited, unassigned, mapped, Tg)
-        # Update tree
-        edge = (source,target)
-        tree[edge] = path
-        del target_dict[reached]
-
-    return tree
-
-def _update_costs(paths, Sg, Tg):
+def _update_costs(paths, mapped, unassigned, Sg, Tg):
     """ Update present-sharing and history-sharing costs
 
     """
+
     legal = True
-    print("Paths:")
-    for (source,target), path in paths.items():
-        print(source, target, path)
-        for qubit in path:
-            print(Tg.nodes[qubit]['sharing'])
-            if Tg.nodes[qubit]['sharing'] > 1:
+    print("Mapped")
+    for s_node, t_nodes in mapped.items():
+        for t_node in t_nodes:
+            Tg.nodes[t_node]['history'] += 1.0
+            sharing =  Tg.nodes[t_node]['sharing']
+            if sharing > 1.0:
                 legal = False
+            print(t_node, sharing)
 
     return legal
 
@@ -599,17 +557,20 @@ def _embed_node(source, mapped, Sg, Tg, opts):
     # Assign qubit to node
     mapped[source] = set([q_index])
 
-def _rip_up(Tg, paths={}, mapped={}, unassigned={}):
+def _rip_up(Tg):
     """
     Search Structures
         paths = { Sg edge : Tg nodes path }
         mapped = { Sg node: set(Tg nodes) }
         unassigned = { Tg node : set(Sg nodes) }
     """
+    paths={}
+    mapped={}
+    unassigned={}
 
-    for name, qubit  in Tg.nodes(data=True):
+    for t_node in Tg.nodes():
         # BFS
-        qubit['sharing'] = 0.0
+        Tg.nodes[t_node]['sharing'] = 0.0
 
     return paths, mapped, unassigned
 
@@ -630,11 +591,13 @@ def _route(Sg, Tg, opts):
     # Termination criteria
     legal = False
     tries = opts.tries
-    # First node selection
-    pending_set = set(Sg)
-    source = _get_node(pending_set)
     # Negotiated Congestion
     while (not legal) and (tries > 0):
+        print('############# TRIES LEFT: %s' % tries)
+        # First node selection
+        pending_set = set(Sg)
+        source = _get_node(pending_set)
+        # Route Rip Up
         paths, mapped, unassigned = _rip_up(Tg)
         _embed_node(source, mapped, Sg, Tg, opts)
         while pending_set:
@@ -642,7 +605,7 @@ def _route(Sg, Tg, opts):
             tree = _steiner_tree(source, targets, mapped, unassigned, Sg, Tg)
             paths.update(tree)
             source = _get_node(pending_set, pre_sel=targets)
-        legal = _update_costs(paths, Sg, Tg)
+        legal = _update_costs(paths, mapped, unassigned, Sg, Tg)
         tries -= 1
     return legal, paths, mapped, unassigned
 
@@ -659,8 +622,27 @@ def _route(Sg, Tg, opts):
 
 def _setup_lp(paths, mapped, unassigned):
     """ Setup linear Programming Problem
-        Goal: Minimize
+        Notes:
+            -Constraint names need to start with letters
 
+        Example: K3 embedding requiring a 2-length Chain
+            >>  \* Solve Chains *\
+            >>  Minimize
+            >>  OBJ: Z
+            >>  Subject To
+            >>  ZeroSum12: var112 + var212 = 1
+            >>  c_0: Z >= 1
+            >>  c_1: Z - var112 >= 1
+            >>  c_2: Z - var212 >= 1
+            >>  Bounds
+            >>  0 <= Z
+            >>  0 <= var112
+            >>  0 <= var212
+            >>  Generals
+            >>  Z
+            >>  var112
+            >>  var212
+            >>  End
     """
     lp = pulp.LpProblem("Solve Chains",pulp.LpMinimize)
 
@@ -671,10 +653,12 @@ def _setup_lp(paths, mapped, unassigned):
     Lpvars = {}
     chain = {}
 
+    # Create constraints per source node
     for node, assigned in mapped.items():
         node_name = str(node).replace(" ","")
-        lp += Z >= len(assigned), node_name
+        lp += Z >= len(assigned), 'c_' + node_name
 
+    # Create variables per path to select unassigned nodes
     for edge, path in paths.items():
         # Nodes in path excluding source and target
         shared = len(path) - 2
@@ -695,8 +679,8 @@ def _setup_lp(paths, mapped, unassigned):
 
             constraint_name = "ZeroSum" + s_name + t_name
             lp += Lpvars[var_s] + Lpvars[var_t] == shared, constraint_name
-            lp.constraints[s_name] -= Lpvars[var_s]
-            lp.constraints[t_name] -= Lpvars[var_t]
+            lp.constraints['c_' + s_name] -= Lpvars[var_s]
+            lp.constraints['c_' + t_name] -= Lpvars[var_t]
 
     return lp, var_map
 
@@ -723,7 +707,7 @@ def _assign_nodes(paths, lp_sol, var_map, mapped):
 
 def _paths_to_chains(legal, paths, mapped, unassigned):
 
-    if not legal: return {}
+    if not legal: print ('##########\n\n\n\nNOT LEGAL\n\n\n\n##########')
 
     print('Assigned')
     for node, fixed in mapped.items():
@@ -866,18 +850,17 @@ if __name__== "__main__":
 
     verbose = 3
 
-    p = 2
-    S = nx.grid_2d_graph(p,p)
-    topology = {v:v for v in S}
+    p = 4
+    #S = nx.grid_2d_graph(p,p)
+    #topology = {v:v for v in S}
 
     #S = nx.cycle_graph(p)
     #topology = nx.circular_layout(S)
 
-    #S = nx.complete_graph(p)
-    #S = nx.relabel_nodes(S, {0:'A',1:'B',2:'C'})
-    #topology = nx.spring_layout(S)
+    S = nx.complete_graph(p)
+    topology = nx.spring_layout(S)
 
-    m = 1
+    m = 2
     T = dnx.chimera_graph(m, coordinates=True)
     #T = dnx.pegasus_graph(m, coordinates=True)
 
