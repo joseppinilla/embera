@@ -1,3 +1,4 @@
+import sys
 import pulp
 import traceback
 
@@ -8,13 +9,18 @@ import networkx as nx
 import dwave_networkx as dnx
 import matplotlib.pyplot as plt
 
-from math import floor
+from math import floor, sqrt
 from embedding_methods.utilities import draw_tiled_graph
 from embedding_methods.utilities import EmbedderOptions, i2c
 from embedding_methods.utilities import read_source_graph, read_target_graph
 from heapq import heappop, heappush
 
 __all__ = ["find_embedding"]
+
+
+# Routing cost scalers
+__alpha_p = 0.0
+__alpha_h = 0.0
 
 class Tile:
     """ Tile for migration stage
@@ -381,9 +387,11 @@ def _init_graphs(Sg, Tg, tiling, opts):
 
 def _get_cost(node_tile, neighbor_name, Tg):
 
+    global __alpha_p
+
     next_node = Tg.nodes[neighbor_name]
 
-    sharing_cost = 1.0 + next_node['sharing'] * 0.4
+    sharing_cost = 1.0 + next_node['sharing'] * __alpha_p
 
     scope_cost = 0.0 if node_tile==next_node['tile'] else 1.0
 
@@ -422,10 +430,10 @@ def _bfs(target_set, visited, visiting, queue, Tg):
                 if prev_cost > neighbor_cost:
                     visiting[neighbor] = neighbor_data
 
-                #print('Queue:' + str(queue))
         # Once all neighbours have been checked
         visited[node] = node_cost, node_parent, node_dist
         node_cost, node = heappop(queue)
+
         _, node_parent, node_dist = visiting[node]
         found = (node in target_set) and (node_dist >= 2)
 
@@ -488,7 +496,10 @@ def _get_target_dict(targets, mapped, Sg):
 
     return target_dict
 
-def _init_queue(source, visiting, queue, mapped, Sg):
+def _init_queue(source, visiting, queue, mapped, Sg, Tg):
+    if source not in mapped:
+        _embed_node(source, mapped, Sg, Tg)
+    
     for node in mapped[source]:
         node_cost = 0.0
         node_parent = source
@@ -516,7 +527,7 @@ def _steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
         # Priority Queue (cost, name)
         queue = []
         # Start search using previously-assigned nodes
-        _init_queue(source, visiting, queue, mapped, Sg)
+        _init_queue(source, visiting, queue, mapped, Sg, Tg)
         # Search for target candidates, or nodes assigned to target
         target_set = _get_target_set(target, mapped, Sg)
         # BFS graph traversal
@@ -534,11 +545,13 @@ def _update_costs(mapped, Tg):
 
     """
 
+    global __alpha_h
+
     legal = True
     print("Mapped")
     for t_nodes in mapped.values():
         for t_node in t_nodes:
-            Tg.nodes[t_node]['history'] += 1.0
+            Tg.nodes[t_node]['history'] += __alpha_h
             sharing =  Tg.nodes[t_node]['sharing']
             if sharing > 1.0:
                 legal = False
@@ -546,21 +559,20 @@ def _update_costs(mapped, Tg):
 
     return legal
 
-def _embed_node(source, mapped, Sg, Tg, opts):
+def _embed_node(source, mapped, Sg, Tg, opts={}):
 
     if source in mapped: return
 
-    node = Sg.nodes[source]
+    s_node = Sg.nodes[source]
 
     # Get best candidate
-    candidates = node['candidates']
-    q_index = min( candidates, key=lambda q: _get_cost(node['tile'], q, Tg) )
+    candidates = s_node['candidates']
+    t_index = min( candidates, key=lambda t: _get_cost(s_node['tile'], t, Tg) )
 
-    # Populate qubit
-    qubit = Tg.nodes[q_index]
-    qubit['sharing'] += 1.0
-    # Assign qubit to node
-    mapped[source] = set([q_index])
+    # Populate target node
+    t_node = Tg.nodes[t_index]
+    t_node['sharing'] += 1.0
+    mapped[source] = set([t_index])
 
 def _rip_up(Tg):
     """
@@ -573,8 +585,8 @@ def _rip_up(Tg):
     mapped={}
     unassigned={}
 
+    # BFS
     for t_node in Tg.nodes():
-        # BFS
         Tg.nodes[t_node]['sharing'] = 0.0
 
     return paths, mapped, unassigned
@@ -592,6 +604,7 @@ def _route(Sg, Tg, opts):
     """ Negotiated Congestion
 
     """
+    global __alpha_p, __alpha_h
 
     # Termination criteria
     legal = False
@@ -611,6 +624,8 @@ def _route(Sg, Tg, opts):
             paths.update(tree)
             source = _get_node(pending_set, pre_sel=targets)
         legal = _update_costs(mapped, Tg)
+        __alpha_p += 0.45
+        __alpha_h += 0.10
         tries -= 1
     return legal, paths, mapped, unassigned
 
@@ -848,21 +863,44 @@ def find_embedding(S, T, **params):
     return embedding
 
 #TEMP: standalone test
+
+def get_stats(embedding):
+    max_chain = 0
+    min_chain = sys.maxsize
+    total = 0
+    N = len(embedding)
+    for chain in embedding.values():
+        chain_len = len(chain)
+        total += chain_len
+        if chain_len > max_chain:
+            max_chain = chain_len
+        if chain_len < min_chain:
+            min_chain =  chain_len
+    avg_chain = total/N
+    sum_deviations = 0
+    for chain in embedding.values():
+        chain_len = len(chain)
+        deviation = (chain_len - avg_chain)**2
+        sum_deviations += deviation
+    std_dev = sqrt(sum_deviations/N)
+
+    return max_chain, min_chain, total, avg_chain, std_dev
+
 if __name__== "__main__":
 
     verbose = 3
 
-    p = 4
-    #S = nx.grid_2d_graph(p, p)
-    #topology = {v:v for v in S}
+    p = 10
+    S = nx.grid_2d_graph(p, p)
+    topology = {v:v for v in S}
 
     #S = nx.cycle_graph(p)
     #topology = nx.circular_layout(S)
 
-    S = nx.complete_graph(p)
-    topology = nx.spring_layout(S)
+    #S = nx.complete_graph(p)
+    #topology = nx.spring_layout(S)
 
-    m = 2
+    m = 10
     T = dnx.chimera_graph(m, coordinates=True)
     #T = dnx.pegasus_graph(m, coordinates=True)
 
@@ -871,12 +909,19 @@ if __name__== "__main__":
 
     try:
         #find_embedding(S_edgelist, T_edgelist, topology=topology, construction=T.graph, verbose=verbose)
-        embedding = find_embedding(S_edgelist, T_edgelist, topology=topology, construction=T.graph, enable_migration=False, verbose=verbose)
+        embedding = find_embedding(S_edgelist, T_edgelist, tries=10, topology=topology, construction=T.graph, enable_migration=False, verbose=verbose)
         #find_embedding(S_edgelist, T_edgelist, construction=T.graph, verbose=verbose)
     except:
         traceback.print_exc()
 
-    print('Embedding:' + str(embedding))
+    from minorminer import find_embedding
+    mm_embedding = find_embedding(S_edgelist, T_edgelist)
+
+    print('Layout:\n%s' % str(get_stats(embedding)))
+    print('MinorMiner:\n%s' % str(get_stats(mm_embedding)))
+
+
+
     plt.clf()
     dnx.draw_chimera_embedding(T, embedding)
     #dnx.draw_pegasus_embedding(T, embedding)
