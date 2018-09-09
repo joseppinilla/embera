@@ -20,24 +20,19 @@ def i2c(index, n):
 """ Embedding specific
 """
 
-class EmbedderOptions:
-    def __init__(self, **params):
-        # Parse optional parameters
-        self.names = {"random_seed", "construction", "tries", "verbose"}
+class EmbedderOptions(object):
+    def __init__(self, names = {}, **params):
 
         # Random Number Generator
-        try: self.random_seed = params['random_seed']
-        except: self.random_seed = None
+        self.random_seed = params.pop('random_seed', None)
         self.rng = random.Random(self.random_seed)
 
-        try: self.tries = params['tries']
-        except: self.tries = 10
+        self.tries =        params.pop('tries', 10)
+        self.construction = params.pop('construction', __default_construction__)
+        self.verbose =      params.pop('verbose', 0)
 
-        try: self.construction = params['construction']
-        except: self.construction = __default_construction__
-
-        try: self.verbose = params['verbose']
-        except: self.verbose = 0
+        for name in params:
+            raise ValueError("%s is not a valid parameter." % name)
 
 def read_source_graph(S, opts):
 

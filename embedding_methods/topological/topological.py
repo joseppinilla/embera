@@ -3,7 +3,7 @@ import pulp
 import traceback
 
 import matplotlib
-matplotlib.use('Qt4Agg')
+#matplotlib.use('Qt4Agg')
 
 import networkx as nx
 import dwave_networkx as dnx
@@ -15,12 +15,29 @@ from embedding_methods.utilities import EmbedderOptions, i2c
 from embedding_methods.utilities import read_source_graph, read_target_graph
 from heapq import heappop, heappush
 
-__all__ = ["find_embedding"]
+__all__ = ["find_embedding", "find_candidates"]
 
 
 # Routing cost scalers
 __alpha_p = 0.0
 __alpha_h = 0.0
+
+"""
+Option parser for diffusion-based migration of the graph topology
+"""
+class DiffusionOptions(EmbedderOptions):
+    def __init__(self, **params):
+
+        # If a topology of the graph is not provided, generate one
+        self.topology =         params.pop('topology', None)
+        # Diffusion hyperparameters
+        self.enable_migration = params.pop('enable_migration', True)
+        self.vicinity =         params.pop('vicinity', 0)
+        self.delta_t =          params.pop('delta_t', 0.20)
+        self.d_lim =            params.pop('d_lim', 0.75)
+        self.viscosity =        params.pop('viscosity', 0.00)
+
+        EmbedderOptions.__init__(self, **params)
 
 class Tile:
     """ Tile for migration stage
@@ -287,7 +304,6 @@ def _get_demand(Sg, tiling, opts):
     if opts.verbose==3:
         concentrations = {name : "d=%s"%tile.concentration
                         for name, tile in tiling.tiles.items() if name!=None}
-
         draw_tiled_graph(Sg,n,m,concentrations)
         plt.show()
 
@@ -320,8 +336,6 @@ def _migrate(Sg, tiling, opts):
         _get_demand(Sg, tiling, opts)
         dispersion = _step(Sg, tiling, opts)
         migrating = _condition(tiling, dispersion)
-
-    return tiling
 
 def _place(Sg, tiling, opts):
     """
@@ -358,6 +372,24 @@ def _simulated_annealing(Sg, tiling, opts):
     opts.enable_migration = False
     return init_loc
 
+def find_candidates(S, T, **params):
+    """
+
+    """
+
+    opts = DiffusionOptions(**params)
+
+    Sg = read_source_graph(S, opts)
+
+    Tg = read_target_graph(T, opts)
+
+    tiling = Tiling(Tg, opts)
+
+    _place(Sg, tiling, opts)
+
+    candidates = {s_node: t_nodes for s_node, t_nodes in Sg.items()}
+
+    return
 
 """ Negotiated-congestion based router for multiple
     disjoint Steiner Tree Search.
@@ -499,7 +531,7 @@ def _get_target_dict(targets, mapped, Sg):
 def _init_queue(source, visiting, queue, mapped, Sg, Tg):
     if source not in mapped:
         _embed_node(source, mapped, Sg, Tg)
-    
+
     for node in mapped[source]:
         node_cost = 0.0
         node_parent = source
@@ -624,8 +656,8 @@ def _route(Sg, Tg, opts):
             paths.update(tree)
             source = _get_node(pending_set, pre_sel=targets)
         legal = _update_costs(mapped, Tg)
-        __alpha_p += 0.45
-        __alpha_h += 0.10
+        __alpha_p += opts.delta_p
+        __alpha_h += opts.delta_h
         tries -= 1
     return legal, paths, mapped, unassigned
 
@@ -752,46 +784,15 @@ def _paths_to_chains(legal, paths, mapped, unassigned):
     return mapped
 
 """
-
+Option parser for diffusion-based migration of the graph topology
 """
-class TopologicalOptions(EmbedderOptions):
+class RouterOptions(DiffusionOptions):
     def __init__(self, **params):
-        EmbedderOptions.__init__(self, **params)
-        # Parse optional parameters
-        self.names.update({ "topology",
-                            "enable_migration",
-                            "vicinity",
-                            "delta_t",
-                            "viscosity",
-                            "verbose"})
 
-        for name in params:
-            if name not in self.names:
-                raise ValueError("%s is not a valid parameter for \
-                                    topological find_embedding"%name)
+        self.delta_p =  params.pop('delta_p', 0.45)
+        self.delta_h =  params.pop('delta_h', 0.10)
 
-        # If a topology of the graph is not provided, generate one
-        try: self.topology =  params['topology']
-        except KeyError: self.topology = None
-
-        try: self.enable_migration = params['enable_migration']
-        except: self.enable_migration = True
-
-        try: self.vicinity = params['vicinity']
-        except: self.vicinity = 0
-
-        try: self.delta_t = params['delta_t']
-        except: self.delta_t = 0.2
-
-        try: self.d_lim = params['d_lim']
-        except: self.d_lim = 0.75
-
-        try: self.viscosity = params['viscosity']
-        except: self.viscosity = 0.0
-
-        try: self.verbose = params['verbose']
-        except: self.verbose = 0
-
+        DiffusionOptions.__init__(self, **params)
 
 def find_embedding(S, T, **params):
     """
@@ -844,7 +845,7 @@ def find_embedding(S, T, **params):
 
     """
 
-    opts = TopologicalOptions(**params)
+    opts = RouterOptions(**params)
 
     Sg = read_source_graph(S, opts)
 
@@ -888,7 +889,7 @@ def get_stats(embedding):
 
 if __name__== "__main__":
 
-    verbose = 3
+    verbose = 0
 
     p = 10
     S = nx.grid_2d_graph(p, p)
