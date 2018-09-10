@@ -3,10 +3,8 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import dwave_networkx as dnx
 
-__all__ = ["i2c", "EmbedderOptions","read_source_graph","read_target_graph","draw_source_graph", "draw_tiled_graph"]
-
-__default_construction__ =  {"family": "chimera", "rows": 16, "columns": 16,
-                            "tile": 4, "data": True, "labels": "coordinate"}
+__all__ = ["i2c", "read_source_graph","read_target_graph",
+            "draw_source_graph", "draw_tiled_graph"]
 
 """ General Utilities
 """
@@ -16,23 +14,6 @@ def i2c(index, n):
     """
     j,i = divmod(index,n)
     return i,j
-
-""" Embedding specific
-"""
-
-class EmbedderOptions(object):
-    def __init__(self, names = {}, **params):
-
-        # Random Number Generator
-        self.random_seed = params.pop('random_seed', None)
-        self.rng = random.Random(self.random_seed)
-
-        self.tries =        params.pop('tries', 10)
-        self.construction = params.pop('construction', __default_construction__)
-        self.verbose =      params.pop('verbose', 0)
-
-        for name in params:
-            raise ValueError("%s is not a valid parameter." % name)
 
 def read_source_graph(S, opts):
 

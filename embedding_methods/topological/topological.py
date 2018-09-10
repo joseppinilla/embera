@@ -1,5 +1,7 @@
 import sys
 import pulp
+import time
+import random
 import traceback
 
 import matplotlib
@@ -11,12 +13,15 @@ import matplotlib.pyplot as plt
 
 from math import floor, sqrt
 from embedding_methods.utilities import draw_tiled_graph
-from embedding_methods.utilities import EmbedderOptions, i2c
+from embedding_methods.utilities import i2c
 from embedding_methods.utilities import read_source_graph, read_target_graph
 from heapq import heappop, heappush
 
 __all__ = ["find_embedding", "find_candidates"]
 
+
+__default_construction__ =  {"family": "chimera", "rows": 16, "columns": 16,
+                    "tile": 4, "data": True, "labels": "coordinate"}
 
 # Routing cost scalers
 __alpha_p = 0.0
@@ -25,8 +30,14 @@ __alpha_h = 0.0
 """
 Option parser for diffusion-based migration of the graph topology
 """
-class DiffusionOptions(EmbedderOptions):
+class DiffusionOptions(object):
     def __init__(self, **params):
+
+        self.random_seed = params.pop('random_seed', None)
+        self.rng = random.Random(self.random_seed)
+
+        self.tries =  params.pop('tries', 10)
+        self.verbose =  params.pop('verbose', 0)
 
         # If a topology of the graph is not provided, generate one
         self.topology =         params.pop('topology', None)
@@ -37,7 +48,10 @@ class DiffusionOptions(EmbedderOptions):
         self.d_lim =            params.pop('d_lim', 0.75)
         self.viscosity =        params.pop('viscosity', 0.00)
 
-        EmbedderOptions.__init__(self, **params)
+        self.construction = params.pop('construction', __default_construction__)
+
+        for name in params:
+            raise ValueError("%s is not a valid parameter." % name)
 
 class Tile:
     """ Tile for migration stage
@@ -301,7 +315,7 @@ def _get_demand(Sg, tiling, opts):
             tile.concentration = len(tile.nodes)/tile.supply
 
 
-    if opts.verbose==3:
+    if opts.verbose==4:
         concentrations = {name : "d=%s"%tile.concentration
                         for name, tile in tiling.tiles.items() if name!=None}
         draw_tiled_graph(Sg,n,m,concentrations)
@@ -337,6 +351,20 @@ def _migrate(Sg, tiling, opts):
         dispersion = _step(Sg, tiling, opts)
         migrating = _condition(tiling, dispersion)
 
+def _assign_candidates(Sg, tiling, opts):
+    """ Use tiling to create the sets of target
+        nodes assigned to each source node.
+        #TODO: vicinity
+    """
+
+    candidates = {}
+    for s_node, s_data in Sg.nodes(data=True):
+        # Fixed data
+        node_tile = s_data['tile']
+        candidates[s_node] = tiling.tiles[node_tile].qubits
+
+    return candidates
+
 def _place(Sg, tiling, opts):
     """
 
@@ -353,11 +381,9 @@ def _place(Sg, tiling, opts):
     #elif:
     #_simulated_annealing(Sg, tiling, opts)
 
-    print("Placement:")
-    for name, node in Sg.nodes(data=True):
-        print(str(name) + str(node['tile']))
-        print('qubits:' + str(tiling.tiles[node['tile']].qubits))
+    candidates = _assign_candidates(Sg, tiling, opts)
 
+    return candidates
 
 def _simulated_annealing(Sg, tiling, opts):
     rng = opts.rng
@@ -365,8 +391,8 @@ def _simulated_annealing(Sg, tiling, opts):
     n = opts.construction['columns']
 
     init_loc = {}
-    for node in S:
-        init_loc[node] = (rng.randint(0,n),rng.randint(0,m))
+    for node in Sg:
+        init_loc[node] = ( rng.randint(0, n), rng.randint(0, m) )
 
     #TODO: Simulated Annealing placement
     opts.enable_migration = False
@@ -385,11 +411,9 @@ def find_candidates(S, T, **params):
 
     tiling = Tiling(Tg, opts)
 
-    _place(Sg, tiling, opts)
+    candidates = _place(Sg, tiling, opts)
 
-    candidates = {s_node: t_nodes for s_node, t_nodes in Sg.items()}
-
-    return
+    return candidates
 
 """ Negotiated-congestion based router for multiple
     disjoint Steiner Tree Search.
@@ -402,22 +426,21 @@ def find_candidates(S, T, **params):
 
 """
 
-def _init_graphs(Sg, Tg, tiling, opts):
+def _init_graphs(Sg, Tg, opts):
 
-    for name, node in Sg.nodes(data=True):
+    for s_node, s_data in Sg.nodes(data=True):
         # Fixed data
-        node_tile = node['tile']
-        node['degree'] = Sg.degree(name)
-        node['candidates'] = tiling.tiles[node_tile].qubits #TODO: Granularity
+        s_data['degree'] = Sg.degree(s_node)
+        s_data['candidates'] = opts.initial_chains[s_node]
 
-    for name, qubit in Tg.nodes(data=True):
+    for t_node, t_data in Tg.nodes(data=True):
         # Fixed cost
-        qubit['degree'] = 1.0 - ( Tg.degree(name)/tiling.max_degree )
+        t_data['degree'] = Tg.degree(t_node)
         # BFS
-        qubit['history'] =  1.0
-        qubit['sharing'] = 0.0
+        t_data['history'] =  1.0
+        t_data['sharing'] = 0.0
 
-def _get_cost(node_tile, neighbor_name, Tg):
+def _get_cost(neighbor_name, Tg):
 
     global __alpha_p
 
@@ -425,9 +448,9 @@ def _get_cost(node_tile, neighbor_name, Tg):
 
     sharing_cost = 1.0 + next_node['sharing'] * __alpha_p
 
-    scope_cost = 0.0 if node_tile==next_node['tile'] else 1.0
+    scope_cost = 0.0 #TODO: higher if different tile
 
-    degree_cost = next_node['degree']
+    degree_cost = 0.0 #TODO: Use next_node['degree'] with ARCH max_degree
 
     base_cost = 1.0 + degree_cost + scope_cost
 
@@ -448,12 +471,11 @@ def _bfs(target_set, visited, visiting, queue, Tg):
     found = False
     while (not found):
         #print("Node: %s"%str(node))
-        node_tile = Tg.nodes[node]['tile']
         neighbor_dist = node_dist + 1
         neighbor_parent = node
         for neighbor in Tg[node]:
             if neighbor not in visited:
-                neighbor_cost = node_cost + _get_cost(node_tile, neighbor, Tg)
+                neighbor_cost = node_cost + _get_cost(neighbor, Tg)
 
                 heappush(queue, (neighbor_cost, neighbor))
                 neighbor_data = neighbor_cost, neighbor_parent, neighbor_dist
@@ -599,7 +621,7 @@ def _embed_node(source, mapped, Sg, Tg, opts={}):
 
     # Get best candidate
     candidates = s_node['candidates']
-    t_index = min( candidates, key=lambda t: _get_cost(s_node['tile'], t, Tg) )
+    t_index = min( candidates, key=lambda t: _get_cost(t, Tg) )
 
     # Populate target node
     t_node = Tg.nodes[t_index]
@@ -786,13 +808,22 @@ def _paths_to_chains(legal, paths, mapped, unassigned):
 """
 Option parser for diffusion-based migration of the graph topology
 """
-class RouterOptions(DiffusionOptions):
+class RouterOptions(object):
     def __init__(self, **params):
+
+        self.random_seed = params.pop('random_seed', None)
+        self.rng = random.Random(self.random_seed)
+
+        self.tries =  params.pop('tries', 10)
+        self.verbose =  params.pop('verbose', 0)
 
         self.delta_p =  params.pop('delta_p', 0.45)
         self.delta_h =  params.pop('delta_h', 0.10)
 
-        DiffusionOptions.__init__(self, **params)
+        self.initial_chains = params.pop('initial_chains', None)
+
+        for name in params:
+            raise ValueError("%s is not a valid parameter." % name)
 
 def find_embedding(S, T, **params):
     """
@@ -847,15 +878,11 @@ def find_embedding(S, T, **params):
 
     opts = RouterOptions(**params)
 
-    Sg = read_source_graph(S, opts)
+    Sg = nx.Graph(S)
 
-    Tg = read_target_graph(T, opts)
+    Tg = nx.Graph(T)
 
-    tiling = Tiling(Tg, opts)
-
-    _place(Sg, tiling, opts)
-
-    _init_graphs(Sg, Tg, tiling, opts)
+    _init_graphs(Sg, Tg, opts)
 
     legal, paths, mapped, unassigned = _route(Sg, Tg, opts)
 
@@ -891,7 +918,7 @@ if __name__== "__main__":
 
     verbose = 0
 
-    p = 10
+    p = 16
     S = nx.grid_2d_graph(p, p)
     topology = {v:v for v in S}
 
@@ -901,7 +928,7 @@ if __name__== "__main__":
     #S = nx.complete_graph(p)
     #topology = nx.spring_layout(S)
 
-    m = 10
+    m = 16
     T = dnx.chimera_graph(m, coordinates=True)
     #T = dnx.pegasus_graph(m, coordinates=True)
 
@@ -909,21 +936,40 @@ if __name__== "__main__":
     T_edgelist = list(T.edges())
 
     try:
-        #find_embedding(S_edgelist, T_edgelist, topology=topology, construction=T.graph, verbose=verbose)
-        embedding = find_embedding(S_edgelist, T_edgelist, tries=10, topology=topology, construction=T.graph, enable_migration=False, verbose=verbose)
-        #find_embedding(S_edgelist, T_edgelist, construction=T.graph, verbose=verbose)
+        candidates = find_candidates(S_edgelist, T_edgelist,
+                                    topology = topology,
+                                    construction = T.graph,
+                                    enable_migration = False,
+                                    verbose = verbose)
+        # embedding = find_embedding( S_edgelist, T_edgelist,
+        #                             initial_chains=candidates,
+        #                             verbose=verbose)
+        #print('Layout:\n%s' % str(get_stats(embedding)))
     except:
         traceback.print_exc()
 
-    from minorminer import find_embedding
-    mm_embedding = find_embedding(S_edgelist, T_edgelist)
+    import minorminer
 
-    print('Layout:\n%s' % str(get_stats(embedding)))
-    print('MinorMiner:\n%s' % str(get_stats(mm_embedding)))
+    t_start = time.time()
+    mm_embedding = minorminer.find_embedding( S_edgelist, T_edgelist,
+                                    initial_chains=candidates,
+                                    verbose=verbose)
+    t_end = time.time()
+    t_elap = t_end-t_start
+    print('MinorMiner:\n%s in %s' % (str(get_stats(mm_embedding)), t_elap) )
+
+    t_start = time.time()
+    mm_embedding = minorminer.find_embedding( S_edgelist, T_edgelist,
+                                    #initial_chains=candidates,
+                                    verbose=verbose)
+    t_end = time.time()
+    t_elap = t_end-t_start
+    print('MinorMiner:\n%s in %s' % (str(get_stats(mm_embedding)), t_elap) )
 
 
 
-    plt.clf()
-    dnx.draw_chimera_embedding(T, embedding)
-    #dnx.draw_pegasus_embedding(T, embedding)
-    plt.show()
+
+    # plt.clf()
+    # dnx.draw_chimera_embedding(T, embedding)
+    # #dnx.draw_pegasus_embedding(T, embedding)
+    # plt.show()
