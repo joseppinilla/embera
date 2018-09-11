@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 
 from collections import Counter
 
-from embedding_methods.architectures import *
+from embedding_methods import architectures
 
 from embedding_methods.dense import dense
 from embedding_methods.topological import topological
@@ -26,8 +26,27 @@ from dimod.reference.samplers.random_sampler import RandomSampler
 from dimod.reference.composites.structure import StructureComposite
 from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampler
 
+PROFILES = {'C4':       {'bipartite':32, 'complete':17,
+                        'grid2d':49, 'hypercube':32, 'rooks':25},
+            'DW2X':     {'bipartite':96, 'complete':49,
+                        'grid2d':256, 'hypercube': 64, 'rooks': 64},
+            'DW2000Q':  {'bipartite':128, 'complete':65,
+                        'grid2d':484, 'hypercube': 128, 'rooks': 100},
+            'P6':       {'bipartite':100, 'complete':59,
+                        'grid2d':361, 'hypercube': 128, 'rooks': 81},
+            'P16':      {'bipartite':266, 'complete':172,
+                        'grid2d':1939, 'hypercube': 256, 'rooks': 196},
+            #'H20K':     {}
+            }
 
-profilesdir = "./profiles/"
+GENERATORS = {'C4':      architectures.rainier_graph,
+            'DW2X':     architectures.dw2x_graph,
+            'DW2000Q':  architectures.dw2000q_graph,
+            'P6':       architectures.p6_graph,
+            'P16':      architectures.p16_graph,
+            'H20K':     architectures.h20k_graph
+            }
+
 resultsdir = "./results/"
 
 verbose = 1
@@ -73,10 +92,10 @@ if __name__== "__main__":
         for i_method in methods:
         ############################################################################
             for i_arch in archs:
-                gen, draw, specs, profile = ARCHS[i_arch]
+                gen = GENERATORS[i_arch]
         ############################################################################
                 for i_fault_pct in fault_pcts:
-                    T = gen(*specs)
+                    T = gen()
                     faults = int( i_fault_pct/100 * len(T))
                     for val in range(faults):
                         fault = random.choice(list(T.nodes))
@@ -85,7 +104,7 @@ if __name__== "__main__":
                     sampler = EmbeddingComposite(structsampler, i_method)
         ############################################################################
                     for i_graph in graphs:
-                        sizes = [ profile[i_graph] ] + s_sizes
+                        sizes = [ PROFILES[i_arch][i_graph] ] + s_sizes
         ############################################################################
                         for i_size in sizes:
                             if i_graph == 'complete':

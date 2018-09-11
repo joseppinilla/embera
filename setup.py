@@ -4,12 +4,15 @@ from distutils.core import setup
 
 packages = ['embedding_methods',
             'embedding_methods.composites',
-            'embedding_methods.dense',
-            'embedding_methods.topological']
+            'embedding_methods.architectures',
+            'embedding_methods.topological',
+            #'embedding_methods.dense', #TODO: In Progress
+            ]
 
 install_requires = ['networkx>=2.0,<3.0',
                     'decorator>=4.1.0,<5.0.0',
-                    'dimod>=0.6.8,<0.7.0']
+                    'dimod>=0.6.8,<0.7.0',
+                    'pulp>=1.6.0,<2.0.0']
 
 
 setup(name='embedding_methods',

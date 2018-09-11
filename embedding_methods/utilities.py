@@ -3,17 +3,11 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import dwave_networkx as dnx
 
-__all__ = ["i2c", "read_source_graph","read_target_graph",
+__all__ = ["read_source_graph","read_target_graph",
             "draw_source_graph", "draw_tiled_graph"]
 
 """ General Utilities
 """
-
-def i2c(index, n):
-    """ Convert array index to coordinate
-    """
-    j,i = divmod(index,n)
-    return i,j
 
 def read_source_graph(S, opts):
 

@@ -4,42 +4,34 @@ import time
 import random
 import traceback
 
-import matplotlib
-#matplotlib.use('Qt4Agg')
-
 import networkx as nx
-import dwave_networkx as dnx
 import matplotlib.pyplot as plt
 
 from math import floor, sqrt
 from embedding_methods.utilities import draw_tiled_graph
-from embedding_methods.utilities import i2c
 from embedding_methods.utilities import read_source_graph, read_target_graph
 from heapq import heappop, heappush
 
 __all__ = ["find_embedding", "find_candidates"]
 
-
-__default_construction__ =  {"family": "chimera", "rows": 16, "columns": 16,
-                    "tile": 4, "data": True, "labels": "coordinate"}
-
-# Routing cost scalers
-__alpha_p = 0.0
-__alpha_h = 0.0
+# Default example target graph construction
+__construction__ =  {"name": 'C4', "family": "chimera",
+                    "rows": 4, "columns": 4, "tile": 4,
+                    "data": True, "labels": "coordinate"}
 
 """
-Option parser for diffusion-based migration of the graph topology
+Option parser for diffusion-based migration of a graph topology
 """
 class DiffusionOptions(object):
     def __init__(self, **params):
 
-        self.random_seed = params.pop('random_seed', None)
-        self.rng = random.Random(self.random_seed)
+        self.random_seed =      params.pop('random_seed', None)
+        self.rng =              random.Random(self.random_seed)
 
-        self.tries =  params.pop('tries', 10)
-        self.verbose =  params.pop('verbose', 0)
+        self.tries =            params.pop('tries', 10)
+        self.verbose =          params.pop('verbose', 0)
 
-        # If a topology of the graph is not provided, generate one
+        # If a topology of the graph is not provided, one is generated
         self.topology =         params.pop('topology', None)
         # Diffusion hyperparameters
         self.enable_migration = params.pop('enable_migration', True)
@@ -48,11 +40,14 @@ class DiffusionOptions(object):
         self.d_lim =            params.pop('d_lim', 0.75)
         self.viscosity =        params.pop('viscosity', 0.00)
 
-        self.construction = params.pop('construction', __default_construction__)
+        self.construction =     params.pop('construction', __construction__)
 
         for name in params:
             raise ValueError("%s is not a valid parameter." % name)
 
+"""
+Tile Class
+"""
 class Tile:
     """ Tile for migration stage
     """
@@ -84,24 +79,30 @@ class Tile:
     def remove_node(self, node):
         self.nodes.remove(node)
 
+    def _i2c(self, index, n):
+        """ Convert tile array index to coordinate
+        """
+        j, i = divmod(index,n)
+        return i, j
+
     def _get_neighbors(self, i, j, n, m, index):
         """ Calculate indices and names of negihbouring tiles to use recurrently
             during migration and routing.
             The vicinity parameter is later used to prune out the neighbors of
             interest.
-            Uses cardinal notation north, south, ...
+            Uses cardinal notation north, south, west, east
         """
-        north = i2c(index - n, n)     if (j > 0)      else   None
-        south = i2c(index + n, n)     if (j < m-1)    else   None
-        west =  i2c(index - 1, n)     if (i > 0)      else   None
-        east =  i2c(index + 1, n)     if (i < n-1)    else   None
+        north = self._i2c(index - n, n)     if (j > 0)      else   None
+        south = self._i2c(index + n, n)     if (j < m-1)    else   None
+        west =  self._i2c(index - 1, n)     if (i > 0)      else   None
+        east =  self._i2c(index + 1, n)     if (i < n-1)    else   None
 
-        nw = i2c(index - n - 1, n)  if (j > 0    and i > 0)    else None
-        ne = i2c(index - n + 1, n)  if (j > 0    and i < n-1)  else None
-        se = i2c(index + n + 1, n)  if (j < m-1  and i < n-1)  else None
-        sw = i2c(index + n - 1, n)  if (j < m-1  and i > 0)    else None
+        nw = self._i2c(index - n - 1, n)  if (j > 0    and i > 0)    else None
+        ne = self._i2c(index - n + 1, n)  if (j > 0    and i < n-1)  else None
+        se = self._i2c(index + n + 1, n)  if (j < m-1  and i < n-1)  else None
+        sw = self._i2c(index + n - 1, n)  if (j < m-1  and i > 0)    else None
 
-        return (north,south,west,east,nw,ne,se,sw)
+        return (north, south, west, east, nw, ne, se, sw)
 
     def _get_chimera_qubits(self, Tg, t, i, j):
         """ Finds the available qubits associated to tile (i,j) of the Chimera
@@ -401,6 +402,37 @@ def _simulated_annealing(Sg, tiling, opts):
 def find_candidates(S, T, **params):
     """
 
+        Args:
+
+            S: an iterable of label pairs representing the edges in the source graph
+
+            T: an iterable of label pairs representing the edges in the target graph
+                The node labels for the different target archictures should be either
+                node indices or coordinates as given from dwave_networkx_.
+
+
+            **params (optional): see below
+        Returns:
+
+            embedding: a dict that maps labels in S to lists of labels in T
+
+        Optional parameters:
+            topology ({<node>:(<x>,<y>),...}):
+                Dict of 2D positions assigned to the source graph nodes.
+
+            vicinity (int): Granularity of the candidate assignment.
+                0: Single tile
+                1: Immediate neighbors = (north, south, east, west)
+                2: Extended neighbors = (Immediate) + diagonals
+                3: Directed  = (Single) + 3 tiles closest to the node
+
+            construction (dict of construction parameters of the graph):
+                family : {'chimera','pegasus'}
+                rows : (int)
+                columns : (int)
+                labels : {'coordinate', 'int'}
+                data : (bool)
+                **family_parameters
     """
 
     opts = DiffusionOptions(**params)
@@ -425,6 +457,10 @@ def find_candidates(S, T, **params):
         unassigned: Dictionary keyed by node from Tg and problem node values
 
 """
+
+# Routing cost scalers
+__alpha_p = 0.0
+__alpha_h = 0.0
 
 def _init_graphs(Sg, Tg, opts):
 
@@ -846,27 +882,9 @@ def find_embedding(S, T, **params):
 
     Optional parameters:
 
-        topology ({<node>:(<x>,<y>),...}):
-            Dict of 2D positions assigned to the source graph nodes.
-
-        vicinity (int): Granularity of the candidate qubits.
-            0: Single tile
-            1: Immediate neighbors = (north, south, east, west)
-            2: Extended neighbors = (Immediate) + diagonals
-            3: Directed  = (Single) + 3 tiles closest to the node
-
         random_seed (int):
 
         tries (int):
-
-        construction (dict of construction parameters of the graph):
-            family {'chimera','pegasus'}: Target graph architecture family
-            rows (int)
-            columns (int)
-            labels {'coordinate', 'int'}
-            data (bool)
-            **family_parameters:
-
 
         verbose (int): Verbosity level
             0: Quiet mode
@@ -891,6 +909,9 @@ def find_embedding(S, T, **params):
     return embedding
 
 #TEMP: standalone test
+
+
+import dwave_networkx as dnx
 
 def get_stats(embedding):
     max_chain = 0
@@ -929,8 +950,9 @@ if __name__== "__main__":
     #topology = nx.spring_layout(S)
 
     m = 16
-    T = dnx.chimera_graph(m, coordinates=True)
+    T = dnx.chimera_graph(m, coordinates=True) #TODO: Needs coordinates?
     #T = dnx.pegasus_graph(m, coordinates=True)
+
 
     S_edgelist = list(S.edges())
     T_edgelist = list(T.edges())
