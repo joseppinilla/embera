@@ -8,16 +8,9 @@ import networkx as nx
 import matplotlib.pyplot as plt
 
 from math import floor, sqrt
-from embedding_methods.utilities import draw_tiled_graph
-from embedding_methods.utilities import read_source_graph, read_target_graph
 from heapq import heappop, heappush
 
 __all__ = ["find_embedding", "find_candidates"]
-
-# Default example target graph construction
-__construction__ =  {"name": 'C4', "family": "chimera",
-                    "rows": 4, "columns": 4, "tile": 4,
-                    "data": True, "labels": "coordinate"}
 
 """
 Option parser for diffusion-based migration of a graph topology
@@ -40,8 +33,6 @@ class DiffusionOptions(object):
         self.d_lim =            params.pop('d_lim', 0.75)
         self.viscosity =        params.pop('viscosity', 0.00)
 
-        self.construction =     params.pop('construction', __construction__)
-
         for name in params:
             raise ValueError("%s is not a valid parameter." % name)
 
@@ -53,10 +44,10 @@ class Tile:
     """
     def __init__(self, Tg, i, j, opts):
 
-        m = opts.construction['rows']
-        n = opts.construction['columns']
-        t = opts.construction['tile']
-        family = opts.construction['family']
+        m = Tg.graph['rows']
+        n = Tg.graph['columns']
+        t = Tg.graph['tile']
+        family = Tg.graph['family']
         index = j*n + i
         self.name = (i,j)
         self.index = index
@@ -72,12 +63,6 @@ class Tile:
             self.concentration = 1.0
         else:
             self.concentration = 0.0
-
-    def add_node(self, node):
-        self.nodes.add(node)
-
-    def remove_node(self, node):
-        self.nodes.remove(node)
 
     def _i2c(self, index, n):
         """ Convert tile array index to coordinate
@@ -122,7 +107,6 @@ class Tile:
                 chimera_index = (i, j, u, k)
                 if chimera_index in Tg.nodes:
                     self.qubits.add(chimera_index)
-                    Tg.nodes[chimera_index]['tile'] = (i,j)
                     v += 1.0
         return v
 
@@ -144,7 +128,6 @@ class Tile:
                 pegasus_index = (u, j, k, i)
                 if pegasus_index in Tg.nodes:
                     self.qubits.add(pegasus_index)
-                    Tg.nodes[pegasus_index]['tile'] = (i,j)
                     v += 1.0
         return v
 
@@ -153,6 +136,7 @@ class DummyTile:
         # Keyed in tile dictionary as None
         self.name = None
         # Treat as a fully occupied tile
+        self.supply = 0.0
         self.concentration = 1.0
         # Dummy empty set to skip calculations
         self.nodes = set()
@@ -162,17 +146,17 @@ class Tiling:
     """
     def __init__(self, Tg, opts):
         # Support for different target architectures
-        family = opts.construction['family']
+        family = Tg.graph['family']
         # Maximum degree of qubits
         if family=='chimera':
             self.max_degree = 6
         elif family=='pegasus':
             self.max_degree = 15
-            opts.construction['columns'] -= 1
+            Tg.graph['columns'] -= 1
 
-        n = opts.construction['columns']
-        m = opts.construction['rows']
-        t = opts.construction['tile']
+        n = Tg.graph['columns']
+        m = Tg.graph['rows']
+        t = Tg.graph['tile']
         self.m = m
         self.n = n
         self.t = t
@@ -196,21 +180,20 @@ def _scale(Sg, tiling, opts):
     """ Assign node locations to in-scale values of the dimension
     of the target graph.
     """
-    P = len(Sg)
-    m = opts.construction['rows']
-    n = opts.construction['columns']
+    m = tiling.m
+    n = tiling.n
     topology = opts.topology
+    P = len(topology)
 
     ###### Find dimensions of source graph S
     Sx_min = Sy_min = float("inf")
     Sx_max = Sy_max = 0.0
     # Loop through all source graph nodes to find dimensions
-    for name, node in Sg.nodes(data=True):
-        sx,sy = topology[name]
-        Sx_min = min(sx,Sx_min)
-        Sx_max = max(sx,Sx_max)
-        Sy_min = min(sy,Sy_min)
-        Sy_max = max(sy,Sy_max)
+    for s_node, (sx, sy) in topology.items():
+        Sx_min = min(sx, Sx_min)
+        Sx_max = max(sx, Sx_max)
+        Sy_min = min(sy, Sy_min)
+        Sy_max = max(sy, Sy_max)
     # Source graph width
     Swidth =  (Sx_max - Sx_min)
     Sheight = (Sx_max - Sx_min)
@@ -266,8 +249,8 @@ def _step(Sg, tiling, opts):
     P = len(Sg)
     # Number of Qubits
     Q = tiling.qubits
-    m = opts.construction['rows']
-    n = opts.construction['columns']
+    m = tiling.m
+    n = tiling.n
     delta_t = opts.delta_t
     viscosity = opts.viscosity
 
@@ -298,8 +281,8 @@ def _step(Sg, tiling, opts):
 
 def _get_demand(Sg, tiling, opts):
 
-    m = opts.construction['rows']
-    n = opts.construction['columns']
+    m = tiling.m
+    n = tiling.n
 
     for name, node in Sg.nodes(data=True):
         x,y = node['coordinate']
@@ -311,8 +294,8 @@ def _get_demand(Sg, tiling, opts):
         tiling.tiles[new_tile].nodes.add(name)
         node['tile'] = new_tile
 
-    for name, tile in tiling.tiles.items():
-        if name!=None and tile.supply!=0:
+    for tile in tiling.tiles.values():
+        if tile.supply:
             tile.concentration = len(tile.nodes)/tile.supply
 
 
@@ -388,8 +371,8 @@ def _place(Sg, tiling, opts):
 
 def _simulated_annealing(Sg, tiling, opts):
     rng = opts.rng
-    m = opts.construction['rows']
-    n = opts.construction['columns']
+    m = tiling.m
+    n = tiling.n
 
     init_loc = {}
     for node in Sg:
@@ -399,22 +382,26 @@ def _simulated_annealing(Sg, tiling, opts):
     opts.enable_migration = False
     return init_loc
 
-def find_candidates(S, T, **params):
+def find_candidates(S, Tg, **params):
     """
 
         Args:
 
             S: an iterable of label pairs representing the edges in the source graph
 
-            T: an iterable of label pairs representing the edges in the target graph
-                The node labels for the different target archictures should be either
-                node indices or coordinates as given from dwave_networkx_.
-
+            Tg: a NetworkX Graph with construction parameters dictionary:
+                    family : {'chimera','pegasus', ...}
+                    rows : (int)
+                    columns : (int)
+                    labels : {'coordinate', 'int'}
+                    data : (bool)
+                    **family_parameters
 
             **params (optional): see below
+
         Returns:
 
-            embedding: a dict that maps labels in S to lists of labels in T
+            candidates: a dict that maps labels in S to lists of labels in T
 
         Optional parameters:
             topology ({<node>:(<x>,<y>),...}):
@@ -425,21 +412,11 @@ def find_candidates(S, T, **params):
                 1: Immediate neighbors = (north, south, east, west)
                 2: Extended neighbors = (Immediate) + diagonals
                 3: Directed  = (Single) + 3 tiles closest to the node
-
-            construction (dict of construction parameters of the graph):
-                family : {'chimera','pegasus'}
-                rows : (int)
-                columns : (int)
-                labels : {'coordinate', 'int'}
-                data : (bool)
-                **family_parameters
     """
 
     opts = DiffusionOptions(**params)
 
-    Sg = read_source_graph(S, opts)
-
-    Tg = read_target_graph(T, opts)
+    Sg = nx.Graph(S)
 
     tiling = Tiling(Tg, opts)
 
@@ -913,6 +890,20 @@ def find_embedding(S, T, **params):
 
 import dwave_networkx as dnx
 
+def draw_tiled_graph(G, n, m, tile_labels={}, **kwargs):
+    layout = {name:node['coordinate'] for name,node in G.nodes(data=True)}
+    dnx.drawing.qubit_layout.draw_qubit_graph(G, layout,**kwargs)
+    plt.grid('on')
+    plt.axis('on')
+    plt.axis([0,n,0,m])
+    x_ticks = range(0, n) # steps are width/width = 1 without scaling
+    y_ticks = range(0, m)
+    plt.xticks(x_ticks)
+    plt.yticks(y_ticks)
+    # Label tiles
+    for (i,j), label in tile_labels.items():
+        plt.text(i,j,label)
+
 def get_stats(embedding):
     max_chain = 0
     min_chain = sys.maxsize
@@ -937,9 +928,9 @@ def get_stats(embedding):
 
 if __name__== "__main__":
 
-    verbose = 0
+    verbose = 3
 
-    p = 16
+    p = 2
     S = nx.grid_2d_graph(p, p)
     topology = {v:v for v in S}
 
@@ -949,7 +940,7 @@ if __name__== "__main__":
     #S = nx.complete_graph(p)
     #topology = nx.spring_layout(S)
 
-    m = 16
+    m = 8
     T = dnx.chimera_graph(m, coordinates=True) #TODO: Needs coordinates?
     #T = dnx.pegasus_graph(m, coordinates=True)
 
@@ -958,40 +949,39 @@ if __name__== "__main__":
     T_edgelist = list(T.edges())
 
     try:
-        candidates = find_candidates(S_edgelist, T_edgelist,
+        candidates = find_candidates(S_edgelist, T,
                                     topology = topology,
-                                    construction = T.graph,
-                                    enable_migration = False,
+                                    enable_migration = True,
                                     verbose = verbose)
-        # embedding = find_embedding( S_edgelist, T_edgelist,
-        #                             initial_chains=candidates,
-        #                             verbose=verbose)
-        #print('Layout:\n%s' % str(get_stats(embedding)))
+        embedding = find_embedding( S_edgelist, T_edgelist,
+                                    initial_chains=candidates,
+                                    verbose=verbose)
+        print('Layout:\n%s' % str(get_stats(embedding)))
     except:
         traceback.print_exc()
 
-    import minorminer
-
-    t_start = time.time()
-    mm_embedding = minorminer.find_embedding( S_edgelist, T_edgelist,
-                                    initial_chains=candidates,
-                                    verbose=verbose)
-    t_end = time.time()
-    t_elap = t_end-t_start
-    print('MinorMiner:\n%s in %s' % (str(get_stats(mm_embedding)), t_elap) )
-
-    t_start = time.time()
-    mm_embedding = minorminer.find_embedding( S_edgelist, T_edgelist,
-                                    #initial_chains=candidates,
-                                    verbose=verbose)
-    t_end = time.time()
-    t_elap = t_end-t_start
-    print('MinorMiner:\n%s in %s' % (str(get_stats(mm_embedding)), t_elap) )
-
-
+    # import minorminer
+    #
+    # t_start = time.time()
+    # mm_embedding = minorminer.find_embedding( S_edgelist, T_edgelist,
+    #                                 initial_chains=candidates,
+    #                                 verbose=verbose)
+    # t_end = time.time()
+    # t_elap = t_end-t_start
+    # print('MinorMiner:\n%s in %s' % (str(get_stats(mm_embedding)), t_elap) )
+    #
+    # t_start = time.time()
+    # mm_embedding = minorminer.find_embedding( S_edgelist, T_edgelist,
+    #                                 #initial_chains=candidates,
+    #                                 verbose=verbose)
+    # t_end = time.time()
+    # t_elap = t_end-t_start
+    # print('MinorMiner:\n%s in %s' % (str(get_stats(mm_embedding)), t_elap) )
 
 
-    # plt.clf()
-    # dnx.draw_chimera_embedding(T, embedding)
-    # #dnx.draw_pegasus_embedding(T, embedding)
-    # plt.show()
+
+
+    plt.clf()
+    dnx.draw_chimera_embedding(T, embedding)
+    #dnx.draw_pegasus_embedding(T, embedding)
+    plt.show()

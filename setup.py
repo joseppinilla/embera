@@ -6,7 +6,6 @@ packages = ['embedding_methods',
             'embedding_methods.composites',
             'embedding_methods.architectures',
             'embedding_methods.topological',
-            #'embedding_methods.dense', #TODO: In Progress
             ]
 
 install_requires = ['networkx>=2.0,<3.0',
