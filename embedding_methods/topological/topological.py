@@ -36,33 +36,20 @@ class DiffusionOptions(object):
         for name in params:
             raise ValueError("%s is not a valid parameter." % name)
 
-"""
-Tile Class
-"""
+
 class Tile:
-    """ Tile for migration stage
     """
-    def __init__(self, Tg, i, j, opts):
-
-        m = Tg.graph['rows']
-        n = Tg.graph['columns']
-        t = Tg.graph['tile']
-        family = Tg.graph['family']
-        index = j*n + i
+    Tile Class
+    """
+    def __init__(self, Tg, i, j):
+        self.n = Tg.graph['columns']
+        self.m = Tg.graph['rows']
+        self.t = Tg.graph['tile']
         self.name = (i,j)
-        self.index = index
         self.nodes = set()
-        self.neighbors = self._get_neighbors(i, j, n, m, index)
-
-        if family=='chimera':
-            self.supply = self._get_chimera_qubits(Tg, t, i, j)
-        elif family=='pegasus':
-            self.supply = self._get_pegasus_qubits(Tg, t, i, j)
-
-        if self.supply == 0.0:
-            self.concentration = 1.0
-        else:
-            self.concentration = 0.0
+        index = j*self.n + i
+        self.index = index
+        self.neighbors = self._get_neighbors(i, j, index)
 
     def _i2c(self, index, n):
         """ Convert tile array index to coordinate
@@ -70,13 +57,16 @@ class Tile:
         j, i = divmod(index,n)
         return i, j
 
-    def _get_neighbors(self, i, j, n, m, index):
+    def _get_neighbors(self, i, j, index):
         """ Calculate indices and names of negihbouring tiles to use recurrently
             during migration and routing.
             The vicinity parameter is later used to prune out the neighbors of
             interest.
             Uses cardinal notation north, south, west, east
         """
+        n = self.n
+        m = self.m
+
         north = self._i2c(index - n, n)     if (j > 0)      else   None
         south = self._i2c(index + n, n)     if (j < m-1)    else   None
         west =  self._i2c(index - 1, n)     if (i > 0)      else   None
@@ -89,7 +79,29 @@ class Tile:
 
         return (north, south, west, east, nw, ne, se, sw)
 
-    def _get_chimera_qubits(self, Tg, t, i, j):
+class DummyTile:
+    """
+    Dummy Tile Class to use as boundaries
+    """
+    def __init__(self):
+        # Keyed in tile dictionary as None
+        self.name = None
+        # Treat as a fully occupied tile
+        self.supply = 0.0
+        self.concentration = 1.0
+        # Dummy empty sets
+        self.nodes = set()
+        self.qubits = set()
+
+class ChimeraTile(Tile):
+    """ Tile configuration for Chimera Architecture
+    """
+    def __init__(self, Tg, i, j):
+        Tile.__init__(self, Tg, i, j)
+        self.supply = self._get_chimera_qubits(Tg, i, j)
+        self.concentration = 1.0 if not self.supply else 0.0
+
+    def _get_chimera_qubits(self, Tg, i, j):
         """ Finds the available qubits associated to tile (i,j) of the Chimera
             Graph and returns the supply or number of qubits found.
 
@@ -100,6 +112,7 @@ class Tile:
                 k : indexes the qubit within either the left- or right-hand shore
                     from 0 to t inclusive
         """
+        t = self.t
         self.qubits = set()
         v = 0.0
         for u in range(2):
@@ -110,8 +123,15 @@ class Tile:
                     v += 1.0
         return v
 
+class PegasusTile(Tile):
+    """ Tile configuration for Pegasus Architecture
+    """
+    def __init__(self, Tg, i, j):
+        Tile.__init__(self, Tg, i, j)
+        self.supply = self._get_pegasus_qubits(Tg, i, j)
+        self.concentration = 1.0 if not self.supply else 0.0
 
-    def _get_pegasus_qubits(self, Tg, t, i, j):
+    def _get_pegasus_qubits(self, Tg, i, j):
         """ Finds the avilable qubits associated to tile (i,j) of the Pegasus
             Graph and returns the supply or number of qubits found.
 
@@ -121,55 +141,44 @@ class Tile:
                 k : orthogonal minor offset
                 z : parallel offset
         """
+        t = self.t
         self.qubits = set()
         v=0.0
         for u in range(2):
-            for k in range(t):
+            for k in range(self.t):
                 pegasus_index = (u, j, k, i)
                 if pegasus_index in Tg.nodes:
                     self.qubits.add(pegasus_index)
                     v += 1.0
         return v
 
-class DummyTile:
-    def __init__(self):
-        # Keyed in tile dictionary as None
-        self.name = None
-        # Treat as a fully occupied tile
-        self.supply = 0.0
-        self.concentration = 1.0
-        # Dummy empty set to skip calculations
-        self.nodes = set()
-
 class Tiling:
     """Tiling for migration stage
     """
     def __init__(self, Tg, opts):
         # Support for different target architectures
-        family = Tg.graph['family']
-        # Maximum degree of qubits
-        if family=='chimera':
-            self.max_degree = 6
-        elif family=='pegasus':
-            self.max_degree = 15
-            # TEMP: When tiling Pegasus graph, column is out of range
-            Tg.graph['columns'] -= 1
+        self.family = Tg.graph['family']
 
-        n = Tg.graph['columns']
-        m = Tg.graph['rows']
-        t = Tg.graph['tile']
-        self.m = m
-        self.n = n
-        self.t = t
+        if self.family=='chimera':
+            self.max_degree = 6
+            TileClass = ChimeraTile
+        elif self.family=='pegasus':
+            self.max_degree = 15
+            TileClass = PegasusTile
+            Tg.graph['columns'] -= 1 # n is out of range
+
+        self.n = Tg.graph['columns']
+        self.m = Tg.graph['rows']
+        self.t = Tg.graph['tile']
         self.qubits = float(len(Tg))
         # Mapping of source nodes to tile
         self.mapping = {}
         # Add Tile objects
         self.tiles = {}
-        for i in range(n):
-            for j in range(m):
+        for i in range(self.n):
+            for j in range(self.m):
                 tile = (i,j)
-                self.tiles[tile] = Tile(Tg, i, j, opts)
+                self.tiles[tile] = TileClass(Tg, i, j)
         # Dummy tile to represent boundaries
         self.tiles[None] = DummyTile()
         # Dispersion cost accumulator for termination
@@ -344,14 +353,36 @@ def _migrate(tiling, opts):
 def _assign_candidates(tiling, opts):
     """ Use tiling to create the sets of target
         nodes assigned to each source node.
-        #TODO: vicinity
+            0: Single tile
+            1: Immediate neighbors = (north, south, east, west)
+            2: Extended neighbors = (Immediate) + diagonals
+            3: Directed  = (Single) + 3 tiles closest to the node
     """
 
     candidates = {}
 
     for s_node, s_tile in tiling.mapping.items():
-        # Fixed data
-        candidates[s_node] = tiling.tiles[s_tile].qubits
+        if opts.vicinity == 0:
+            # Single tile
+            candidates[s_node] = tiling.tiles[s_tile].qubits
+        else:
+            # Neighbouring tiles (N, S, W, E, NW, NE, SE, SW)
+            neighbors = tiling.tiles[s_tile].neighbors
+            if opts.vicinity == 1:
+                # Immediate neighbors
+                candidates[s_node] = tiling.tiles[s_tile].qubits
+                for tile in neighbors[0:3]:
+                    candidates[s_node].update(tiling.tiles[tile].qubits)
+            elif opts.vicinity == 2:
+                # Extended neighbors
+                candidates[s_node] = tiling.tiles[s_tile].qubits
+                for tile in neighbors:
+                    candidates[s_node].update(tiling.tiles[tile].qubits)
+            elif opts.vicinity == 3:
+                #TODO:# Directed  = (Single) + 3 tiles closest to the node
+                candidates[s_node] = tiling.tiles[s_tile].qubits
+            else:
+                raise ValueError("vicinity %s not valid [0-3]." % opts.vicinity)
 
     return candidates
 
@@ -937,9 +968,9 @@ if __name__ == "__main__":
     #S = nx.complete_graph(p)
     #topology = nx.spring_layout(S)
 
-    m = 8
-    Tg = dnx.chimera_graph(m, coordinates=True) #TODO: Needs coordinates?
-    #T = dnx.pegasus_graph(m, coordinates=True)
+    m = 3
+    #Tg = dnx.chimera_graph(m, coordinates=True) #TODO: Needs coordinates?
+    Tg = dnx.pegasus_graph(m, coordinates=True)
 
 
     S_edgelist = list(Sg.edges())
@@ -949,6 +980,7 @@ if __name__ == "__main__":
         candidates = find_candidates(S_edgelist, Tg,
                                      topology=topology,
                                      enable_migration=True,
+                                     vicinity=2,
                                      verbose=verbose)
         embedding = find_embedding(S_edgelist, T_edgelist,
                                     initial_chains=candidates,
@@ -979,6 +1011,6 @@ if __name__ == "__main__":
 
 
     plt.clf()
-    dnx.draw_chimera_embedding(Tg, embedding)
-    #dnx.draw_pegasus_embedding(T, embedding)
+    #dnx.draw_chimera_embedding(Tg, embedding)
+    dnx.draw_pegasus_embedding(Tg, embedding)
     plt.show()
