@@ -145,6 +145,12 @@ class CharacterizeEmbedding(unittest.TestCase):
         F.name = 'rooks'
         return F
 
+    def grid_3d_generator(self, size):
+        m = n = t = int(size**(1./3.))
+        G = nx.grid_graph(dim=[m,n,t])
+        G.name = 'grid3d'
+        return G
+
     def complete(self):
         self.size_bisection(self.complete_generator)
 

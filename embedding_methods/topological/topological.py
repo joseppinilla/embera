@@ -152,6 +152,7 @@ class Tiling:
             self.max_degree = 6
         elif family=='pegasus':
             self.max_degree = 15
+            # TEMP: When tiling Pegasus graph, column is out of range
             Tg.graph['columns'] -= 1
 
         n = Tg.graph['columns']
@@ -160,8 +161,9 @@ class Tiling:
         self.m = m
         self.n = n
         self.t = t
-        self.qubits = 1.0*len(Tg)
-        self.family = family
+        self.qubits = float(len(Tg))
+        # Mapping of source nodes to tile
+        self.mapping = {}
         # Add Tile objects
         self.tiles = {}
         for i in range(n):
@@ -176,7 +178,7 @@ class Tiling:
 """
 """
 
-def _scale(Sg, tiling, opts):
+def _scale(tiling, opts):
     """ Assign node locations to in-scale values of the dimension
     of the target graph.
     """
@@ -201,15 +203,14 @@ def _scale(Sg, tiling, opts):
     center_x, center_y = n/2.0, m/2.0
     dist_accum = 0.0
     ###### Normalize and scale
-    for name, node in Sg.nodes(data=True):
-        x,y = topology[name]
+    for name, (x, y) in topology.items():
         norm_x = (x-Sx_min) / Swidth
         norm_y = (y-Sy_min) / Sheight
         scaled_x = norm_x * (n-1) + 0.5
         scaled_y = norm_y * (m-1) + 0.5
-        node['coordinate'] = (scaled_x, scaled_y)
+        topology[name] = (scaled_x, scaled_y)
         tile = min(floor(scaled_x), n-1), min(floor(scaled_y), m-1)
-        node['tile'] = tile
+        tiling.mapping[name] = tile
         tiling.tiles[tile].nodes.add(name)
         dist_accum += (scaled_x-center_x)**2 + (scaled_y-center_y)**2
 
@@ -243,56 +244,59 @@ def _get_gradient(tile, tiling, opts):
     return del_x, del_y
 
 
-def _step(Sg, tiling, opts):
+def _step(tiling, opts):
+    """ Discrete Diffusion Step
+    """
 
     # Problem size
-    P = len(Sg)
     # Number of Qubits
     Q = tiling.qubits
     m = tiling.m
     n = tiling.n
     delta_t = opts.delta_t
+    topology = opts.topology
     viscosity = opts.viscosity
 
     center_x, center_y = n/2.0, m/2.0
     dist_accum = 0.0
 
+    # Problem size
+    P = float(len(topology))
     # Diffusivity
-    D = min( (viscosity*P) / Q, 1.0)
+    D = min((viscosity*P) / Q, 1.0)
 
     # Iterate over tiles
     for tile in tiling.tiles.values():
-
-        del_x, del_y = _get_gradient(tile, tiling, opts)
+        gradient_x, gradient_y = _get_gradient(tile, tiling, opts)
         # Iterate over nodes in tile and migrate
         for node in tile.nodes:
-            x, y = Sg.nodes[node]['coordinate']
+            x, y = topology[node]
             l_x = (2.0*x/n)-1.0
             l_y = (2.0*y/m)-1.0
-            v_x = l_x * del_x
-            v_y = l_y * del_y
+            v_x = l_x * gradient_x
+            v_y = l_y * gradient_y
             x_1 = x + (1.0 - D) * v_x * delta_t
             y_1 = y + (1.0 - D) * v_y * delta_t
-            Sg.nodes[node]['coordinate'] = (x_1, y_1)
+            topology[node] = (x_1, y_1)
             dist_accum += (x_1-center_x)**2 + (y_1-center_y)**2
 
     dispersion = dist_accum/P
     return dispersion
 
-def _get_demand(Sg, tiling, opts):
+def _get_demand(tiling, opts):
 
     m = tiling.m
     n = tiling.n
+    topology = opts.topology
 
-    for name, node in Sg.nodes(data=True):
-        x,y = node['coordinate']
-        tile = node['tile']
+    for s_node, (x, y) in topology.items():
+        tile = tiling.mapping[s_node]
         i = min(floor(x), n-1)
         j = min(floor(y), m-1)
         new_tile = (i,j)
-        tiling.tiles[tile].nodes.remove(name)
-        tiling.tiles[new_tile].nodes.add(name)
-        node['tile'] = new_tile
+        tiling.tiles[tile].nodes.remove(s_node)
+        tiling.tiles[new_tile].nodes.add(s_node)
+        tiling.mapping[s_node] = new_tile
 
     for tile in tiling.tiles.values():
         if tile.supply:
@@ -302,7 +306,9 @@ def _get_demand(Sg, tiling, opts):
     if opts.verbose==4:
         concentrations = {name : "d=%s"%tile.concentration
                         for name, tile in tiling.tiles.items() if name!=None}
-        draw_tiled_graph(Sg,n,m,concentrations)
+        G = nx.Graph()
+        G.add_nodes_from(topology.keys())
+        draw_tiled_graph(G, n, m, tile_labels=concentrations, layout=topology)
         plt.show()
 
 def _condition(tiling, dispersion):
@@ -326,56 +332,50 @@ def _condition(tiling, dispersion):
     spread = variance > 0.01
     return spread and not increasing
 
-def _migrate(Sg, tiling, opts):
+def _migrate(tiling, opts):
     """
     """
     migrating = opts.enable_migration
     while migrating:
-        _get_demand(Sg, tiling, opts)
-        dispersion = _step(Sg, tiling, opts)
+        _get_demand(tiling, opts)
+        dispersion = _step(tiling, opts)
         migrating = _condition(tiling, dispersion)
 
-def _assign_candidates(Sg, tiling, opts):
+def _assign_candidates(tiling, opts):
     """ Use tiling to create the sets of target
         nodes assigned to each source node.
         #TODO: vicinity
     """
 
     candidates = {}
-    for s_node, s_data in Sg.nodes(data=True):
+
+    for s_node, s_tile in tiling.mapping.items():
         # Fixed data
-        node_tile = s_data['tile']
-        candidates[s_node] = tiling.tiles[node_tile].qubits
+        candidates[s_node] = tiling.tiles[s_tile].qubits
 
     return candidates
 
-def _place(Sg, tiling, opts):
+def _place(S, tiling, opts):
     """
 
     """
     if opts.topology:
-        _scale(Sg, tiling, opts)
-        _migrate(Sg, tiling, opts)
+        _scale(tiling, opts)
+        _migrate(tiling, opts)
     else:
-        opts.topology = nx.spring_layout(Sg, center=(1.0,1.0))
-        _scale(Sg, tiling, opts)
-        _migrate(Sg, tiling, opts)
+        _simulated_annealing(S, tiling, opts)
 
-    #TODO: Plugin different placement methods
-    #elif:
-    #_simulated_annealing(Sg, tiling, opts)
-
-    candidates = _assign_candidates(Sg, tiling, opts)
+    candidates = _assign_candidates(tiling, opts)
 
     return candidates
 
-def _simulated_annealing(Sg, tiling, opts):
+def _simulated_annealing(S, tiling, opts):
     rng = opts.rng
     m = tiling.m
     n = tiling.n
 
     init_loc = {}
-    for node in Sg:
+    for node in S:
         init_loc[node] = ( rng.randint(0, n), rng.randint(0, m) )
 
     #TODO: Simulated Annealing placement
@@ -416,11 +416,9 @@ def find_candidates(S, Tg, **params):
 
     opts = DiffusionOptions(**params)
 
-    Sg = nx.Graph(S)
-
     tiling = Tiling(Tg, opts)
 
-    candidates = _place(Sg, tiling, opts)
+    candidates = _place(S, tiling, opts)
 
     return candidates
 
@@ -575,7 +573,7 @@ def _init_queue(source, visiting, queue, mapped, Sg, Tg):
         heappush(queue, (node_cost, node))
 
     if verbose:
-        queue_str = str(["%0.3f %s" % (c,str(n)) for c,n in queue])
+        queue_str = str(["%0.3f %s" % (c,str(n)) for c, n in queue])
         print('Init Queue:' + queue_str)
 
 def _steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
@@ -731,9 +729,9 @@ def _setup_lp(paths, mapped, unassigned):
             >>  var212
             >>  End
     """
-    lp = pulp.LpProblem("Solve Chains",pulp.LpMinimize)
+    lp = pulp.LpProblem("Solve Chains", pulp.LpMinimize)
 
-    Z = pulp.LpVariable('Z',lowBound=0,cat='Integer')
+    Z = pulp.LpVariable('Z', lowBound=0, cat='Integer')
     lp += Z, "OBJ"
 
     var_map = {}
@@ -890,8 +888,7 @@ def find_embedding(S, T, **params):
 
 import dwave_networkx as dnx
 
-def draw_tiled_graph(G, n, m, tile_labels={}, **kwargs):
-    layout = {name:node['coordinate'] for name,node in G.nodes(data=True)}
+def draw_tiled_graph(G, n, m, tile_labels={}, layout={}, **kwargs):
     dnx.drawing.qubit_layout.draw_qubit_graph(G, layout,**kwargs)
     plt.grid('on')
     plt.axis('on')
@@ -902,7 +899,7 @@ def draw_tiled_graph(G, n, m, tile_labels={}, **kwargs):
     plt.yticks(y_ticks)
     # Label tiles
     for (i,j), label in tile_labels.items():
-        plt.text(i,j,label)
+        plt.text(i, j, label)
 
 def get_stats(embedding):
     max_chain = 0
@@ -926,13 +923,13 @@ def get_stats(embedding):
 
     return max_chain, min_chain, total, avg_chain, std_dev
 
-if __name__== "__main__":
+if __name__ == "__main__":
 
-    verbose = 3
+    verbose = 4
 
     p = 2
-    S = nx.grid_2d_graph(p, p)
-    topology = {v:v for v in S}
+    Sg = nx.grid_2d_graph(p, p)
+    topology = {v:v for v in Sg}
 
     #S = nx.cycle_graph(p)
     #topology = nx.circular_layout(S)
@@ -941,19 +938,19 @@ if __name__== "__main__":
     #topology = nx.spring_layout(S)
 
     m = 8
-    T = dnx.chimera_graph(m, coordinates=True) #TODO: Needs coordinates?
+    Tg = dnx.chimera_graph(m, coordinates=True) #TODO: Needs coordinates?
     #T = dnx.pegasus_graph(m, coordinates=True)
 
 
-    S_edgelist = list(S.edges())
-    T_edgelist = list(T.edges())
+    S_edgelist = list(Sg.edges())
+    T_edgelist = list(Tg.edges())
 
     try:
-        candidates = find_candidates(S_edgelist, T,
-                                    topology = topology,
-                                    enable_migration = True,
-                                    verbose = verbose)
-        embedding = find_embedding( S_edgelist, T_edgelist,
+        candidates = find_candidates(S_edgelist, Tg,
+                                     topology=topology,
+                                     enable_migration=True,
+                                     verbose=verbose)
+        embedding = find_embedding(S_edgelist, T_edgelist,
                                     initial_chains=candidates,
                                     verbose=verbose)
         print('Layout:\n%s' % str(get_stats(embedding)))
@@ -982,6 +979,6 @@ if __name__== "__main__":
 
 
     plt.clf()
-    dnx.draw_chimera_embedding(T, embedding)
+    dnx.draw_chimera_embedding(Tg, embedding)
     #dnx.draw_pegasus_embedding(T, embedding)
     plt.show()
