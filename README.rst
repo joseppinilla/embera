@@ -11,16 +11,23 @@ A graph G is a minor of H if G is isomorphic to a graph obtained from a subgraph
 
 Installation
 ------------
-
+.. installation-start-marker
 To install from source:
 
 .. code-block:: bash
+
   python setup.py install
+  
+.. installation-end-marker
 
 Examples
 --------
+.. examples-start-marker
+
+Example comparing the embeddings obtained from a Layout-Agnostic and a Layout-Aware embedding flow.
 
 .. code-block:: python
+
   import networkx as nx
   import dwave_networkx as dnx
   from minorminer import find_embedding
@@ -49,8 +56,10 @@ Examples
   print('sum: %s' % sum(len(v) for v in guided_embedding.values()))
   print('max: %s' % max(len(v)for v in guided_embedding.values()))
 
+Example of a layout aware embedding flow.
 
 .. code-block:: python
+
   import networkx as nx
   import dwave_networkx as dnx
   from embedding_methods.topological import find_embedding
@@ -74,3 +83,5 @@ Examples
   print(embedding)
   print('sum: %s' % sum(len(v) for v in embedding.values()))
   print('max: %s' % max(len(v)for v in embedding.values()))
+  
+.. examples-end-marker
