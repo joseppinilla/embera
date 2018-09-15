@@ -54,8 +54,7 @@ class Tile:
         return (north, south, west, east, nw, ne, se, sw)
 
 class DummyTile:
-    """
-    Dummy Tile Class to use as boundaries
+    """ Dummy Tile Class to use as boundaries
     """
     def __init__(self):
         # Keyed in tile dictionary as None
@@ -115,6 +114,7 @@ class PegasusTile(Tile):
                 k : orthogonal minor offset
                 z : parallel offset
         """
+        #TODO: Choice of qubits from Pegasus index is naive. Can do better.
         t = self.t
         self.qubits = set()
         v=0.0
@@ -205,6 +205,7 @@ class Placer(Tiling):
                         candidates[s_node].update(self.tiles[tile].qubits)
                 elif self.vicinity == 3:
                     #TODO:# Directed  = (Single) + 3 tiles closest to the node
+                    warnings.warn('Not implemented. Using [0] Single vicinity.')
                     candidates[s_node] = self.tiles[s_tile].qubits
                 else:
                     raise ValueError("vicinity %s not valid [0-3]." % self.vicinity)
@@ -253,7 +254,7 @@ class DiffusionPlacer(Placer):
 
         center_x, center_y = n/2.0, m/2.0
         dist_accum = 0.0
-        # Normalizem, scale and accumulate initial distances
+        # Normalize, scale and accumulate initial distances
         for s_node, (sx, sy) in topology.items():
             norm_x = (sx-Sx_min) / s_width
             norm_y = (sy-Sy_min) / s_height
@@ -382,34 +383,29 @@ class DiffusionPlacer(Placer):
         diff_accum = 0.0
         increasing = True
         for value in self.dispersion_accum:
-            sq_diff = (value-mean)**2
-            diff_accum = diff_accum + sq_diff
+            diff_accum = diff_accum + (value-mean)**2
             increasing = value > prev_val
             prev_val = value
         variance = (diff_accum/3.0)
         spread = variance > 0.01
         return spread and not increasing
 
-    def _migrate(self):
+    def run(self):
+        """ Run two-stage global placement.
         """
-        """
+        self._scale()
         migrating = self.enable_migration
         while migrating:
             self._map_tiles()
             dispersion = self._step()
             migrating = self._condition(dispersion)
-
-    def run(self):
-        """ Run placement
-        """
-        self._scale()
-        self._migrate()
         candidates = self._assign_candidates()
         return candidates
 
 
 class SimulatedAnnealingPlacer(Tiling):
-
+    """ A simulated annealing based global placement
+    """
     def __init__(self, S, T, **params):
         Placer.__init__(self)
         Tiling.__init__(self, Tg)
@@ -424,21 +420,26 @@ class SimulatedAnnealingPlacer(Tiling):
 
     def run():
         #TODO: Simulated Annealing placement
-        pass
-        candidates = elf._assign_candidates()
+        candidates = self._assign_candidates()
         return candidates
 
-
-
-
 def find_candidates(S, Tg, **params):
-    """
+    """ find_candidates(S, Tg, **params)
+    Given an arbitrary source graph and a target graph belonging to a
+    tiled architecture (i.e. Chimera Graph), find a mapping from source
+    nodes to target nodes, so that this mapping assists in a subsequent
+    minor embedding.
+
+    If a topology is given, the chosen method to find candidates is
+    the DiffusionPlacer_ approach. If no topology is given, the
+    SimulatedAnnealingPlacer_ is used.
 
         Args:
+            S: an iterable of label pairs representing the edges in the
+                source graph
 
-            S: an iterable of label pairs representing the edges in the source graph
-
-            Tg: a NetworkX Graph with construction parameters dictionary:
+            Tg: a NetworkX Graph with construction parameters such as those
+                generated using dwave_networkx_:
                     family : {'chimera','pegasus', ...}
                     rows : (int)
                     columns : (int)
@@ -460,9 +461,9 @@ def find_candidates(S, Tg, **params):
                 0: Single tile
                 1: Immediate neighbors = (north, south, east, west)
                 2: Extended neighbors = (Immediate) + diagonals
-                3: Directed  = (Single) + 3 tiles closest to the node
-    """
+                3: Directed  = (Single) + 3 tiles closest to the node coordinates
 
+    """
 
     diffuse = params.pop('diffuse', True)
 
@@ -475,23 +476,25 @@ def find_candidates(S, Tg, **params):
 
     return candidates
 
-""" Negotiated-congestion based router for multiple
-    disjoint Steiner Tree Search.
-    Args:
+""" Negotiated-congestion based router for multiple disjoint Steiner Tree Search.
 
-
-    Returns:
-        paths: Dictionary keyed by Problem graph edges with assigned nodes
-        unassigned: Dictionary keyed by node from Tg and problem node values
+This router uses a negotiated-congestion scheme, which is widely-used for FPGA
+routing, in which overlap of resources is initially allowed but the costs of
+using each qubit is recalculated until a legal solution is found. A solution is
+legal when the occupancy of the qubits do not have conflicts. The cost of using
+one qubit is defined to depend on a base cost, a present-sharing cost, and a
+historical-sharing cost.
 
 """
 
 # Routing cost scalers
-__alpha_p = 0.0
-__alpha_h = 0.0
+ALPHA_P = 0.0
+ALPHA_H = 0.0
 
 def _init_graphs(Sg, Tg, opts):
-
+    """ Assign values to source and target graphs required for
+        the tree search.
+    """
     for s_node, s_data in Sg.nodes(data=True):
         # Fixed data
         s_data['degree'] = Sg.degree(s_node)
@@ -506,11 +509,11 @@ def _init_graphs(Sg, Tg, opts):
 
 def _get_cost(neighbor_name, Tg):
 
-    global __alpha_p
+    global ALPHA_P
 
     next_node = Tg.nodes[neighbor_name]
 
-    sharing_cost = 1.0 + next_node['sharing'] * __alpha_p
+    sharing_cost = 1.0 + next_node['sharing'] * ALPHA_P
 
     scope_cost = 0.0 #TODO: higher if different tile
 
@@ -524,9 +527,6 @@ def _get_cost(neighbor_name, Tg):
 
 def _bfs(target_set, visited, visiting, queue, Tg):
     """ Breadth-First Search
-        Args:
-            queue: Breadth-First Search Priority Queue
-
     """
 
     # Pop node out of Priority queue and its cost, parent, and distance.
@@ -534,7 +534,6 @@ def _bfs(target_set, visited, visiting, queue, Tg):
     _, node_parent, node_dist = visiting[node]
     found = False
     while (not found):
-        #print("Node: %s"%str(node))
         neighbor_dist = node_dist + 1
         neighbor_parent = node
         for neighbor in Tg[node]:
@@ -555,7 +554,6 @@ def _bfs(target_set, visited, visiting, queue, Tg):
         _, node_parent, node_dist = visiting[node]
         found = (node in target_set) and (node_dist >= 2)
 
-    print( 'Found target %s at %s cost %s' % (str(node), str(node_dist), str(node_cost)) )
     visited[node] = node_cost, node_parent, node_dist
     return node
 
@@ -570,7 +568,6 @@ def _traceback(source, target, reached, visited, unassigned, mapped, Tg):
     path = [reached]
     node = node_parent
     while(node not in mapped[source]):
-        print('Node:' + str(node))
         path.append(node)
 
         if node in unassigned:
@@ -591,7 +588,6 @@ def _traceback(source, target, reached, visited, unassigned, mapped, Tg):
         node = node_parent
     path.append(node)
 
-    print("Path:" + str(path))
     return path
 
 
@@ -615,6 +611,9 @@ def _get_target_dict(targets, mapped, Sg):
     return target_dict
 
 def _init_queue(source, visiting, queue, mapped, Sg, Tg):
+    """ Given a source node, expand the search queue over previously
+        assigned target nodes with cost 0.0
+    """
     if source not in mapped:
         _embed_node(source, mapped, Sg, Tg)
 
@@ -625,20 +624,14 @@ def _init_queue(source, visiting, queue, mapped, Sg, Tg):
         visiting[node] = (node_cost, node_parent, node_dist)
         heappush(queue, (node_cost, node))
 
-    if verbose:
-        queue_str = str(["%0.3f %s" % (c,str(n)) for c, n in queue])
-        print('Init Queue:' + queue_str)
-
 def _steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
     """ Steiner Tree Search
     """
-    print('\n New Source:' + str(source))
     # Resulting tree dictionary keyed by edges and path values.
     tree = {}
 
     # Breadth-First Search
     for target in targets:
-        print('Target:' + str(target))
         # Breadth-First Search structures.
         visiting = {} # (cost, parent, distance) during search
         visited = {} # (parent, distance) after popped from queue
@@ -659,27 +652,23 @@ def _steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
     return tree
 
 def _update_costs(mapped, Tg):
-    """ Update present-sharing and history-sharing costs
-
+    """ Update present-sharing and history-sharing costs.
+        If a target node is shared, the embedding is not legal.
     """
 
-    global __alpha_h
-
     legal = True
-    print("Mapped")
-    for t_nodes in mapped.values():
-        for t_node in t_nodes:
-            Tg.nodes[t_node]['history'] += __alpha_h
+    for s_map in mapped.values():
+        for t_node in s_map:
+            Tg.nodes[t_node]['history'] += ALPHA_H
             sharing =  Tg.nodes[t_node]['sharing']
             if sharing > 1.0:
                 legal = False
-            print(t_node, sharing)
 
     return legal
 
 def _embed_node(source, mapped, Sg, Tg, opts={}):
 
-    if source in mapped: return
+    #if source in mapped: return
 
     s_node = Sg.nodes[source]
 
@@ -722,14 +711,14 @@ def _route(Sg, Tg, opts):
     """ Negotiated Congestion
 
     """
-    global __alpha_p, __alpha_h
+    global ALPHA_P, ALPHA_H
 
     # Termination criteria
     legal = False
     tries = opts.tries
     # Negotiated Congestion
     while (not legal) and (tries > 0):
-        print('############# TRIES LEFT: %s' % tries)
+        if opts.verbose: print('############# TRIES LEFT: %s' % tries)
         # First node selection
         pending_set = set(Sg)
         source = _get_node(pending_set)
@@ -742,45 +731,35 @@ def _route(Sg, Tg, opts):
             paths.update(tree)
             source = _get_node(pending_set, pre_sel=targets)
         legal = _update_costs(mapped, Tg)
-        __alpha_p += opts.delta_p
-        __alpha_h += opts.delta_h
+        ALPHA_P += opts.delta_p
+        ALPHA_H += opts.delta_h
         tries -= 1
     return legal, paths, mapped, unassigned
 
 
-""" Linear Programming formulation to solve unassigned nodes.
-
-    Constraints for all edges:
-        var<source><source><target> + var<target><source><target> = |path|
-    Constraints for all nodes:
-        Z - All( var<node><source><target> ) >= |<mapped['node']>|
-    Goal:
-        min(Z)
-"""
-
 def _setup_lp(paths, mapped, unassigned):
     """ Setup linear Programming Problem
-        Notes:
-            -Constraint names need to start with letters
+    Notes:
+        -Constraint names need to start with letters
 
-        Example: K3 embedding requiring a 2-length Chain
-            >>  Solve Chains
-            >>  Minimize
-            >>  OBJ: Z
-            >>  Subject To
-            >>  ZeroSum12: var112 + var212 = 1
-            >>  c_0: Z >= 1
-            >>  c_1: Z - var112 >= 1
-            >>  c_2: Z - var212 >= 1
-            >>  Bounds
-            >>  0 <= Z
-            >>  0 <= var112
-            >>  0 <= var212
-            >>  Generals
-            >>  Z
-            >>  var112
-            >>  var212
-            >>  End
+    Example: K3 embedding requiring a 2-length Chain
+        >>  Solve Chains
+        >>  Minimize
+        >>  OBJ: Z
+        >>  Subject To
+        >>  ZeroSum12: var112 + var212 = 1
+        >>  c_0: Z >= 1
+        >>  c_1: Z - var112 >= 1
+        >>  c_2: Z - var212 >= 1
+        >>  Bounds
+        >>  0 <= Z
+        >>  0 <= var112
+        >>  0 <= var212
+        >>  Generals
+        >>  Z
+        >>  var112
+        >>  var212
+        >>  End
     """
     lp = pulp.LpProblem("Solve Chains", pulp.LpMinimize)
 
@@ -822,7 +801,11 @@ def _setup_lp(paths, mapped, unassigned):
     return lp, var_map
 
 def _assign_nodes(paths, lp_sol, var_map, mapped):
-
+    """ Once a solution to the linear program is found, the new mapping
+    of nodes is transformed from the resulting number of target nodes to
+    add to a source node, into the corresponding target nodes in the target
+    graph.
+    """
     for edge, path in paths.items():
         # Nodes in path excluding source and target
         shared = len(path) - 2
@@ -840,39 +823,60 @@ def _assign_nodes(paths, lp_sol, var_map, mapped):
                     mapped[target].add(path[i])
 
 
-def _paths_to_chains(legal, paths, mapped, unassigned):
+def _paths_to_chains(legal, paths, mapped, unassigned, opts):
+    """ Using a Linear Programming formulation, map the unassigned
+    target nodes, so that the maximum length chain in the embedding
+    is minimized.
 
-    if not legal: print ('##########\n\n\n\nNOT LEGAL\n\n\n\n##########')
+    Linear Programming formulation to solve unassigned nodes.
 
-    print('Assigned')
-    for node, fixed in mapped.items():
-        print(str(node) + str(fixed))
+        Constraints for all edges:
+            var<source><source><target> + var<target><source><target> = |path|
+        Constraints for all nodes:
+            Z - All( var<node><source><target> ) >= |<mapped['node']>|
+        Goal:
+            min(Z)
+    """
 
-    print('Unassigned')
-    for node, shared in unassigned.items():
-        print(str(node) + str(shared))
+    if not legal:
+        warnings.warn('Embedding is illegal.')
+
+    if opts.verbose:
+        print('Assigned')
+        for node, fixed in mapped.items():
+            print(str(node) + str(fixed))
+        print('Unassigned')
+        for node, shared in unassigned.items():
+            print(str(node) + str(shared))
 
     lp, var_map = _setup_lp(paths, mapped, unassigned)
 
-    if verbose>0: lp.writeLP("SHARING.lp") #TEMP change to verbose 3
+    if opts.verbose==2: lp.writeLP("SHARING.lp") #TEMP change to verbose 3
 
-    lp.solve(solver=pulp.GLPK_CMD(msg=verbose))
+    lp.solve(solver=pulp.GLPK_CMD(msg=opts.verbose))
 
     # read solution
     lp_sol = {}
     for v in  lp.variables():
         lp_sol[v.name] = v.varValue
 
-    print(lp_sol)
-
     _assign_nodes(paths, lp_sol, var_map, mapped)
 
     return mapped
 
-"""
-Option parser for diffusion-based migration of the graph topology
-"""
 class RouterOptions(object):
+    """ Option parser for negotiated congestion based detailed router.
+        Optional parameters:
+
+            random_seed (int): Used as an argument for the RNG.
+
+            tries (int):
+
+            verbose (int): Verbosity level
+                0: Quiet mode
+                1: Print statements
+                2: Log LP problem
+    """
     def __init__(self, **params):
 
         self.random_seed = params.pop('random_seed', None)
@@ -890,9 +894,9 @@ class RouterOptions(object):
             raise ValueError("%s is not a valid parameter." % name)
 
 def find_embedding(S, T, **params):
-    """
-    Heuristically attempt to find a minor-embedding of a graph representing an
-    Ising/QUBO into a target graph.
+    """ find_embedding(S, T, **params)
+    Heuristically attempt to find a minor-embedding of a graph, representing an
+    Ising/QUBO, into a target graph.
 
     Args:
 
@@ -902,23 +906,11 @@ def find_embedding(S, T, **params):
             The node labels for the different target archictures should be either
             node indices or coordinates as given from dwave_networkx_.
 
+        **params (optional): see RouterOptions_
 
-        **params (optional): see below
     Returns:
 
         embedding: a dict that maps labels in S to lists of labels in T
-
-    Optional parameters:
-
-        random_seed (int):
-
-        tries (int):
-
-        verbose (int): Verbosity level
-            0: Quiet mode
-            1: Print statements
-            2: NetworkX graph drawings
-            3: Migration process
 
     """
 
@@ -932,97 +924,6 @@ def find_embedding(S, T, **params):
 
     legal, paths, mapped, unassigned = _route(Sg, Tg, opts)
 
-    embedding = _paths_to_chains(legal, paths, mapped, unassigned)
+    embedding = _paths_to_chains(legal, paths, mapped, unassigned, opts)
 
     return embedding
-
-#TEMP: standalone test
-
-import sys
-import dwave_networkx as dnx
-
-def get_stats(embedding):
-    max_chain = 0
-    min_chain = sys.maxsize
-    total = 0
-
-    N = len(embedding)
-    for chain in embedding.values():
-        chain_len = len(chain)
-        total += chain_len
-        if chain_len > max_chain:
-            max_chain = chain_len
-        if chain_len < min_chain:
-            min_chain =  chain_len
-    avg_chain = total/N
-    sum_deviations = 0
-    for chain in embedding.values():
-        chain_len = len(chain)
-        deviation = (chain_len - avg_chain)**2
-        sum_deviations += deviation
-    std_dev = sqrt(sum_deviations/N)
-
-    return max_chain, min_chain, total, avg_chain, std_dev
-
-if __name__ == "__main__":
-
-    import time
-    import traceback
-
-    verbose = 4
-
-    p = 2
-    Sg = nx.grid_2d_graph(p, p)
-    topology = {v:v for v in Sg}
-
-    #S = nx.cycle_graph(p)
-    #topology = nx.circular_layout(S)
-
-    #S = nx.complete_graph(p)
-    #topology = nx.spring_layout(S)
-
-    m = 3
-    #Tg = dnx.chimera_graph(m, coordinates=True) #TODO: Needs coordinates?
-    Tg = dnx.pegasus_graph(m, coordinates=True)
-
-
-    S_edgelist = list(Sg.edges())
-    T_edgelist = list(Tg.edges())
-
-    try:
-        candidates = find_candidates(S_edgelist, Tg,
-                                     topology=topology,
-                                     enable_migration=True,
-                                     verbose=verbose)
-        embedding = find_embedding(S_edgelist, T_edgelist,
-                                    initial_chains=candidates,
-                                    verbose=verbose)
-        print('Layout:\n%s' % str(get_stats(embedding)))
-    except:
-        traceback.print_exc()
-
-    # import minorminer
-    #
-    # t_start = time.time()
-    # mm_embedding = minorminer.find_embedding( S_edgelist, T_edgelist,
-    #                                 initial_chains=candidates,
-    #                                 verbose=verbose)
-    # t_end = time.time()
-    # t_elap = t_end-t_start
-    # print('MinorMiner:\n%s in %s' % (str(get_stats(mm_embedding)), t_elap) )
-    #
-    # t_start = time.time()
-    # mm_embedding = minorminer.find_embedding( S_edgelist, T_edgelist,
-    #                                 #initial_chains=candidates,
-    #                                 verbose=verbose)
-    # t_end = time.time()
-    # t_elap = t_end-t_start
-    # print('MinorMiner:\n%s in %s' % (str(get_stats(mm_embedding)), t_elap) )
-
-
-
-
-    plt.clf()
-    #dnx.draw_chimera_embedding(Tg, embedding)
-    dnx.draw_pegasus_embedding(Tg, embedding)
-    plt.show()

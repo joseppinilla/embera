@@ -1,1 +1,1 @@
-from embedding_methods.topological import *
+from embedding_methods.topological.topological import *
