@@ -55,8 +55,8 @@ if __name__ == "__main__":
     #topology = nx.spring_layout(S)
 
     m = 3
-    Tg = dnx.chimera_graph(m, coordinates=True) #TODO: Needs coordinates?
-    #Tg = dnx.pegasus_graph(m, coordinates=True)
+    #Tg = dnx.chimera_graph(m, coordinates=True) #TODO: Needs coordinates?
+    Tg = dnx.pegasus_graph(m, coordinates=True)
 
 
     S_edgelist = list(Sg.edges())
@@ -96,6 +96,6 @@ if __name__ == "__main__":
 
 
     plt.clf()
-    dnx.draw_chimera_embedding(Tg, embedding)
-    #dnx.draw_pegasus_embedding(Tg, embedding)
+    #dnx.draw_chimera_embedding(Tg, embedding)
+    dnx.draw_pegasus_embedding(Tg, embedding)
     plt.show()
