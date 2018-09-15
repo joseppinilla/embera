@@ -1,4 +1,4 @@
 from embedding_methods import architectures
 from embedding_methods import composites
-from embedding_methods import dense
+from embedding_methods import global_placement
 from embedding_methods import topological

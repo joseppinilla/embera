@@ -5,7 +5,9 @@
 __all__ = ['Tiling']
 
 class Tiling:
-    """ Tiling for migration stage
+    """ Generate tiling from architecture graph construction.
+    According to the architecture family, create a grid of Tile
+    objects.
     """
     def __init__(self, Tg):
         # Support for different target architectures
@@ -22,7 +24,7 @@ class Tiling:
         self.n = Tg.graph['columns']
         self.m = Tg.graph['rows']
         self.t = Tg.graph['tile']
-        self.qubits = float(len(Tg))
+        self.size = float(len(Tg))
         # Mapping of source nodes to tile
         self.mapping = {}
         # Add Tile objects

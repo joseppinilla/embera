@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 from math import floor, sqrt
 from heapq import heappop, heappush
 
-from embedding_methods.topological.topological import find_embedding, find_candidates
+from embedding_methods.topological import find_embedding
+from embedding_methods.global_placement.diffusion_based import find_candidates
 
 def get_stats(embedding):
     max_chain = 0
@@ -55,8 +56,8 @@ if __name__ == "__main__":
     #topology = nx.spring_layout(S)
 
     m = 3
-    #Tg = dnx.chimera_graph(m, coordinates=True) #TODO: Needs coordinates?
-    Tg = dnx.pegasus_graph(m, coordinates=True)
+    Tg = dnx.chimera_graph(m, coordinates=True) #TODO: Needs coordinates?
+    #Tg = dnx.pegasus_graph(m, coordinates=True)
 
 
     S_edgelist = list(Sg.edges())
@@ -65,7 +66,6 @@ if __name__ == "__main__":
     try:
         candidates = find_candidates(S_edgelist, Tg,
                                      topology=topology,
-                                     enable_migration=True,
                                      verbose=verbose)
         embedding = find_embedding(S_edgelist, T_edgelist,
                                     initial_chains=candidates,
@@ -96,6 +96,6 @@ if __name__ == "__main__":
 
 
     plt.clf()
-    #dnx.draw_chimera_embedding(Tg, embedding)
-    dnx.draw_pegasus_embedding(Tg, embedding)
+    dnx.draw_chimera_embedding(Tg, embedding)
+    #dnx.draw_pegasus_embedding(Tg, embedding)
     plt.show()
