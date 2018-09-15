@@ -1,3 +1,5 @@
+.. index-start-marker
+
 embedding-methods
 =============
 
@@ -5,14 +7,15 @@ embedding-methods
 
 A graph G is a minor of H if G is isomorphic to a graph obtained from a subgraph of H by successively contracting edges.
 
+.. index-end-marker
+
 Installation
 ------------
 
 To install from source:
 
 .. code-block:: bash
-
-    python setup.py install
+  python setup.py install
 
 Examples
 --------
