@@ -3,10 +3,11 @@
 from setuptools import setup
 
 packages = ['embedding_methods',
-            'embedding_methods.composites',
             'embedding_methods.architectures',
+            'embedding_methods.composites',
+            'embedding_methods.dense',
             'embedding_methods.global_placement',
-            'embedding_methods.topological',
+            'embedding_methods.topological'
             ]
 
 install_requires = ['networkx>=2.0,<3.0',

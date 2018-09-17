@@ -1,27 +1,19 @@
 '''
 
->> python3 -m unittest tests.test_greedy
+>> python3 -m unittest tests.<test_name>.<test_method>
 
 '''
 import os
-import sys
 import math
 import json
 import time
-import numpy
 import pickle
 import unittest
 import minorminer
 import networkx as nx
 import dwave_networkx as dnx
-import matplotlib.pyplot as plt
 
-from collections import Counter
-
-from embedding_methods.architectures import *
-
-from embedding_methods.dense import dense
-from embedding_methods.topological import topological
+from embedding_methods.architectures import generators
 from embedding_methods.composites.embedding import EmbeddingComposite
 
 from dimod.reference.samplers.exact_solver import ExactSolver
@@ -35,17 +27,6 @@ tries = 4
 filedir = "./results/"
 
 class CharacterizeEmbedding(unittest.TestCase):
-
-    def setUp(self):
-
-        self.tries = tries
-        self.target = 'C4'
-        self.method = minorminer
-        gen, _, specs, _ = ARCHS['C4']
-        T = gen(*specs)
-        self.structsampler = StructureComposite(SimulatedAnnealingSampler(), T.nodes, T.edges)
-        self.sampler = EmbeddingComposite(self.structsampler, self.method)
-
 
     def log(self, S, obj):
         graphstr = '-' + S.name
@@ -169,24 +150,31 @@ class CharacterizeEmbedding(unittest.TestCase):
 
 class CharacterizeArchitecture(CharacterizeEmbedding):
 
+    def setUp(self):
+        self.tries = tries
+        self.method = minorminer
+
     def all_graphs(self):
-        gen, _, specs, _ = ARCHS[self.target]
-        T = gen(*specs)
+        gen = generators.__dict__[self.target]
+        T = gen()
         self.structsampler = StructureComposite(SimulatedAnnealingSampler(), T.nodes, T.edges)
+        self.sampler = EmbeddingComposite(self.structsampler, self.method)
         self.grid()
         self.bipartite()
         self.complete()
         self.hypercube()
 
     def all_archs(self):
-        for arch, (gen, _, specs, _) in ARCHS.items():
-            print('ARCH %s' % arch)
-            self.target = arch
-            T = gen(*specs)
-            self.structsampler = StructureComposite(SimulatedAnnealingSampler(), T.nodes, T.edges)
-            self.sampler = EmbeddingComposite(self.structsampler, self.method)
-            self.graph()
+        for name, gen in generators.__dict__.items:
+            if callable(gen):
+                print('ARCH %s' % name)
+                self.target = name
+                T = gen()
+                self.structsampler = StructureComposite(SimulatedAnnealingSampler(), T.nodes, T.edges)
+                self.sampler = EmbeddingComposite(self.structsampler, self.method)
+                self.graph()
 
+    @unittest.skip("Exhaustive test. Not run if not characterizing a new method")
     def test_hypercube(self):
         self.graph = self.hypercube
         self.all_archs()
@@ -199,22 +187,32 @@ class CharacterizeArchitecture(CharacterizeEmbedding):
         self.graph = self.complete
         self.all_archs()
 
+    def test_rainier(self):
+        """ Rainier """
+        self.target = 'rainier_graph'
+        self.all_graphs()
+
+    def test_vesuvius(self):
+        """ Vesuvius """
+        self.target = 'vesuvius_graph'
+        self.all_graphs()
+
     def test_dw2000q(self):
         """ D-Wave 2000Q """
-        self.target = 'DW2000Q'
+        self.target = 'dw2000q_graph'
         self.all_graphs()
 
     def test_dw2x(self):
         """ D-Wave 2X """
-        self.target = 'DW2X'
+        self.target = 'dw2x_graph'
         self.all_graphs()
 
     def test_p6(self):
         """ D-Wave P6 """
-        self.target = 'P6'
+        self.target = 'p6_graph'
         self.all_graphs()
 
     def test_p16(self):
         """ D-Wave P16 """
-        self.target = 'P16'
+        self.target = 'p16_graph'
         self.all_graphs()

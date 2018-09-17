@@ -2,7 +2,7 @@
 A generic dimod composite_ to map unstructured problems to a structured_ sampler.
 
 A structured_ sampler can only solve problems that map to a specific graph: the
-D-Wave system's architecture is represented by a Chimera_ graph.
+Ising solver architecture is represented by a graph.
 
 .. _composite: http://dimod.readthedocs.io/en/latest/reference/samplers.html
 .. _minorminer: https://github.com/dwavesystems/minorminer
@@ -61,7 +61,26 @@ class EmbeddingComposite(dimod.ComposedSampler):
         return {'child_properties': self.child.properties.copy()}
 
     def get_embedding(self, S_edgelist, T_edgelist=None, get_new=False, **embedding_parameters):
-        """
+        """Retrieve or create a minor-embedding
+
+        Args:
+            S_edgelist (list):
+                An iterable of label pairs representing the edges in the source graph
+
+            T_edgelist (list, optional, default=<Child Structure>):
+                An iterable of label pairs representing the edges in the target graph.
+
+            get_new (bool, optional, default=False):
+                If the sampler has used an embedding return it. Otherwise, embed problem.
+
+            **parameters:
+                Parameters for the embedding method.
+
+        Returns:
+            embedding (dict):
+                Dictionary that maps labels in S_edgelist to lists of labels in the
+                graph of the structured sampler.
+
 
         """
         child = self.child
