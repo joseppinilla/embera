@@ -5,17 +5,17 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from embedding_methods.architectures import generators
 from embedding_methods.architectures import drawing
-from embedding_methods.topological import find_embedding
+from embedding_methods.topological.topological import find_embedding
 from embedding_methods.global_placement.diffusion_based import find_candidates
 
-# A 4x4 grid problem graph
-Sg = nx.grid_2d_graph(2, 2)
+# A 3x3 grid problem graph
+Sg = nx.grid_2d_graph(3, 3)
 S_edgelist = list(Sg.edges())
 # Layout of the problem graph
 topology = {v:v for v in Sg}
 
 # The corresponding graph of the D-Wave C4 annealer
-Tg = generators.rainier_graph(coordinates=True)
+Tg = generators.rainier_graph()
 T_edgelist = list(Tg.edges())
 
 # Find a global placement for problem graph

@@ -4,6 +4,10 @@
 
 __all__ = ['Tiling']
 
+import dwave_networkx as dnx
+from dwave_networkx.generators.chimera import chimera_coordinates
+from dwave_networkx.generators.pegasus import pegasus_coordinates
+
 class Tiling:
     """ Generate tiling from architecture graph construction.
     According to the architecture family, create a grid of Tile
@@ -43,6 +47,7 @@ class Tile:
         self.n = Tg.graph['columns']
         self.m = Tg.graph['rows']
         self.t = Tg.graph['tile']
+        self.labels = Tg.graph['labels']
         self.name = (i,j)
         self.nodes = set()
         index = j*self.n + i
@@ -95,6 +100,7 @@ class ChimeraTile(Tile):
     """
     def __init__(self, Tg, i, j):
         Tile.__init__(self, Tg, i, j)
+        self.converter = chimera_coordinates(self.m, self.n, self.t)
         self.supply = self._get_chimera_qubits(Tg, i, j)
         self.concentration = 1.0 if not self.supply else 0.0
 
@@ -115,8 +121,14 @@ class ChimeraTile(Tile):
         for u in range(2):
             for k in range(t):
                 chimera_index = (i, j, u, k)
-                if chimera_index in Tg.nodes:
-                    self.qubits.add(chimera_index)
+                if self.labels == 'coordinate':
+                    chimera_label = chimera_index
+                elif self.labels == 'int':
+                    chimera_label = self.converter.int(chimera_index)
+                else:
+                    raise Exception("Invalid labeling. {'coordinate', 'int'}")
+                if chimera_label in Tg.nodes:
+                    self.qubits.add(chimera_label)
                     v += 1.0
         return v
 
@@ -125,6 +137,7 @@ class PegasusTile(Tile):
     """
     def __init__(self, Tg, i, j):
         Tile.__init__(self, Tg, i, j)
+        self.converter = pegasus_coordinates(self.m)
         self.supply = self._get_pegasus_qubits(Tg, i, j)
         self.concentration = 1.0 if not self.supply else 0.0
 
@@ -145,7 +158,13 @@ class PegasusTile(Tile):
         for u in range(2):
             for k in range(self.t):
                 pegasus_index = (u, j, k, i)
-                if pegasus_index in Tg.nodes:
-                    self.qubits.add(pegasus_index)
+                if self.labels == 'coordinate':
+                    pegasus_label = pegasus_index
+                elif self.labels == 'int':
+                    pegasus_label = self.converter.int(pegasus_index)
+                else:
+                    raise Exception("Invalid labeling. {'coordinate', 'int'}")
+                if pegasus_label in Tg.nodes:
+                    self.qubits.add(pegasus_label)
                     v += 1.0
         return v

@@ -45,6 +45,7 @@ def draw_tiled_graph(m, n, tiles, topology, **kwargs):
     """ Draws a grid representing the architecture tiles
         with an overlay of source nodes.
     """
+    #TODO: Use graph colouring from dwave.system.composites.tiling.draw_tiling
 
     concentrations = {name : "d=%s"%tile.concentration
                             for name, tile in tiles.items() if name!=None}

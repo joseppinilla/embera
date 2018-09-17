@@ -2,8 +2,10 @@ import math
 import random
 import warnings
 import networkx as nx
+import matplotlib.pyplot as plt
 
 from embedding_methods.architectures.tiling import Tiling
+from embedding_methods.architectures.drawing import draw_tiled_graph
 
 __all__ = ['find_candidates']
 
@@ -284,6 +286,11 @@ def find_candidates(S, Tg, **params):
             candidates: a dict that maps labels in S to lists of labels in T
 
         Optional parameters:
+            verbose (int): Verbosity level
+                0: Quiet mode
+                1: Print statements
+                4: Tile drawings with concentration
+
             topology ({<node>:(<x>,<y>),...}):
                 Dict of 2D positions assigned to the source graph nodes.
 
