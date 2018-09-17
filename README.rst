@@ -6,6 +6,7 @@ embedding-methods
 ``embedding-methods`` offers a collection of minor-embedding methods and utilities. These can be used from the interface functions, such as ``find_embedding()``, or as composites making part of the `D-Wave Ocean <http://dw-docs.readthedocs.io/en/latest/overview/stack.html#stack>`_ software stack. Additional resources are provided to generate graphs for existing and conceptual architecures of Ising samplers (e.g. D-Wave's Quantum Annealers).
 
 **Definition:**
+
 *A graph G is a minor of H if G is isomorphic to a graph obtained from a subgraph of H by successively contracting edges.*
 
 .. index-end-marker
@@ -66,7 +67,9 @@ Example of a Layout-Aware embedding flow.
 .. code-block:: python
 
   import networkx as nx
+  import matplotlib.pyplot as plt
   from embedding_methods.architectures import generators
+  from embedding_methods.architectures import drawing
   from embedding_methods.topological import find_embedding
   from embedding_methods.global_placement.diffusion_based import find_candidates
 
@@ -85,10 +88,11 @@ Example of a Layout-Aware embedding flow.
   # Find a minor-embedding using the topological method
   embedding = find_embedding(S_edgelist, T_edgelist, initial_chains=candidates)
 
-  print(len(embedding))
-  print(embedding)
   print('sum: %s' % sum(len(v) for v in embedding.values()))
   print('max: %s' % max(len(v)for v in embedding.values()))
+  
+  drawing.draw_architecture_embedding(Tg, embedding)
+  plt.show()
 
 .. examples-end-marker
 
@@ -124,3 +128,6 @@ or the generic ``EmbeddingComposite``:
 
     structsampler = StructureComposite(RandomSampler(), target_graph.nodes, target_graph.edges)
     sampler = EmbeddingComposite(structsampler, minorminer)
+
+The composite is then compatible with the use of the ``sample()`` method as any other sampler.
+In addition, a method ``get_embedding()`` is provided as an interface for the user to obtain a new embedding or retrieve the resulting embedding from which the problem was sampled.
