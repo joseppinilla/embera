@@ -3,9 +3,10 @@
 embedding-methods
 =============
 
-`embedding-methods` offers a collection of minor-embedding methods and utilities.
+``embedding-methods`` offers a collection of minor-embedding methods and utilities. These can be used from the interface functions, such as ``find_embedding()``, or as composites making part of the `D-Wave Ocean <http://dw-docs.readthedocs.io/en/latest/overview/stack.html#stack>`_ software stack. Additional resources are provided to generate graphs for existing and conceptual architecures of Ising samplers (e.g. D-Wave's Quantum Annealers).
 
-A graph G is a minor of H if G is isomorphic to a graph obtained from a subgraph of H by successively contracting edges.
+**Definition:**
+*A graph G is a minor of H if G is isomorphic to a graph obtained from a subgraph of H by successively contracting edges.*
 
 .. index-end-marker
 
@@ -17,11 +18,14 @@ To install from source:
 .. code-block:: bash
 
   python setup.py install
-  
+
 .. installation-end-marker
 
-Examples
---------
+Example Usage
+-------------
+
+**Using function interface:**
+
 .. examples-start-marker
 
 Example comparing the embeddings obtained from a Layout-Agnostic and a Layout-Aware embedding flow.
@@ -29,17 +33,18 @@ Example comparing the embeddings obtained from a Layout-Agnostic and a Layout-Aw
 .. code-block:: python
 
   import networkx as nx
-  import dwave_networkx as dnx
   from minorminer import find_embedding
+  from embedding_methods.architectures import generators
   from embedding_methods.global_placement.diffusion_based import find_candidates
 
   # A 16x16 grid problem graph
   Sg = nx.grid_2d_graph(16, 16)
-  topology = {v:v for v in Sg}
   S_edgelist = list(Sg.edges())
+  # Layout of the problem graph
+  topology = {v:v for v in Sg}
 
-  # A C16 chimera target graph
-  Tg = dnx.chimera_graph(16, coordinates=True)
+  # The corresponding graph of the D-Wave 2000Q annealer
+  Tg = generators.dw2000q_graph()
   T_edgelist = list(Tg.edges())
 
   print('Layout-Agnostic')
@@ -56,22 +61,23 @@ Example comparing the embeddings obtained from a Layout-Agnostic and a Layout-Aw
   print('sum: %s' % sum(len(v) for v in guided_embedding.values()))
   print('max: %s' % max(len(v)for v in guided_embedding.values()))
 
-Example of a layout aware embedding flow.
+Example of a Layout-Aware embedding flow.
 
 .. code-block:: python
 
   import networkx as nx
-  import dwave_networkx as dnx
+  from embedding_methods.architectures import generators
   from embedding_methods.topological import find_embedding
   from embedding_methods.global_placement.diffusion_based import find_candidates
 
   # A 4x4 grid problem graph
   Sg = nx.grid_2d_graph(2, 2)
-  topology = {v:v for v in Sg}
   S_edgelist = list(Sg.edges())
+  # Layout of the problem graph
+  topology = {v:v for v in Sg}
 
-  # A C4 chimera target graph
-  Tg = dnx.chimera_graph(4, coordinates=True)
+  # The corresponding graph of the D-Wave C4 annealer
+  Tg = generators.rainier_graph(coordinates=True)
   T_edgelist = list(Tg.edges())
 
   # Find a global placement for problem graph
@@ -79,9 +85,42 @@ Example of a layout aware embedding flow.
   # Find a minor-embedding using the topological method
   embedding = find_embedding(S_edgelist, T_edgelist, initial_chains=candidates)
 
-  print(len(embedding))  # 3, one set for each variable in the triangle
+  print(len(embedding))
   print(embedding)
   print('sum: %s' % sum(len(v) for v in embedding.values()))
   print('max: %s' % max(len(v)for v in embedding.values()))
-  
+
 .. examples-end-marker
+
+**Using dimod:**
+
+When using along with ``dimod``, either use the method-specific composites (i.e. ``MinorMinerEmbeddingComposite``, ``TopologicalEmbeddingComposite``, ...):
+
+.. code-block:: python
+
+    from embedding_methods.architectures import generators
+    from embedding_methods.composites.minorminer import MinorMinerEmbeddingComposite
+    from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampler
+    
+    # Use the provided architectures
+    target_graph = generators.dw2x_graph()
+
+    # Use any sampler and make structured (i.e. Simulated Annealing, Exact) or use structured sampler if available (i.e. D-Wave machine)
+    structsampler = StructureComposite(SimulatedAnnealingSampler(), target_graph.nodes, target_graph.edges)
+    sampler = MinorMinerEmbeddingComposite(structsampler)
+
+or the generic ``EmbeddingComposite``:
+
+.. code-block:: python
+
+    import minorminer
+    from embedding_methods.architectures import generators
+    from embedding_methods.composites.embedding import EmbeddingComposite
+    from dimod.reference.samplers.random_sampler import RandomSampler
+    
+    
+    # Use the provided architectures
+    target_graph = generators.p6_graph()
+
+    structsampler = StructureComposite(RandomSampler(), target_graph.nodes, target_graph.edges)
+    sampler = EmbeddingComposite(structsampler, minorminer)
