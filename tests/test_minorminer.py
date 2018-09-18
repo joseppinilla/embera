@@ -52,7 +52,8 @@ embedding = sampler.get_embedding()
 valid, invalid, data = 0, 0, []
 
 for datum in response.data():
-    sample, energy = datum
+
+    sample, energy = datum.sample, datum.energy
     if (csp.check(sample)):
         valid = valid+1
         data.append((sample, energy, '1'))

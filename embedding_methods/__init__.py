@@ -1,5 +1,11 @@
-from embedding_methods import architectures
-from embedding_methods import composites
-from embedding_methods import dense
-from embedding_methods import global_placement
-from embedding_methods import topological
+import embedding_methods.dense
+import embedding_methods.topological
+
+from embedding_methods.architectures import *
+import embedding_methods.architectures
+
+from embedding_methods.composites import *
+import embedding_methods.composites
+
+from embedding_methods.global_placement import *
+import embedding_methods.global_placement

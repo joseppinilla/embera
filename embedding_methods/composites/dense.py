@@ -11,7 +11,7 @@ D-Wave system's architecture is represented by a Chimera_ graph.
 
 """
 import dimod
-from embedding_methods.dense import dense
+from embedding_methods import dense
 
 class DenseEmbeddingComposite(dimod.ComposedSampler):
 

@@ -3,9 +3,8 @@
 
 import networkx as nx
 import matplotlib.pyplot as plt
-from embedding_methods.architectures import generators
-from embedding_methods.architectures import drawing
-from embedding_methods.topological.topological import find_embedding
+from embedding_methods.architectures import drawing, generators
+from embedding_methods.topological import find_embedding
 from embedding_methods.global_placement.diffusion_based import find_candidates
 
 # A 3x3 grid problem graph
