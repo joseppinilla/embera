@@ -103,6 +103,7 @@ When using along with ``dimod``, either use the method-specific composites (i.e.
 .. code-block:: python
 
     from embedding_methods.architectures import generators
+    from dimod.reference.composites.structure import StructureComposite
     from embedding_methods.composites.minorminer import MinorMinerEmbeddingComposite
     from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampler
     
@@ -118,9 +119,10 @@ or the generic ``EmbeddingComposite``:
 .. code-block:: python
 
     import minorminer
-    from embedding_methods.architectures import generators
-    from embedding_methods.composites.embedding import EmbeddingComposite
+    from embedding_methods.architectures import generators 
     from dimod.reference.samplers.random_sampler import RandomSampler
+    from dimod.reference.composites.structure import StructureComposite
+    from embedding_methods.composites.embedding import EmbeddingComposite
     
     
     # Use the provided architectures
