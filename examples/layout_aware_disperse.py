@@ -7,7 +7,7 @@ from embedding_methods.architectures import drawing, generators
 from embedding_methods.disperse import find_embedding
 from embedding_methods.global_placement.diffusion_based import find_candidates
 
-# A 3x3 grid problem graph
+# A 2x2 grid problem graph
 p = 2
 Sg = nx.grid_2d_graph(p, p)
 S_edgelist = list(Sg.edges())

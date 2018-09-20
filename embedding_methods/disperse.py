@@ -1,15 +1,8 @@
-""" Dispersed router for multiple disjoint Steiner Tree Search.
+""" Disperse router for multiple disjoint Steiner Tree Search.
 
 This router uses a set of initial chains as candidates to reduce the search
 space of multiple Steiner Trees. As a result, the root of each tree or chain
 in the resultant embedding is one of the provided candidates.
-
-The dispersed router a negotiated-congestion scheme, which is widely-used for
-FPGA routing, in which overlap of resources is initially allowed but the costs
-of using each qubit is recalculated until a legal solution is found. A solution
-is legal when the occupancy of the qubits do not have conflicts. The cost of
-using one qubit is defined to depend on a base cost, a present-sharing cost,
-and a historical-sharing cost.
 
 """
 
@@ -30,7 +23,7 @@ ALPHA_H = 0.0
 
 def _init_graphs(Sg, Tg, initial_chains, opts):
     """ Assign values to source and target graphs required for
-        the tree search.
+    the tree search.
     """
     for s_node, s_data in Sg.nodes(data=True):
         # Fixed data
@@ -49,6 +42,9 @@ def _init_graphs(Sg, Tg, initial_chains, opts):
         t_data['sharing'] = 0.0
 
 def _get_cost(neighbor_name, Tg):
+    """ The cost of using one target node is defined to depend on a base cost,
+    a present-sharing cost, and a historical-sharing cost.
+    """
 
     next_node = Tg.nodes[neighbor_name]
 
@@ -64,7 +60,7 @@ def _get_cost(neighbor_name, Tg):
 
     return base_cost * sharing_cost * history_cost
 
-def _bfs(target_set, visited, visiting, queue, Tg):
+def _bfs(sink_set, visited, visiting, queue, Tg):
     """ Breadth-First Search
     """
 
@@ -91,20 +87,22 @@ def _bfs(target_set, visited, visiting, queue, Tg):
         node_cost, node = heappop(queue)
 
         _, node_parent, node_dist = visiting[node]
-        found = (node in target_set) and (node_dist >= 2)
+        found = (node in sink_set) and (node_dist >= 2)
 
     visited[node] = node_cost, node_parent, node_dist
     return node
 
-def _traceback(source, target, reached, visited, unassigned, mapped, Tg):
-
-    _, node_parent, _ = visited[reached]
-
-    if target not in mapped:
-        mapped[target] = set([reached])
+def _traceback(source, sink, reached, visited, unassigned, mapped, Tg):
+    """ Retrace steps from sink to source and populate target graph nodes
+    accordingly. Use head and tail of chain as mapped nodes.
+    """
+    # If
+    if sink not in mapped:
+        mapped[sink] = set([reached])
         Tg.nodes[reached]['sharing'] += 1.0
 
     path = [reached]
+    _, node_parent, _ = visited[reached]
     node = node_parent
     while(node not in mapped[source]):
         path.append(node)
@@ -113,14 +111,14 @@ def _traceback(source, target, reached, visited, unassigned, mapped, Tg):
             if source in unassigned[node]:
                 del unassigned[node]
                 mapped[source].add(node)
-            elif target in unassigned[node]:
+            elif sink in unassigned[node]:
                 del unassigned[node]
-                mapped[target].add(node)
+                mapped[sink].add(node)
             else:
                 unassigned[node].add(source)
-                unassigned[node].add(target)
+                unassigned[node].add(sink)
         else:
-            unassigned[node] = set([source, target])
+            unassigned[node] = set([source, sink])
 
         Tg.nodes[node]['sharing'] += 1.0
         _, node_parent, _ = visited[node]
@@ -129,13 +127,13 @@ def _traceback(source, target, reached, visited, unassigned, mapped, Tg):
 
     return path
 
-def _get_target_set(target, mapped, Sg):
+def _get_sink_set(sink, mapped, Sg):
     """ Given a node, return either the its associated candidates or
     previously mapped nodes.
     """
-    target_node = Sg.nodes[target]
-    target_candidates = target_node['candidates']
-    return target_candidates if target not in mapped else mapped[target]
+    sink_node = Sg.nodes[sink]
+    sink_candidates = sink_node['candidates']
+    return sink_candidates if sink not in mapped else mapped[sink]
 
 def _init_queue(source, visiting, queue, mapped, Sg, Tg):
     """ Given a source node, expand the search queue over previously
@@ -151,14 +149,13 @@ def _init_queue(source, visiting, queue, mapped, Sg, Tg):
         visiting[node] = (node_cost, node_parent, node_dist)
         heappush(queue, (node_cost, node))
 
-def _steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
+def _steiner_tree(source, sinks, mapped, unassigned, Sg, Tg):
     """ Steiner Tree Search
     """
     # Resulting tree dictionary keyed by edges and path values.
     tree = {}
-
     # Breadth-First Search
-    for target in targets:
+    for sink in sinks:
         # Breadth-First Search structures.
         visiting = {} # (cost, parent, distance) during search
         visited = {} # (parent, distance) after popped from queue
@@ -166,21 +163,21 @@ def _steiner_tree(source, targets, mapped, unassigned, Sg, Tg):
         queue = []
         # Start search using previously-assigned nodes
         _init_queue(source, visiting, queue, mapped, Sg, Tg)
-        # Search for target candidates, or nodes assigned to target
-        target_set = _get_target_set(target, mapped, Sg)
+        # Search for sink candidates, or nodes assigned to sink
+        sink_set = _get_sink_set(sink, mapped, Sg)
         # BFS graph traversal
-        reached = _bfs(target_set, visited, visiting, queue, Tg)
-        # Retrace steps from target to source
-        path = _traceback(source, target, reached, visited, unassigned, mapped, Tg)
+        reached = _bfs(sink_set, visited, visiting, queue, Tg)
+        # Retrace steps from sink to source
+        path = _traceback(source, sink, reached, visited, unassigned, mapped, Tg)
         # Update tree
-        edge = (source,target)
+        edge = (source,sink)
         tree[edge] = path
 
     return tree
 
 def _update_costs(mapped, Tg):
     """ Update present-sharing and history-sharing costs.
-        If a target node is shared, the embedding is not legal.
+    If a target node is shared, the embedding is not legal.
     """
 
     legal = True
@@ -194,8 +191,10 @@ def _update_costs(mapped, Tg):
     return legal
 
 def _embed_node(source, mapped, Sg, Tg, opts={}):
-
-    #if source in mapped: return
+    """ Given a source node and the current mapping from source nodes to target
+    nodes. Select the lowest cost target node from the set of candidates assigned
+    to the source node.
+    """
 
     s_node = Sg.nodes[source]
 
@@ -209,11 +208,10 @@ def _embed_node(source, mapped, Sg, Tg, opts={}):
     mapped[source] = set([t_index])
 
 def _rip_up(Tg):
-    """
-    Search Structures
-        paths = { Sg edge : Tg nodes path }
-        mapped = { Sg node: set(Tg nodes) }
-        unassigned = { Tg node : set(Sg nodes) }
+    """ Rip Up current embedding
+    paths = { Sg edge : Tg nodes path }
+    mapped = { Sg node: set(Tg nodes) }
+    unassigned = { Tg node : set(Sg nodes) }
     """
     paths={}
     mapped={}
@@ -236,7 +234,11 @@ def _get_node(pending_set, pre_sel=[], opts={}):
     return pending_set.pop()
 
 def _route(Sg, Tg, opts):
-    """ Negotiated Congestion router
+    """ The disperse router uses a negotiated-congestion scheme, which is widely
+    used for FPGA routing, in which overlap of resources is initially allowed
+    but the costs of using each target node is recalculated until a legal
+    solution is found. A solution is legal when the occupancy of the qubits do
+    not have conflicts.
     """
     global ALPHA_P, ALPHA_H
 
@@ -253,10 +255,10 @@ def _route(Sg, Tg, opts):
         paths, mapped, unassigned = _rip_up(Tg)
         _embed_node(source, mapped, Sg, Tg, opts)
         while pending_set:
-            targets = [target for target in Sg[source] if target in pending_set]
-            tree = _steiner_tree(source, targets, mapped, unassigned, Sg, Tg)
+            sinks = [sink for sink in Sg[source] if sink in pending_set]
+            tree = _steiner_tree(source, sinks, mapped, unassigned, Sg, Tg)
             paths.update(tree)
-            source = _get_node(pending_set, pre_sel=targets)
+            source = _get_node(pending_set, pre_sel=sinks)
         legal = _update_costs(mapped, Tg)
         ALPHA_P += opts.delta_p
         ALPHA_H += opts.delta_h
@@ -303,12 +305,12 @@ def _setup_lp(paths, mapped, unassigned):
 
     # Create variables per path to select unassigned nodes
     for edge, path in paths.items():
-        # Nodes in path excluding source and target
+        # Nodes in path excluding source and sink
         shared = len(path) - 2
         if shared > 0:
             # PuLP variable names do not support spaces
             s_name, t_name = (str(x).replace(" ","") for x in edge)
-            # Name of variables are var<source><edge> and var<target><edge>
+            # Name of variables are var<source><edge> and var<sink><edge>
             var_s = "var" + s_name + s_name + t_name
             var_t = "var" + t_name + s_name + t_name
 
@@ -334,20 +336,20 @@ def _assign_nodes(paths, lp_sol, var_map, mapped):
     graph.
     """
     for edge, path in paths.items():
-        # Nodes in path excluding source and target
+        # Nodes in path excluding source and sink
         shared = len(path) - 2
         if shared>0:
-            source, target = edge
+            source, sink = edge
 
-            var_t = var_map[edge][str(target).replace(" ","")]
+            var_t = var_map[edge][str(sink).replace(" ","")]
 
             num_t = lp_sol[var_t]
-            # Path from traceback starts from target
+            # Path from traceback starts from sink
             for i in range(1,shared+1):
                 if i > num_t:
                     mapped[source].add(path[i])
                 else:
-                    mapped[target].add(path[i])
+                    mapped[sink].add(path[i])
 
 
 def _paths_to_chains(legal, paths, mapped, unassigned, opts):
@@ -358,9 +360,9 @@ def _paths_to_chains(legal, paths, mapped, unassigned, opts):
     Linear Programming formulation to solve unassigned nodes.
 
         Constraints for all edges:
-            var<source><source><target> + var<target><source><target> = |path|
+            var<source><source><sink> + var<sink><source><sink> = |path|
         Constraints for all nodes:
-            Z - All( var<node><source><target> ) >= |<mapped['node']>|
+            Z - All( var<node><source><sink> ) >= |<mapped['node']>|
         Goal:
             min(Z)
     """
@@ -433,7 +435,7 @@ def find_embedding(S, T, initial_chains, **params):
         S: an iterable of label pairs representing the edges in the source graph
 
         T: an iterable of label pairs representing the edges in the target graph
-            The node labels for the different target archictures should be either
+            The node labels for the different target architectures should be either
             node indices or coordinates as given from dwave_networkx_.
 
         initial_chains: a dictionary, where initial_chains[i] is a list of
