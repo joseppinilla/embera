@@ -29,13 +29,16 @@ Example Usage
 
 .. examples-start-marker
 
-Example comparing the embeddings obtained from a Layout-Agnostic and a Layout-Aware embedding flow.
+Example comparing the embeddings obtained from a Layout-Agnostic and a Layout-Aware embedding flow using minorminer.
 
 .. code-block:: python
 
   import networkx as nx
+  import dwave_networkx as dnx
+  import matplotlib.pyplot as plt
   from minorminer import find_embedding
   from embedding_methods.architectures import generators
+  from embedding_methods.architectures import drawing
   from embedding_methods.global_placement.diffusion_based import find_candidates
 
   # A 16x16 grid problem graph
@@ -54,6 +57,10 @@ Example comparing the embeddings obtained from a Layout-Agnostic and a Layout-Aw
   print('sum: %s' % sum(len(v) for v in embedding.values()))
   print('max: %s' % max(len(v)for v in embedding.values()))
 
+  plt.figure(1)
+  plt.title('Layout-Agnostic')
+  drawing.draw_architecture_embedding(Tg, embedding, node_size=50)
+
   print('Layout-Aware')
   # Find a global placement for problem graph
   candidates = find_candidates(S_edgelist, Tg, topology=topology)
@@ -62,35 +69,41 @@ Example comparing the embeddings obtained from a Layout-Agnostic and a Layout-Aw
   print('sum: %s' % sum(len(v) for v in guided_embedding.values()))
   print('max: %s' % max(len(v)for v in guided_embedding.values()))
 
-Example of a Layout-Aware embedding flow.
+  plt.figure(2)
+  plt.title('Layout-Aware')
+  drawing.draw_architecture_embedding(Tg, guided_embedding, node_size=50)
+
+  plt.show()
+
+Example of a Layout-Aware embedding flow using disperse routing.
 
 .. code-block:: python
 
   import networkx as nx
   import matplotlib.pyplot as plt
-  from embedding_methods.architectures import generators
-  from embedding_methods.architectures import drawing
-  from embedding_methods.topological import find_embedding
+  from embedding_methods.architectures import drawing, generators
+  from embedding_methods.disperse import find_embedding
   from embedding_methods.global_placement.diffusion_based import find_candidates
 
-  # A 4x4 grid problem graph
-  Sg = nx.grid_2d_graph(2, 2)
+  # A 3x3 grid problem graph
+  p = 2
+  Sg = nx.grid_2d_graph(p, p)
   S_edgelist = list(Sg.edges())
   # Layout of the problem graph
   topology = {v:v for v in Sg}
 
   # The corresponding graph of the D-Wave C4 annealer
-  Tg = generators.rainier_graph(coordinates=True)
+  Tg = generators.rainier_graph()
   T_edgelist = list(Tg.edges())
 
   # Find a global placement for problem graph
   candidates = find_candidates(S_edgelist, Tg, topology=topology)
-  # Find a minor-embedding using the topological method
+  # Find a minor-embedding using the disperse router method
   embedding = find_embedding(S_edgelist, T_edgelist, initial_chains=candidates)
 
   print('sum: %s' % sum(len(v) for v in embedding.values()))
   print('max: %s' % max(len(v)for v in embedding.values()))
-  
+
   drawing.draw_architecture_embedding(Tg, embedding)
   plt.show()
 
@@ -98,7 +111,7 @@ Example of a Layout-Aware embedding flow.
 
 **Using dimod:**
 
-When using along with ``dimod``, either use the method-specific composites (i.e. ``MinorMinerEmbeddingComposite``, ``TopologicalEmbeddingComposite``, ...):
+When using along with ``dimod``, either use the method-specific composites (i.e. ``MinorMinerEmbeddingComposite``, ``LayoutAwareEmbeddingComposite``, ...):
 
 .. code-block:: python
 
@@ -106,7 +119,7 @@ When using along with ``dimod``, either use the method-specific composites (i.e.
     from dimod.reference.composites.structure import StructureComposite
     from embedding_methods.composites.minorminer import MinorMinerEmbeddingComposite
     from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampler
-    
+
     # Use the provided architectures
     target_graph = generators.dw2x_graph()
 
@@ -119,12 +132,12 @@ or the generic ``EmbeddingComposite``:
 .. code-block:: python
 
     import minorminer
-    from embedding_methods.architectures import generators 
+    from embedding_methods.architectures import generators
     from dimod.reference.samplers.random_sampler import RandomSampler
     from dimod.reference.composites.structure import StructureComposite
     from embedding_methods.composites.embedding import EmbeddingComposite
-    
-    
+
+
     # Use the provided architectures
     target_graph = generators.p6_graph()
 

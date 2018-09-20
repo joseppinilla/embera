@@ -60,13 +60,13 @@ class MinorMinerEmbeddingComposite(dimod.ComposedSampler):
         """
         return {'child_properties': self.child.properties.copy()}
 
-    def get_embedding(self, S=None, T=None, get_new=False, **embedding_parameters):
+    def get_embedding(self, S=None, T=None, force_embed=False, **embedding_parameters):
         """
 
         """
         self._embedding_parameters = embedding_parameters
 
-        if get_new or not self._embedding:
+        if force_embed or not self._embedding:
             embedding = minorminer.find_embedding(S,T,**embedding_parameters)
             self._embedding = embedding
 

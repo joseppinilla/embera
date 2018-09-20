@@ -17,8 +17,8 @@ from collections import Counter
 
 from embedding_methods import architectures
 
-from embedding_methods.dense import dense
-from embedding_methods.topological import topological
+from embedding_methods import dense
+from embedding_methods import disperse
 from embedding_methods.composites.embedding import EmbeddingComposite
 
 from dimod.reference.samplers.exact_solver import ExactSolver
@@ -150,7 +150,7 @@ if __name__== "__main__":
 
                                     t_start = time.time()
                                     embedding = sampler.get_embedding(S_edgelist,
-                                                        get_new = True,
+                                                        force_embed = True,
                                                         timeout = 400,
                                                         tries=1,
                                                         verbose=verbose)

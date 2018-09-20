@@ -1,11 +1,15 @@
-""" Negotiated-congestion based router for multiple disjoint Steiner Tree Search.
+""" Dispersed router for multiple disjoint Steiner Tree Search.
 
-This router uses a negotiated-congestion scheme, which is widely-used for FPGA
-routing, in which overlap of resources is initially allowed but the costs of
-using each qubit is recalculated until a legal solution is found. A solution is
-legal when the occupancy of the qubits do not have conflicts. The cost of using
-one qubit is defined to depend on a base cost, a present-sharing cost, and a
-historical-sharing cost.
+This router uses a set of initial chains as candidates to reduce the search
+space of multiple Steiner Trees. As a result, the root of each tree or chain
+in the resultant embedding is one of the provided candidates.
+
+The dispersed router a negotiated-congestion scheme, which is widely-used for
+FPGA routing, in which overlap of resources is initially allowed but the costs
+of using each qubit is recalculated until a legal solution is found. A solution
+is legal when the occupancy of the qubits do not have conflicts. The cost of
+using one qubit is defined to depend on a base cost, a present-sharing cost,
+and a historical-sharing cost.
 
 """
 
@@ -24,14 +28,18 @@ __all__ = ["find_embedding"]
 ALPHA_P = 0.0
 ALPHA_H = 0.0
 
-def _init_graphs(Sg, Tg, opts):
+def _init_graphs(Sg, Tg, initial_chains, opts):
     """ Assign values to source and target graphs required for
         the tree search.
     """
     for s_node, s_data in Sg.nodes(data=True):
         # Fixed data
         s_data['degree'] = Sg.degree(s_node)
-        s_data['candidates'] = opts.initial_chains[s_node]
+        try:
+            s_data['candidates'] = initial_chains[s_node]
+        except KeyError:
+            raise KeyError('All source graph nodes require an initial'
+                            'chain of candidate target nodes.')
 
     for t_node, t_data in Tg.nodes(data=True):
         # Fixed cost
@@ -358,7 +366,7 @@ def _paths_to_chains(legal, paths, mapped, unassigned, opts):
     """
 
     if not legal:
-        warnings.warn('Embedding is illegal.')
+        raise RuntimeError('Embedding is illegal.')
 
     if opts.verbose:
         print('Assigned')
@@ -389,7 +397,11 @@ class RouterOptions(object):
 
             random_seed (int): Used as an argument for the RNG.
 
-            tries (int):
+            tries (int): the algorithm iteratively tries to find an embedding
+
+            delta_p (float):
+
+            delta_h (float):
 
             verbose (int): Verbosity level
                 0: Quiet mode
@@ -402,17 +414,16 @@ class RouterOptions(object):
         self.rng = random.Random(self.random_seed)
 
         self.tries =  params.pop('tries', 10)
-        self.verbose =  params.pop('verbose', 0)
 
         self.delta_p =  params.pop('delta_p', 0.45)
         self.delta_h =  params.pop('delta_h', 0.10)
 
-        self.initial_chains = params.pop('initial_chains', None)
+        self.verbose =  params.pop('verbose', 0)
 
         for name in params:
             raise ValueError("%s is not a valid parameter." % name)
 
-def find_embedding(S, T, **params):
+def find_embedding(S, T, initial_chains, **params):
     """ find_embedding(S, T, **params)
     Heuristically attempt to find a minor-embedding of a graph, representing an
     Ising/QUBO, into a target graph.
@@ -424,6 +435,10 @@ def find_embedding(S, T, **params):
         T: an iterable of label pairs representing the edges in the target graph
             The node labels for the different target archictures should be either
             node indices or coordinates as given from dwave_networkx_.
+
+        initial_chains: a dictionary, where initial_chains[i] is a list of
+            target graph nodes to use as candidates.
+
 
         **params (optional): see RouterOptions_
 
@@ -439,7 +454,7 @@ def find_embedding(S, T, **params):
 
     Tg = nx.Graph(T)
 
-    _init_graphs(Sg, Tg, opts)
+    _init_graphs(Sg, Tg, initial_chains, opts)
 
     legal, paths, mapped, unassigned = _route(Sg, Tg, opts)
 

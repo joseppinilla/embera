@@ -26,6 +26,7 @@ tries = 4
 
 filedir = "./results/"
 
+@unittest.skip("Exhaustive test. Not run if not characterizing a new method")
 class CharacterizeEmbedding(unittest.TestCase):
 
     def log(self, S, obj):
@@ -61,7 +62,7 @@ class CharacterizeEmbedding(unittest.TestCase):
             print('-------------------------Iteration %s' % i)
             t_start = time.time()
             embedding = sampler.get_embedding(S_edgelist,
-                                get_new = True,
+                                force_embed = True,
                                 timeout = 30,
                                 verbose=verbose)
             t_end = time.time()
@@ -147,7 +148,7 @@ class CharacterizeEmbedding(unittest.TestCase):
     def rooks(self):
         self.size_bisection(self.rooks_generator)
 
-
+@unittest.skip("Exhaustive test. Not run if not characterizing a new method")
 class CharacterizeArchitecture(CharacterizeEmbedding):
 
     def setUp(self):

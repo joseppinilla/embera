@@ -1,6 +1,6 @@
 """
 A dimod composite_ to map unstructured problems to a structured_ sampler using
-dense embedding algorithm.
+a layout-aware embedding algorithm.
 
 A structured_ sampler can only solve problems that map to a specific graph: the
 D-Wave system's architecture is represented by a Chimera_ graph.
@@ -11,13 +11,13 @@ D-Wave system's architecture is represented by a Chimera_ graph.
 
 """
 import dimod
-from embedding_methods import dense
+from embedding_methods import disperse
 
-class DenseEmbeddingComposite(dimod.ComposedSampler):
+class LayoutAwareEmbeddingComposite(dimod.ComposedSampler):
 
     def __init__(self, child_sampler, **embedding_parameters):
         if not isinstance(child_sampler, dimod.Structured):
-            raise dimod.InvalidComposition("DenseEmbeddingComposite should only be applied to a Structured sampler")
+            raise dimod.InvalidComposition("LayoutAwareEmbeddingComposite should only be applied to a Structured sampler")
         self._children = [child_sampler]
         self._embedding = None
         self._embedding_parameters = embedding_parameters

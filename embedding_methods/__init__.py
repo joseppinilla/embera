@@ -1,5 +1,5 @@
 import embedding_methods.dense
-import embedding_methods.topological
+import embedding_methods.disperse
 
 from embedding_methods.architectures import *
 import embedding_methods.architectures

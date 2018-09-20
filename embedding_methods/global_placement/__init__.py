@@ -1,2 +1,5 @@
+import embedding_methods.global_placement.diffusion_based
 from embedding_methods.global_placement.diffusion_based import *
+
+import embedding_methods.global_placement.simulated_annealing
 from embedding_methods.global_placement.simulated_annealing import *
