@@ -4,13 +4,13 @@ import warnings
 import networkx as nx
 import matplotlib.pyplot as plt
 
-from embedding_methods.architectures.tiling import Tiling
-from embedding_methods.architectures.drawing import draw_tiled_graph
+from embedding_methods.utilities.architectures.tiling import Tiling
+from embedding_methods.utilities.architectures.drawing import draw_tiled_graph
 
 __all__ = ['find_candidates']
 
 class DiffusionPlacer(Tiling):
-    """ Diffusion-based migration of a graph topology
+    """ Diffusion-based migration of a graph layout
     """
     def __init__(self, S, Tg, **params):
         Tiling.__init__(self, Tg)
@@ -25,10 +25,10 @@ class DiffusionPlacer(Tiling):
         # Choice of vicinity. See below.
         self.vicinity = params.pop('vicinity', 0)
 
-        # Source graph topology
-        try: self.topology = params.pop('topology')
+        # Source graph layout
+        try: self.layout = params.pop('layout')
         except KeyError:
-            self.topology = nx.spring_layout(nx.Graph(S))
+            self.layout = nx.spring_layout(nx.Graph(S))
             warnings.warn('A spring layout was generated using NetworkX.')
 
         # Diffusion hyperparameters
@@ -85,14 +85,14 @@ class DiffusionPlacer(Tiling):
         """
         m = self.m
         n = self.n
-        topology = self.topology
-        P = len(topology)
+        layout = self.layout
+        P = len(layout)
 
         # Find dimensions of source graph S
         Sx_min = Sy_min = float("inf")
         Sx_max = Sy_max = 0.0
         # Loop through all source graph nodes to find dimensions
-        for s_node, (sx, sy) in topology.items():
+        for sx, sy in layout.values():
             Sx_min = min(sx, Sx_min)
             Sx_max = max(sx, Sx_max)
             Sy_min = min(sy, Sy_min)
@@ -103,12 +103,13 @@ class DiffusionPlacer(Tiling):
         center_x, center_y = n/2.0, m/2.0
         dist_accum = 0.0
         # Normalize, scale and accumulate initial distances
-        for s_node, (sx, sy) in topology.items():
+        for s_node, s_coords in layout.items():
+            (sx, sy) = s_coords
             norm_x = (sx-Sx_min) / s_width
             norm_y = (sy-Sy_min) / s_height
             scaled_x = norm_x * (n-1) + 0.5
             scaled_y = norm_y * (m-1) + 0.5
-            topology[s_node] = (scaled_x, scaled_y)
+            layout[s_node] = (scaled_x, scaled_y)
             tile = self._coords_to_tile(scaled_x, scaled_y)
             self.mapping[s_node] = tile
             self.tiles[tile].nodes.add(s_node)
@@ -171,8 +172,8 @@ class DiffusionPlacer(Tiling):
         viscosity = self.viscosity
 
         # Problem size
-        topology = self.topology
-        P = float(len(topology))
+        layout = self.layout
+        P = float(len(layout))
 
         # Diffusivity
         D = min((viscosity*P) / t_size, 1.0)
@@ -184,21 +185,21 @@ class DiffusionPlacer(Tiling):
             gradient_x, gradient_y = self._get_gradient(tile)
             # Iterate over nodes in tile and migrate
             for node in tile.nodes:
-                x, y = topology[node]
+                x, y = layout[node]
                 l_x = (2.0*x/n)-1.0
                 l_y = (2.0*y/m)-1.0
                 v_x = l_x * gradient_x
                 v_y = l_y * gradient_y
                 x_1 = x + (1.0 - D) * v_x * delta_t
                 y_1 = y + (1.0 - D) * v_y * delta_t
-                topology[node] = (x_1, y_1)
+                layout[node] = (x_1, y_1)
                 dist_accum += (x_1-center_x)**2 + (y_1-center_y)**2
 
         dispersion = dist_accum/P
         return dispersion
 
     def _map_tiles(self):
-        """ Use source nodes topology to determine tile mapping.
+        """ Use source nodes layout to determine tile mapping.
             Then use new populations of tiles to calculate tile
             concentrations.
             Using verbose==4, a call to draw_tiled_graph() plots
@@ -206,9 +207,9 @@ class DiffusionPlacer(Tiling):
         """
         m = self.m
         n = self.n
-        topology = self.topology
+        layout = self.layout
 
-        for s_node, s_coords in topology.items():
+        for s_node, s_coords in layout.items():
             tile = self.mapping[s_node]
             new_tile = self._coords_to_tile(*s_coords)
             self.tiles[tile].nodes.remove(s_node)
@@ -220,7 +221,7 @@ class DiffusionPlacer(Tiling):
                 tile.concentration = len(tile.nodes)/tile.supply
 
         if self.verbose==4:
-            draw_tiled_graph(self.m, self.n, self.tiles, self.topology)
+            draw_tiled_graph(self.m, self.n, self.tiles, self.layout)
             plt.show()
 
     def _condition(self, dispersion):
@@ -262,8 +263,8 @@ def find_candidates(S, Tg, **params):
     nodes to target nodes, so that this mapping assists in a subsequent
     minor embedding.
 
-    If a topology is given, the chosen method to find candidates is
-    the DiffusionPlacer_ approach. If no topology is given, the
+    If a layout is given, the chosen method to find candidates is
+    the DiffusionPlacer_ approach. If no layout is given, the
     SimulatedAnnealingPlacer_ is used.
 
         Args:
@@ -291,7 +292,7 @@ def find_candidates(S, Tg, **params):
                 1: Print statements
                 4: Tile drawings with concentration
 
-            topology ({<node>:(<x>,<y>),...}):
+            layout ({<node>:(<x>,<y>),...}):
                 Dict of 2D positions assigned to the source graph nodes.
 
             vicinity (int): Granularity of the candidate assignment.

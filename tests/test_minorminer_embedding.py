@@ -1,10 +1,12 @@
 import unittest
 import dimod.testing as dtest
-from embedding_methods.architectures import generators
-from dimod.reference.composites.structure import StructureComposite
-from embedding_methods.composites.minorminer import MinorMinerEmbeddingComposite
-from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampler
 
+
+from embedding_methods.utilities.architectures import generators
+from embedding_methods.composites.minorminer import MinorMinerEmbeddingComposite
+
+from dimod.reference.composites.structure import StructureComposite
+from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampler
 
 class TestMinorMinerEmbeddingComposite(unittest.TestCase):
 

@@ -1,5 +1,5 @@
 import random
-from embedding_methods.architectures.tiling import Tiling
+from embedding_methods.utilities.architectures.tiling import Tiling
 
 __all__ = ['find_candidates']
 

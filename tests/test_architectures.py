@@ -4,9 +4,11 @@ import minorminer
 
 import networkx as nx
 
-from tests import graph_topologies
+from embedding_methods.utilities import graph_topologies
+from embedding_methods.utilities.architectures import generators
 
-from embedding_methods.architectures import generators
+from embedding_methods.preprocess.diffusion_placer import find_candidates
+
 from embedding_methods.composites.embedding import EmbeddingComposite
 
 from dimod.reference.composites.structure import StructureComposite
@@ -26,8 +28,8 @@ class TestArchitectures(unittest.TestCase):
 
         for name, source_gen in graph_topologies.__dict__.items():
             if callable(source_gen):
-                print('graph %s' % name)
                 source_graph = source_gen(GRAPH_SIZE)
+                print('graph %s' % source_graph.name)
                 source_edgelist = source_graph.edges()
                 target_edgelist = target_graph.edges()
                 embedding = self.method.find_embedding(source_edgelist, target_edgelist)

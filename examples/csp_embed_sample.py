@@ -39,8 +39,8 @@ m,n,t = 4,4,4
 chimera = dnx.generators.chimera.chimera_graph(m,n,t)
 
 # Select underlying sampler
-structsampler = StructureComposite(ExactSolver(), chimera.nodes, chimera.edges)
-#structsampler = StructureComposite(RandomSampler(), chimera.nodes, chimera.edges)
+#structsampler = StructureComposite(ExactSolver(), chimera.nodes, chimera.edges)
+structsampler = StructureComposite(RandomSampler(), chimera.nodes, chimera.edges)
 
 # Select embedding method
 sampler = EmbeddingComposite(structsampler, minorminer)
@@ -70,6 +70,7 @@ for datum in response.data():
     else:
         invalid = invalid+1
         data.append((sample, energy, '0'))
+print('valid', 'invalid')
 print(valid, invalid)
 plt.figure(2)
 plt.scatter(range(len(data)), [x[1] for x in data], c=['y' if (x[2] == '1') else 'r' for x in data],marker='.')

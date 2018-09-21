@@ -11,7 +11,7 @@ matplotlib.rcParams['axes.formatter.useoffset'] = False
 
 from collections import Counter, OrderedDict
 
-from embedding_methods.architectures import ARCHS
+from embedding_methods.utilities.architectures import ARCHS
 
 
 resultsdir = "./results/"

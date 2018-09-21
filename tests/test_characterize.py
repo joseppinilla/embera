@@ -13,7 +13,7 @@ import minorminer
 import networkx as nx
 import dwave_networkx as dnx
 
-from embedding_methods.architectures import generators
+from embedding_methods.utilities.architectures import generators
 from embedding_methods.composites.embedding import EmbeddingComposite
 
 from dimod.reference.samplers.exact_solver import ExactSolver
