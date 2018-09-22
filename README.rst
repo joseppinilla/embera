@@ -75,7 +75,8 @@ Example comparing the embeddings obtained from a Layout-Agnostic and a Layout-Aw
 
   plt.show()
 
-Example of a Layout-Aware embedding flow using disperse routing.
+Example of a Layout-Aware embedding flow using disperse routing on a smaller target graph with 5% of the nodes removed.
+This example uses the diffusion placer without migration to demonstrate the anchored nodes.
 
 .. code-block:: python
 
@@ -92,12 +93,11 @@ Example of a Layout-Aware embedding flow using disperse routing.
   # Layout of the problem graph
   layout = {v:v for v in Sg}
 
-  # The corresponding graph of the D-Wave C4 annealer
-  Tg = generators.rainier_graph()
+  # The corresponding graph of the D-Wave C4 annealer with 0.95 qubit yield
+  Tg = generators.faulty(generators.rainier_graph, arch_yield=0.95)
   T_edgelist = list(Tg.edges())
-
   # Find a global placement for problem graph
-  candidates = find_candidates(S_edgelist, Tg, layout=layout)
+  candidates = find_candidates(S_edgelist, Tg, layout=layout, enable_migration=False)
   # Find a minor-embedding using the disperse router method
   embedding = find_embedding(S_edgelist, T_edgelist, initial_chains=candidates)
 

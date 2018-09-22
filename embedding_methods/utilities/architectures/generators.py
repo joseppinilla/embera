@@ -18,11 +18,33 @@
         Nodes are labeled by integers.
 
 """
+import random
 import networkx as nx
 import dwave_networkx as dnx
 
-__all__ = ['rainier_graph', 'vesuvius_graph', 'dw2x_graph',
+
+__all__ = ['faulty', 'rainier_graph', 'vesuvius_graph', 'dw2x_graph',
            'dw2000q_graph', 'p6_graph', 'p16_graph', 'h20k_graph']
+
+
+def faulty(arch_method, arch_yield=0.95, **kwargs):
+    """ Generate a graph of the given architecture with
+    (size*yield) of the original nodes.
+    Args:
+        arch_method (function):
+            One of the graph generator function
+
+        arch_yield (optional, float, default=0.95):
+            Ratio of nodes over original size.
+            i.e. The original graph has yield=1.0
+    """
+    target_graph =  arch_method(**kwargs)
+    node_set = set(target_graph.nodes)
+    target_size = len(target_graph)
+    num_faults = target_size - round(target_size * arch_yield)
+    randnodes = random.sample(node_set, num_faults)
+    target_graph.remove_nodes_from(randnodes)
+    return target_graph
 
 
 def rainier_graph(**kwargs):
