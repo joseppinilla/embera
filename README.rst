@@ -25,6 +25,48 @@ To install from source:
 Example Usage
 -------------
 
+**Using dimod:**
+
+.. dimod-start-marker
+
+When using along with ``dimod``, either use the method-specific composites (i.e. ``MinorMinerEmbeddingComposite``, ``LayoutAwareEmbeddingComposite``, ...):
+
+.. code-block:: python
+
+    from embedding_methods.utilities.architectures import generators
+    from dimod.reference.composites.structure import StructureComposite
+    from embedding_methods.composites.minorminer import MinorMinerEmbeddingComposite
+    from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampler
+
+    # Use the provided architectures
+    target_graph = generators.dw2x_graph()
+
+    # Use any sampler and make structured (i.e. Simulated Annealing, Exact) or use structured sampler if available (i.e. D-Wave machine)
+    structsampler = StructureComposite(SimulatedAnnealingSampler(), target_graph.nodes, target_graph.edges)
+    sampler = MinorMinerEmbeddingComposite(structsampler)
+
+or the generic ``EmbeddingComposite``:
+
+.. code-block:: python
+
+    import minorminer
+    from embedding_methods.utilities.architectures import generators
+    from dimod.reference.samplers.random_sampler import RandomSampler
+    from dimod.reference.composites.structure import StructureComposite
+    from embedding_methods.composites.embedding import EmbeddingComposite
+
+
+    # Use the provided architectures
+    target_graph = generators.p6_graph()
+
+    structsampler = StructureComposite(RandomSampler(), target_graph.nodes, target_graph.edges)
+    sampler = EmbeddingComposite(structsampler, minorminer)
+
+The composite is then compatible with the use of the ``sample()`` method as any other sampler.
+In addition, a method ``get_embedding()`` is provided as an interface for the user to obtain a new embedding or retrieve the resulting embedding from which the problem was sampled.
+
+.. dimod-end-marker
+
 **Using function interface:**
 
 .. examples-start-marker
@@ -119,41 +161,3 @@ This example uses the diffusion placer without migration to demonstrate the anch
   plt.show()
 
 .. examples-end-marker
-
-**Using dimod:**
-
-When using along with ``dimod``, either use the method-specific composites (i.e. ``MinorMinerEmbeddingComposite``, ``LayoutAwareEmbeddingComposite``, ...):
-
-.. code-block:: python
-
-    from embedding_methods.utilities.architectures import generators
-    from dimod.reference.composites.structure import StructureComposite
-    from embedding_methods.composites.minorminer import MinorMinerEmbeddingComposite
-    from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampler
-
-    # Use the provided architectures
-    target_graph = generators.dw2x_graph()
-
-    # Use any sampler and make structured (i.e. Simulated Annealing, Exact) or use structured sampler if available (i.e. D-Wave machine)
-    structsampler = StructureComposite(SimulatedAnnealingSampler(), target_graph.nodes, target_graph.edges)
-    sampler = MinorMinerEmbeddingComposite(structsampler)
-
-or the generic ``EmbeddingComposite``:
-
-.. code-block:: python
-
-    import minorminer
-    from embedding_methods.utilities.architectures import generators
-    from dimod.reference.samplers.random_sampler import RandomSampler
-    from dimod.reference.composites.structure import StructureComposite
-    from embedding_methods.composites.embedding import EmbeddingComposite
-
-
-    # Use the provided architectures
-    target_graph = generators.p6_graph()
-
-    structsampler = StructureComposite(RandomSampler(), target_graph.nodes, target_graph.edges)
-    sampler = EmbeddingComposite(structsampler, minorminer)
-
-The composite is then compatible with the use of the ``sample()`` method as any other sampler.
-In addition, a method ``get_embedding()`` is provided as an interface for the user to obtain a new embedding or retrieve the resulting embedding from which the problem was sampled.
