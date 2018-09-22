@@ -3,7 +3,7 @@
 embedding-methods
 =============
 
-``embedding-methods`` offers a collection of minor-embedding methods and utilities. These can be used from the interface functions, such as ``find_embedding()``, or as composites making part of the `D-Wave Ocean <http://dw-docs.readthedocs.io/en/latest/overview/stack.html#stack>`_ software stack. Additional resources are provided to generate graphs for existing and conceptual architecures of Ising samplers (e.g. D-Wave's Quantum Annealers).
+``embedding-methods`` offers a collection of minor-embedding methods and utilities. These can be used as composites making part of the `D-Wave Ocean <http://dw-docs.readthedocs.io/en/latest/overview/stack.html#stack>`_ software stack, or from the interface functions, such as ``find_embedding()``. Additional resources are provided to generate graphs for existing and conceptual architecures of Ising samplers (e.g. D-Wave's Quantum Annealers) and preprocessing of the source and/or target graphs.
 
 **Definition:**
 
