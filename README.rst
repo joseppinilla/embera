@@ -3,7 +3,7 @@
 embedding-methods
 =============
 
-``embedding-methods`` offers a collection of minor-embedding methods and utilities. These can be used as composites making part of the `D-Wave Ocean <http://dw-docs.readthedocs.io/en/latest/overview/stack.html#stack>`_ software stack, or from the interface functions, such as ``find_embedding()``. Additional resources are provided to generate graphs for existing and conceptual architecures of Ising samplers (e.g. D-Wave's Quantum Annealers) and preprocessing of the source and/or target graphs.
+``embedding-methods`` offers a collection of minor-embedding methods and utilities. These can be used as composites making part of the `D-Wave Ocean <http://dw-docs.readthedocs.io/en/latest/overview/stack.html#stack>`_ software stack, or from the interface functions, such as ``find_embedding()``. Additional resources are provided to generate graphs for existing and conceptual architectures of Ising samplers (e.g. D-Wave's Quantum Annealers) and preprocessing of the source and/or target graphs.
 
 **Definition:**
 
@@ -128,6 +128,13 @@ Example comparing the embeddings obtained from a Layout-Agnostic and a Layout-Aw
 
   plt.show()
 
+
++----------------------------------------+------------------------------------------------------+-------------------------------------------------------+
+|                                        |                                                      |                                                       |
+|   .. image:: ./docs/layout_agnostic.png|   .. image:: ./docs/layout_aware_enable_migration.png|   .. image:: ./docs/layout_aware_disable_migration.png|
+|      :width: 30%                       |      :width: 30%                                     |      :width: 30%                                      |
+|                                        |                                                      |                                                       |
++----------------------------------------+------------------------------------------------------+-------------------------------------------------------+
 Example of a Layout-Aware embedding flow using disperse routing on a smaller target graph with 5% of the nodes removed.
 This example uses the diffusion placer without migration to demonstrate the anchored nodes.
 
