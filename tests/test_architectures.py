@@ -4,7 +4,7 @@ import minorminer
 
 import networkx as nx
 
-from embedding_methods.utilities import graph_topologies
+from embedding_methods.utilities.graph_topologies import *
 from embedding_methods.utilities.architectures import generators
 
 from embedding_methods.preprocess.diffusion_placer import find_candidates
@@ -15,6 +15,11 @@ from dimod.reference.composites.structure import StructureComposite
 from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampler
 
 GRAPH_SIZE = 16
+GRAPHS = [complete_graph, complete_bipartite_graph, grid_2d_graph,
+            hypercube_graph, rooks_graph, grid_3d_graph,
+            random_graph]
+
+
 
 class TestArchitectures(unittest.TestCase):
 
@@ -26,7 +31,7 @@ class TestArchitectures(unittest.TestCase):
         target_gen = generators.__dict__[self.target]
         target_graph = target_gen()
 
-        for name, source_gen in graph_topologies.__dict__.items():
+        for source_gen in GRAPHS:
             if callable(source_gen):
                 source_graph = source_gen(GRAPH_SIZE)
                 print('graph %s' % source_graph.name)

@@ -13,8 +13,6 @@ import networkx as nx
 import dwave_networkx as dnx
 import matplotlib.pyplot as plt
 
-from collections import Counter
-
 from embedding_methods import architectures
 
 from embedding_methods import dense

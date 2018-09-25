@@ -13,31 +13,32 @@ import math
 import random as rand
 import networkx as nx
 
-def complete(size):
+
+def complete_graph(size):
     G = nx.complete_graph(size)
     G.name = 'complete'
     return G
 
-def complete_bipartite(size):
+def complete_bipartite_graph(size):
     m = n = round(size/2)
     G = nx.complete_bipartite_graph(m,n)
     G.name = 'bipartite'
     return G
 
-def grid_2d(size):
+def grid_2d_graph(size):
     m = n = round(math.sqrt(size))
     G = nx.grid_2d_graph(m,n)
     G.name = 'grid2d'
     G.graph['pos'] = {v:list(v) for v in G}
     return G
 
-def hypercube(size):
+def hypercube_graph(size):
     n = round(math.log(size,2))
     G = nx.hypercube_graph(n)
     G.name = 'hypercube'
     return G
 
-def rooks(size):
+def rooks_graph(size):
     n = round(math.sqrt(size))
     G = nx.complete_graph(n)
     H = nx.complete_graph(n)
@@ -46,14 +47,14 @@ def rooks(size):
     F.graph['pos'] = {v:list(v) for v in F}
     return F
 
-def grid_3d(size):
+def grid_3d_graph(size):
     m = n = t = round(size**(1./3.))
     G = nx.grid_graph(dim=[m,n,t])
     G.name = 'grid3d'
     G.graph['pos'] = {(x,y,z):[x+z,y+z] for (x,y,z) in G}
     return G
 
-def random(size, max_degree=None):
+def random_graph(size, max_degree=None):
     if not max_degree: max_degree=round(size/4)
     G = nx.empty_graph(size)
     for v in G:
@@ -64,3 +65,25 @@ def random(size, max_degree=None):
          G.add_edges_from(randedges)
     G.name = 'random%s' % max_degree
     return G
+
+""" When using graph generators, pruning edges of the source graph can be
+done using the following method.
+Example:
+>> # Generate a K16 graph with 5% of the edges removed
+>> prune_graph(complete_graph)(16)
+>> # Generate a K8,8 (16 vertices) with 10% of the edges removed
+>> prune_graph(complete_bipartite_graph, edge_yield=0.90)(16)
+"""
+def _prune(graph, edge_yield):
+    num_edges = round( (1.0 - edge_yield) * len(graph))
+    for val in range(num_edges):
+        while (True):
+            u, v = rand.choice(list(graph.edges))
+            if len(graph[u]) > 1 and len(graph[v]) > 1:
+                break
+        graph.remove_edge(u,v)
+    return graph
+def prune_graph(graph_method, edge_yield=0.95):
+    graph_gen = lambda x: _prune(graph_method(x), edge_yield)
+    graph_gen.__name__ = graph_method.__name__ + str(edge_yield)
+    return graph_gen

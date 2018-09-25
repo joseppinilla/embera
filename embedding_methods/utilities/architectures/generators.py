@@ -23,11 +23,11 @@ import networkx as nx
 import dwave_networkx as dnx
 
 
-__all__ = ['faulty', 'rainier_graph', 'vesuvius_graph', 'dw2x_graph',
+__all__ = ['faulty_arch', 'rainier_graph', 'vesuvius_graph', 'dw2x_graph',
            'dw2000q_graph', 'p6_graph', 'p16_graph', 'h20k_graph']
 
 
-def faulty(arch_method, arch_yield=0.95, **kwargs):
+def _faults(arch_method, arch_yield=0.95, **kwargs):
     """ Generate a graph of the given architecture with
     (size*yield) of the original nodes.
     Args:
@@ -44,8 +44,13 @@ def faulty(arch_method, arch_yield=0.95, **kwargs):
     num_faults = target_size - round(target_size * arch_yield)
     randnodes = random.sample(node_set, num_faults)
     target_graph.remove_nodes_from(randnodes)
+    target_graph.name = target_graph.name + '%s' % arch_yield
     return target_graph
 
+def faulty_arch(arch_method, arch_yield=0.95):
+    arch_gen = lambda : _faults(arch_method)
+    arch_gen.__name__ = arch_method.__name__ + str(arch_yield)
+    return arch_gen
 
 def rainier_graph(**kwargs):
     """ D-Wave One 'Rainier' Quantum Annealer graph
