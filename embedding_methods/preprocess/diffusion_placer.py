@@ -120,8 +120,13 @@ class DiffusionPlacer(Tiling):
         self.dispersion_accum = [dispersion] * 3
 
     def _coords_to_tile(self, x_coord, y_coord):
-        i = min(math.floor(x_coord), self.n-1)
-        j = min(math.floor(y_coord), self.m-1)
+        """ Tile values are restricted.
+        Horizontallly 0<=i<=n
+        Vertically 0<=j<=m
+
+        """
+        i = max(min(round(x_coord), self.n-1), 0)
+        j = max(min(round(y_coord), self.m-1), 0)
         tile = (i,j)
         return tile
 
