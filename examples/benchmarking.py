@@ -18,6 +18,8 @@ from embedding_methods import dense
 from embedding_methods import disperse
 from embedding_methods.preprocess.diffusion_placer import find_candidates
 
+bar = progressbar.ProgressBar(maxval = )
+
 def layout_agnostic(Sg, Tg, **kwargs):
     """ Layout-Agnostic Embedding method using minorminer
     """
@@ -77,26 +79,28 @@ def log(obj, filename):
 
 """ BENCHMARKING SETUP """
 #    target_graphs (list): NetworkX graph generators of sampler architectures
-target_archs = [faulty_arch(rainier_graph), rainier_graph,
-                faulty_arch(vesuvius_graph), vesuvius_graph,
+target_archs = [#faulty_arch(rainier_graph), rainier_graph,
+                #faulty_arch(vesuvius_graph), vesuvius_graph,
+                #faulty_arch(dw2x_graph), dw2x_graph,
                 faulty_arch(dw2000q_graph), dw2000q_graph,
-                faulty_arch(dw2x_graph), dw2x_graph,
-                faulty_arch(p6_graph), p6_graph,
-                faulty_arch(p16_graph), p16_graph]
+                #faulty_arch(p6_graph), p6_graph,
+                faulty_arch(p16_graph), p16_graph
+                ]
 # source_graphs (list): NetworkX graph generators
-source_graphs = [prune_graph(complete_graph), complete_graph,
-                prune_graph(complete_bipartite_graph), complete_bipartite_graph,
+source_graphs = [#prune_graph(complete_graph), complete_graph,
+                #prune_graph(complete_bipartite_graph), complete_bipartite_graph,
                 prune_graph(random_graph), random_graph,
-                prune_graph(rooks_graph), rooks_graph,
-                prune_graph(grid_2d_graph), grid_2d_graph]
+                #prune_graph(rooks_graph), rooks_graph,
+                #prune_graph(grid_2d_graph), grid_2d_graph
+                ]
 # source_sizes (list): Integer values for the number of vertices in the source graph
-source_sizes = [16]
+source_sizes = [64, 72, 80]
 # embed_methods (list): Embedding methods with a "find_embedding()" function interface
 embed_methods = [layout_agnostic,
                 layout_diffuse,
                 layout_spread]
 # embed_tries (int): Multiple tries to account for minor-embedding heuristic noise
-embed_tries = 2
+embed_tries = 200
 
 """  BENCHMARK LOOPS """
 for i_arch in target_archs:
@@ -115,10 +119,9 @@ for i_arch in target_archs:
                 Sg = i_graph(i_size)
                 Tg = i_arch()
                 for i in range(embed_tries):
-                    print('>>TRY: %s' % i)
                     start_time = time.time()
                     # Find a minor-embedding
-                    result = i_method(Sg, Tg, timeout=100, tries=1, random_seed=42)
+                    result = i_method(Sg, Tg, timeout=100, tries=1, random_seed=i)
                     t_elap = time.time() - start_time
                     results[i] = [t_elap] + result
                 log(results, filename)
@@ -184,6 +187,7 @@ for log in read_logs(resultsdir):
         stats[arch][graph][size][method]['avg'] = []
         stats[arch][graph][size][method]['stdev'] = []
         stats[arch][graph][size][method]['min'] = []
+        stats[arch][graph][size][method]['valid'] = 0
 
     for key, result in results.items():
         t_elap, _, _, embedding = result
@@ -195,12 +199,12 @@ for log in read_logs(resultsdir):
             stats[arch][graph][size][method]['avg'].append(avg_chain)
             stats[arch][graph][size][method]['stdev'].append(std_dev)
             stats[arch][graph][size][method]['min'].append(min_chain)
+            stats[arch][graph][size][method]['valid'] += 1
 
 for i_arch, stats_graph in stats.items():
     for i_graph, stats_size in stats_graph.items():
         for i_size, stats_method in stats_size.items():
             ticks = range(len(stats_method)+1)
-
             for i, metric in enumerate(['max','total','time','avg','stdev','min']):
                 plt.clf()
                 plt.figure(i)
@@ -214,7 +218,7 @@ for i_arch, stats_graph in stats.items():
                 method_labels = ['']
                 for method_name, method_dict in stats_method.items():
                     data_points.append(method_dict[metric])
-                    method_labels.append(method_name)
+                    method_labels.append('%s_%s' % (method_name, method_dict['valid']) )
                 wrapped_labels = [ '\n'.join(l.split('_')) for l in method_labels ]
                 plt.boxplot(data_points)
                 plt.xticks(ticks, wrapped_labels)

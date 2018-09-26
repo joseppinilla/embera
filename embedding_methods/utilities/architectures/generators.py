@@ -27,31 +27,6 @@ __all__ = ['faulty_arch', 'rainier_graph', 'vesuvius_graph', 'dw2x_graph',
            'dw2000q_graph', 'p6_graph', 'p16_graph', 'h20k_graph']
 
 
-def _faults(arch_method, arch_yield=0.95, **kwargs):
-    """ Generate a graph of the given architecture with
-    (size*yield) of the original nodes.
-    Args:
-        arch_method (function):
-            One of the graph generator function
-
-        arch_yield (optional, float, default=0.95):
-            Ratio of nodes over original size.
-            i.e. The original graph has yield=1.0
-    """
-    target_graph =  arch_method(**kwargs)
-    node_set = set(target_graph.nodes)
-    target_size = len(target_graph)
-    num_faults = target_size - round(target_size * arch_yield)
-    randnodes = random.sample(node_set, num_faults)
-    target_graph.remove_nodes_from(randnodes)
-    target_graph.name = target_graph.name + '%s' % arch_yield
-    return target_graph
-
-def faulty_arch(arch_method, arch_yield=0.95):
-    arch_gen = lambda : _faults(arch_method)
-    arch_gen.__name__ = arch_method.__name__ + str(arch_yield)
-    return arch_gen
-
 def rainier_graph(**kwargs):
     """ D-Wave One 'Rainier' Quantum Annealer graph
         https://en.wikipedia.org/wiki/D-Wave_Systems
@@ -130,3 +105,27 @@ def h20k_graph(data=True, coordinates=False):
         target_graph = nx.relabel_nodes(target_graph, coordinate_labels)
 
     return target_graph
+
+def _faults(arch_method, arch_yield, **kwargs):
+    """ Generate a graph of the given architecture with
+    (size*yield) of the original nodes.
+    Args:
+        arch_method (function):
+            One of the graph generator function
+
+        arch_yield (optional, float, default=0.95):
+            Ratio of nodes over original size.
+            i.e. The original graph has yield=1.0
+    """
+    target_graph =  arch_method(**kwargs)
+    node_set = set(target_graph.nodes)
+    target_size = len(target_graph)
+    num_faults = target_size - round(target_size * arch_yield)
+    randnodes = random.sample(node_set, int(num_faults))
+    target_graph.remove_nodes_from(randnodes)
+    target_graph.name = target_graph.name + '%s' % arch_yield
+    return target_graph
+def faulty_arch(arch_method, arch_yield=0.95):
+    arch_gen = lambda **kwargs: _faults(arch_method, arch_yield, **kwargs)
+    arch_gen.__name__ = arch_method.__name__ + str(arch_yield)
+    return arch_gen
