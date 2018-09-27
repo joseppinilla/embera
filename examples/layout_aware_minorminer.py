@@ -24,7 +24,7 @@ print('Layout-Agnostic')
 # Find a minor-embedding
 embedding = find_embedding(S_edgelist, T_edgelist)
 print('sum: %s' % sum(len(v) for v in embedding.values()))
-print('max: %s' % max(len(v)for v in embedding.values()))
+print('max: %s' % max(len(v) for v in embedding.values()))
 plt.figure(1)
 plt.title('Layout-Agnostic')
 drawing.draw_architecture_embedding(Tg, embedding)
@@ -34,12 +34,12 @@ print('Layout-Aware (enable_migration=True)')
 # Find a global placement for problem graph
 candidates = find_candidates(S_edgelist, Tg, layout=layout)
 # Find a minor-embedding using the initial chains from global placement
-guided_embedding = find_embedding(S_edgelist, T_edgelist, initial_chains=candidates)
-print('sum: %s' % sum(len(v) for v in guided_embedding.values()))
-print('max: %s' % max(len(v)for v in guided_embedding.values()))
-plt.figure(3)
+migrated_embedding = find_embedding(S_edgelist, T_edgelist, initial_chains=candidates)
+print('sum: %s' % sum(len(v) for v in migrated_embedding.values()))
+print('max: %s' % max(len(v) for v in migrated_embedding.values()))
+plt.figure(2)
 plt.title('Layout-Aware (enable_migration=True)')
-drawing.draw_architecture_embedding(Tg, guided_embedding)
+drawing.draw_architecture_embedding(Tg, migrated_embedding)
 plt.tight_layout()
 
 print('Layout-Aware (enable_migration=False)')
@@ -48,8 +48,8 @@ candidates = find_candidates(S_edgelist, Tg, layout=layout, enable_migration=Fal
 # Find a minor-embedding using the initial chains from global placement
 guided_embedding = find_embedding(S_edgelist, T_edgelist, initial_chains=candidates)
 print('sum: %s' % sum(len(v) for v in guided_embedding.values()))
-print('max: %s' % max(len(v)for v in guided_embedding.values()))
-plt.figure(2)
+print('max: %s' % max(len(v) for v in guided_embedding.values()))
+plt.figure(3)
 plt.title('Layout-Aware (enable_migration=False)')
 drawing.draw_architecture_embedding(Tg, guided_embedding)
 

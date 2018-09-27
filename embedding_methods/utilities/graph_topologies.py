@@ -54,9 +54,10 @@ def grid_3d_graph(size):
     G.graph['pos'] = {(x,y,z):[x+z,y+z] for (x,y,z) in G}
     return G
 
-def random_graph(size, max_degree=None):
+def random_graph(size, max_degree=None, seed=None):
     if not max_degree: max_degree=round(size/4)
     G = nx.empty_graph(size)
+    rand.seed(seed)
     for v in G:
          N = rand.randrange(1, max_degree)
          node_set = set(G.nodes)

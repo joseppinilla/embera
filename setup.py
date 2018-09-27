@@ -29,5 +29,5 @@ setup(name='embedding_methods',
       packages=packages,
       platforms='any',
       install_requires=install_requires,
-      license='TO-DO' #TODO: Choose License
+      license='MIT'
      )
