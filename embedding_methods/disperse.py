@@ -84,6 +84,7 @@ def _bfs(sink_set, visited, visiting, queue, Tg):
 
         # Once all neighbours have been checked
         visited[node] = node_cost, node_parent, node_dist
+        assert len(visited)!=len(Tg), "BFS traversed all the graph."
         node_cost, node = heappop(queue)
 
         _, node_parent, node_dist = visiting[node]
@@ -380,7 +381,7 @@ def _paths_to_chains(legal, paths, mapped, unassigned, opts):
 
     lp, var_map = _setup_lp(paths, mapped, unassigned)
 
-    if opts.verbose==2: lp.writeLP("SHARING.lp") #TEMP change to verbose 3
+    if opts.verbose==2: lp.writeLP("SHARING.lp")
 
     lp.solve(solver=pulp.GLPK_CMD(msg=opts.verbose))
 

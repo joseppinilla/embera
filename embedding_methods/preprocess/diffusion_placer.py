@@ -23,7 +23,7 @@ class DiffusionPlacer(Tiling):
         self.rng = random.Random(self.random_seed)
 
         # Choice of vicinity. See below.
-        self.vicinity = params.pop('vicinity', 0)
+        self.vicinity = params.pop('vicinity', 3)
 
         # Source graph layout
         try: self.layout = params.pop('layout')
@@ -53,29 +53,33 @@ class DiffusionPlacer(Tiling):
         candidates = {}
 
         for s_node, s_tile in self.mapping.items():
-            if self.vicinity == 0:
-                # Single tile
-                candidates[s_node] = self.tiles[s_tile].qubits
-            else:
-                # Neighbouring tiles (N, S, W, E, NW, NE, SE, SW)
-                neighbors = self.tiles[s_tile].neighbors
-                if self.vicinity == 1:
-                    # Immediate neighbors
-                    candidates[s_node] = self.tiles[s_tile].qubits
-                    for tile in neighbors[0:3]:
-                        candidates[s_node].update(self.tiles[tile].qubits)
-                elif self.vicinity == 2:
-                    # Extended neighbors
-                    candidates[s_node] = self.tiles[s_tile].qubits
-                    for tile in neighbors:
-                        candidates[s_node].update(self.tiles[tile].qubits)
-                elif self.vicinity == 3:
-                    #TODO: Not implemented.
-                    # Directed  = (Single) + 3 tiles closest to the node coordinates
-                    warnings.warn('Not implemented. Using [0] Single vicinity.')
-                    candidates[s_node] = self.tiles[s_tile].qubits
+            # Single tile
+            candidates[s_node] = self.tiles[s_tile].qubits
+            # Neighbouring tiles
+            n, s, w, e, nw, ne, se, sw = self.tiles[s_tile].neighbors
+            if self.vicinity == 1:
+                # Immediate neighbors
+                for tile in [n,s,w,e]:
+                    candidates[s_node].update(self.tiles[tile].qubits)
+            elif self.vicinity == 2:
+                # Extended neighbors
+                for tile in [n, s, w, e, nw, ne, se, sw]:
+                    candidates[s_node].update(self.tiles[tile].qubits)
+            elif self.vicinity == 3:
+                # Directed  = (Single) + 3 tiles closest to the node coordinates
+                x_coord, y_coord = self.layout[s_node]
+                i_index, j_index = s_tile
+                if x_coord >= i_index:
+                    if y_coord >= j_index: neighbor_tiles = (e,s,se)
+                    else: neighbor_tiles = (e,n,ne)
                 else:
-                    raise ValueError("vicinity %s not valid [0-3]." % self.vicinity)
+                    if y_coord >= j_index: neighbor_tiles = (w,s,sw)
+                    else: neighbor_tiles = (w,n,nw)
+
+                for tile in neighbor_tiles:
+                    candidates[s_node].update(self.tiles[tile].qubits)
+            elif self.vicinity!=0:
+                raise ValueError("vicinity %s not valid [0-3]." % self.vicinity)
 
         return candidates
 
