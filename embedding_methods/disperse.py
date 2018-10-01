@@ -416,7 +416,7 @@ class RouterOptions(object):
         self.random_seed = params.pop('random_seed', None)
         self.rng = random.Random(self.random_seed)
 
-        self.tries =  params.pop('tries', 10)
+        self.tries =  params.pop('tries', 100)
 
         self.delta_p =  params.pop('delta_p', 0.45)
         self.delta_h =  params.pop('delta_h', 0.10)

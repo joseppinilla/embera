@@ -32,6 +32,18 @@ def read_logs(filedir):
         arch, graph, size, method = base.split('-')
         yield file, arch, graph, size, method, results
 
+def read_log(filename):
+    filepath = os.path.join(resultsdir, filename)
+    try:
+        fp = open(filepath, 'rb')
+        data = pickle.load(fp)
+        fp.close()
+        for i, result in data.items():
+            yield result
+    except:
+        print('File %s not found.' % filepath)
+        return None
+
 def get_stats(embedding):
     max_chain = 0
     min_chain = sys.maxsize
@@ -52,67 +64,66 @@ def get_stats(embedding):
         sum_deviations += deviation
     std_dev = math.sqrt(sum_deviations/N)
 
-    return max_chain, min_chain, total, avg_chain, std_dev
+    stats={'max':max_chain, 'total': total, 'min': min_chain,
+            'avg': avg_chain, 'stdev': std_dev}
+
+    return stats
 
 """ PROCESS DATA """
 # Create and populate stats container
-stats = {}
-for log in read_logs(resultsdir):
-    file, arch, graph, size, method, results = log
-    if arch not in stats:
-        stats[arch] = {}
-    if graph not in stats[arch]:
-        stats[arch][graph] = {}
-    if size not in stats[arch][graph]:
-        stats[arch][graph][size] = {}
-    if method not in stats[arch][graph][size]:
-        stats[arch][graph][size][method] = {}
-        stats[arch][graph][size][method]['total'] = []
-        stats[arch][graph][size][method]['time'] = []
-        stats[arch][graph][size][method]['max'] = []
-        stats[arch][graph][size][method]['avg'] = []
-        stats[arch][graph][size][method]['stdev'] = []
-        stats[arch][graph][size][method]['min'] = []
-        stats[arch][graph][size][method]['valid'] = 0
+archs = ['p16_graph0.95']
+#archs = ['dw2000q_graph0.95', 'p6_graph0.95']
+#archs = ['dw2000q_graph0.95']
+methods = ['layout_agnostic']
+graphs = ['complete_graph', 'complete_graph0.95', 'complete_graph0.9']
+sizes = [140,141,142]
+metrics = ['max','total','time','avg','stdev','min']
+for arch in archs:
+    for method in methods:
+        ticks = range( len(sizes) * len(graphs) + 1)
+        stats = {}
 
-    for key, result in results.items():
-        t_elap, _, _, embedding = result
-        if embedding:
-            max_chain, min_chain, total, avg_chain, std_dev = get_stats(embedding)
-            stats[arch][graph][size][method]['total'].append(total)
-            stats[arch][graph][size][method]['time'].append(t_elap)
-            stats[arch][graph][size][method]['max'].append(max_chain)
-            stats[arch][graph][size][method]['avg'].append(avg_chain)
-            stats[arch][graph][size][method]['stdev'].append(std_dev)
-            stats[arch][graph][size][method]['min'].append(min_chain)
-            stats[arch][graph][size][method]['valid'] += 1
+        box_data = {}
+        for graph in graphs:
+            for size in sizes:
+                data_points = {'valid':0}
+                for metric in metrics:
+                    data_points[metric] = []
+                filename = '-'.join([arch,graph,str(size),method]) + '.pkl'
+                for result in read_log(filename):
+                    stats['time'], _, _, embedding = result
+                    if embedding:
+                        stats.update(get_stats(embedding))
+                        for metric in metrics:
+                            data_points[metric].append(stats[metric])
+                        data_points['valid'] += 1
+                box_data[size, graph] = data_points
 
-for i_arch, stats_graph in stats.items():
-    for i_graph, stats_size in stats_graph.items():
-        for i_size, stats_method in stats_size.items():
-            ticks = range(len(stats_method)+1)
-            for i, metric in enumerate(['max','total','time','avg','stdev','min']):
-                plt.clf()
-                plt.figure(i)
-                figname =   i_arch + '_' + i_graph + '_' + \
-                            i_size + '_' + metric
-                textstr =   'Arch: %s \n' % i_arch + \
-                            'Graph: %s \n' % i_graph + \
-                            'Size: %s \n' % i_size
+        for i, metric in enumerate(metrics):
+            plt.clf()
+            plt.figure(i)
+            figname =   arch + '_' + method + '_' + metric + '_'.join([str(x) for x in sizes])
+            textstr =   'Arch: %s \n' % arch + \
+                        'Method: %s \n' % method
 
-                data_points = []
-                method_labels = ['']
-                for method_name, method_dict in stats_method.items():
-                    data_points.append(method_dict[metric])
-                    method_labels.append('%s_%s' % (method_name, method_dict['valid']) )
-                wrapped_labels = [ '\n'.join(l.split('_')) for l in method_labels ]
-                plt.boxplot(data_points)
-                plt.xticks(ticks, wrapped_labels)
-                side_text = plt.figtext(1, 0.5, textstr, fontsize=12)
-                plt.tight_layout()
-                ymin, ymax = plt.ylim()
-                plt.ylim(ymin=0, ymax=ymax*1.1)
-                plt.xlabel('Method')
-                plt.ylabel(metric)
-                plt.savefig(figsdir + figname + '.png', bbox_extra_artists=(side_text,),bbox_inches='tight')
-                #plt.show()
+            labels = ['']
+            box = []
+
+            for (size, graph), data  in box_data.items():
+                labels.append('%s_%s_%s' % (graph, size, data['valid']))
+                box.append(data[metric])
+            wrapped_labels = [ '\n'.join(l.split('_')) for l in labels ]
+
+
+
+            plt.boxplot(box)
+            plt.xticks(ticks, wrapped_labels)
+            side_text = plt.figtext(1, 0.5, textstr, fontsize=12)
+            plt.tight_layout()
+            ymin, ymax = plt.ylim()
+            plt.ylim(ymin=0, ymax=ymax*1.1)
+            plt.xlabel('Graph')
+            plt.ylabel(metric)
+            #plt.savefig(figsdir + figname + '.png', bbox_extra_artists=(side_text,),bbox_inches='tight')
+            plt.savefig(figsdir + figname + '.png')
+            #plt.show()

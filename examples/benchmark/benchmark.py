@@ -65,27 +65,32 @@ def layout_spread(Sg, Tg, **kwargs):
 #    target_graphs (list): NetworkX graph generators of sampler architectures
 target_archs = [#faulty_arch(rainier_graph), rainier_graph,
                 #faulty_arch(vesuvius_graph), vesuvius_graph,
-                #faulty_arch(dw2x_graph), dw2x_graph,
-                faulty_arch(dw2000q_graph)#, dw2000q_graph,
-                #faulty_arch(p6_graph), p6_graph,
+                faulty_arch(dw2x_graph), dw2x_graph,
+                #faulty_arch(dw2000q_graph), #dw2000q_graph,
+                #faulty_arch(p6_graph)#, p6_graph,
                 #faulty_arch(p16_graph), p16_graph
                 ]
 # source_graphs (list): NetworkX graph generators
-source_graphs = [#prune_graph(complete_graph), complete_graph,
+source_graphs = [
+                prune_graph(complete_graph, edge_yield=0.95),
+                prune_graph(complete_graph, edge_yield=0.90),
+                prune_graph(complete_graph, edge_yield=0.85),
+                complete_graph,
                 #prune_graph(complete_bipartite_graph), complete_bipartite_graph,
-                random_graph, #prune_graph(random_graph),
+                #random_graph, #prune_graph(random_graph),
                 #rooks_graph, #prune_graph(rooks_graph),
                 #grid_2d_graph#, prune_graph(grid_2d_graph),
                 ]
 # source_sizes (list): Integer values for the number of vertices in the source graph
-source_sizes = [256]
+source_sizes = [47,48,49,50]
 # embed_methods (list): Embedding methods with a "find_embedding()" function interface
 embed_methods = [layout_agnostic,
-                layout_diffuse,
-                layout_spread]
+                #layout_diffuse,
+                #layout_spread
+                ]
 # embed_tries (int): Multiple tries to account for minor-embedding heuristic noise
-embed_tries = 100
-timeout = 200
+embed_tries = 200
+timeout = 20
 
 """ LOGGING SETUP """
 # Chosen directory for result files

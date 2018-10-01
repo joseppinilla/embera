@@ -1,4 +1,5 @@
 import random
+import warnings
 from embedding_methods.utilities.architectures.tiling import Tiling
 
 __all__ = ['find_candidates']
@@ -54,7 +55,7 @@ class SimulatedAnnealingPlacer(Tiling):
 
     def run():
         #TODO: Simulated Annealing placement
-
+        warnings.warn('Work in progress.')
         init_loc = {}
         for s_node in S:
             i = self.rng.randint(0, self.n)
