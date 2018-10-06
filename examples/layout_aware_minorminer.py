@@ -18,6 +18,8 @@ layout = {v:v for v in Sg}
 
 # The corresponding graph of the D-Wave 2000Q annealer
 Tg = generators.dw2000q_graph()
+# or other graph architectures
+# Tg = generators.p16_graph()
 T_edgelist = list(Tg.edges())
 
 print('Layout-Agnostic')

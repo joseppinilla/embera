@@ -47,7 +47,7 @@ def draw_tiled_graph(m, n, tiles, topology, **kwargs):
     """
     #TODO: Use graph colouring from dwave.system.composites.tiling.draw_tiling
 
-    concentrations = {name : "d=%s"%tile.concentration
+    concentrations = {name : "s=%s,d=%s"%(tile.supply, tile.concentration)
                             for name, tile in tiles.items() if name!=None}
     G = nx.empty_graph()
     G.add_nodes_from(topology.keys())
@@ -64,3 +64,4 @@ def draw_tiled_graph(m, n, tiles, topology, **kwargs):
     # Label tiles
     for (i,j), label in concentrations.items():
         plt.text(i, j, label)
+        plt.text(i+0.5, j+0.5, '%s,%s'%(i,j))
