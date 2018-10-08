@@ -16,37 +16,63 @@ class Tiling:
     def __init__(self, Tg):
         # Support for different target architectures
         self.family = Tg.graph['family']
+        self.m = Tg.graph['columns']
+        self.t = Tg.graph['tile']
+        self.labels = Tg.graph['labels']
         self.size = float(len(Tg))
         # Mapping of source nodes to tile
         self.mapping = {}
 
         if self.family=='chimera':
+            self.n = Tg.graph['columns']
             self.max_degree = 6
             TileClass = ChimeraTile
+            self.converter = chimera_coordinates(self.m, self.n, self.t )
         elif self.family=='pegasus':
-            Tg.graph['columns'] = Tg.graph['columns']*3
+            self.n = Tg.graph['columns']*3
             self.max_degree = 15
             TileClass = PegasusTile
+            self.converter = pegasus_coordinates(self.m)
+        else:
+            raise ValueError("Invalid family. {'chimera', 'pegasus'}")
 
-        self.n = Tg.graph['columns']
-        self.m = Tg.graph['rows']
-        self.t = Tg.graph['tile']
         # Add Tile objects
         self.tiles = {}
         for i in range(self.n):
             for j in range(self.m):
                 tile = (i,j)
-                self.tiles[tile] = TileClass(Tg, i, j)
+                self.tiles[tile] = TileClass(Tg, i, j, self.m, self.n)
 
         # Dummy tile to represent boundaries
         self.tiles[None] = DummyTile()
 
+    def get_tile(self, qubit_label):
+        """ Given a qubit tuple, return the i and j values of the
+        corresponding tile.
+        """
+        if self.family=='chimera':
+            if self.labels=='coordinate':
+                (i,j,_,_) = qubit_label
+            elif self.labels=='int':
+                (i,j,_,_) = self.converter.tuple(qubit_label)
+
+        elif self.family=='pegasus':
+            if self.labels=='coordinate':
+                (u,w,k,z) = qubit_label
+            elif self.labels=='int':
+                (u,w,k,z) = self.converter.tuple(qubit_label)
+            #TODO: Get tile from pegasus qubit label
+            i,j = 0,0
+            warnings.warn('Work in progress.')
+        return i,j
+
+
 class Tile:
     """ Tile Class
     """
-    def __init__(self, Tg, i, j):
-        self.n = Tg.graph['columns']
-        self.m = Tg.graph['rows']
+    def __init__(self, Tg, i, j, m, n):
+        self.m = m
+        self.n = n
         self.t = Tg.graph['tile']
         self.labels = Tg.graph['labels']
         self.name = (i,j)
@@ -68,8 +94,8 @@ class Tile:
             interest.
             Uses cardinal notation north, south, west, east
         """
-        n = self.n
         m = self.m
+        n = self.n
 
         north = self._i2c(index - n, n)
         south = self._i2c(index + n, n)
@@ -106,9 +132,9 @@ class DummyTile:
 class ChimeraTile(Tile):
     """ Tile configuration for Chimera Architecture
     """
-    def __init__(self, Tg, i, j):
-        Tile.__init__(self, Tg, i, j)
-        self.converter = chimera_coordinates(self.m, self.n, self.t)
+    def __init__(self, Tg, i, j, m, n):
+        Tile.__init__(self, Tg, i, j, m, n)
+        self.converter = chimera_coordinates(self.m, self.n, self.t )
         self.supply = self._get_chimera_qubits(Tg, i, j)
         self.concentration = 1.0 if not self.supply else 0.0
 
@@ -143,8 +169,8 @@ class ChimeraTile(Tile):
 class PegasusTile(Tile):
     """ Tile configuration for Pegasus Architecture
     """
-    def __init__(self, Tg, i, j):
-        Tile.__init__(self, Tg, i, j)
+    def __init__(self, Tg, i, j, m, n):
+        Tile.__init__(self, Tg, i, j, m, n)
         self.converter = pegasus_coordinates(self.m)
         self.supply = self._get_pegasus_qubits(Tg, i, j)
         self.concentration = 1.0 if not self.supply else 0.0
@@ -160,32 +186,32 @@ class PegasusTile(Tile):
                 z : parallel offset
         """
         v=0.0
-        qubit_indices = []
-
-        k_start = (i%3)*4
-        for k in range(k_start, k_start+4):
-            w = i//3
-            z = j if i%3==0 else j-1
-            pegasus_index = (0, w, k, z)
-            qubit_indices.append(pegasus_index)
-
-        k_start = (2-i%3)*4
-        for k in range(k_start, k_start+4):
-            w = j
-            z = (i-1)//3
-            pegasus_index = (1, w, k, z)
-            qubit_indices.append(pegasus_index)
-
         self.qubits = set()
-        if self.labels == 'coordinate':
-            pegasus_labels = qubit_indices
-        elif self.labels == 'int':
-            pegasus_labels = self.converter.ints(qubit_indices)
-        else:
-            raise Exception("Invalid labeling. {'coordinate', 'int'}")
-        for label in list(pegasus_labels):
-            if label in Tg.nodes:
-                self.qubits.add(label)
-                v += 1.0
+
+        for u in range(2):
+            for k_i in range(4):
+                if u==0:
+                    k = (i%3)*4 + k_i
+                    w = i//3
+                    z = j if i%3==0 else j-1
+                    pegasus_index = (0, w, k, z)
+                else:
+                    k = (2-i%3)*4 + k_i
+                    w = j
+                    z = (i-1)//3
+                    pegasus_index = (1, w, k, z)
+
+                if self.labels == 'coordinate':
+                    pegasus_label = pegasus_index
+                elif self.labels == 'int':
+                    pegasus_label = self.converter.int(pegasus_index)
+                    if self.converter.tuple(pegasus_label) != pegasus_index:
+                        continue
+                else:
+                    raise Exception("Invalid labeling. {'coordinate', 'int'}")
+
+                if pegasus_label in Tg.nodes:
+                    self.qubits.add(pegasus_label)
+                    v += 1.0
 
         return v
