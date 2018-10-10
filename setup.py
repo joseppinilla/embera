@@ -6,7 +6,7 @@ packages = ['embedding_methods',
             'embedding_methods.composites',
             'embedding_methods.preprocess',
             'embedding_methods.utilities',
-            'embedding_methods.utilities.architectures',
+            'embedding_methods.utilities.architectures'
             ]
 
 install_requires = ['networkx>=2.0,<3.0',

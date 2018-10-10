@@ -61,9 +61,16 @@ class Tiling:
                 (u,w,k,z) = qubit_label
             elif self.labels=='int':
                 (u,w,k,z) = self.converter.tuple(qubit_label)
-            #TODO: Get tile from pegasus qubit label
-            i,j = 0,0
-            warnings.warn('Work in progress.')
+            if u ==0:
+                q = w
+                r = k//4
+                i = q*3+r
+                j = z+1 if i%3 else z
+            else:
+                j = w
+                r = (2-k//4)
+                q = z+1 if r==0 else z
+                i = q*3+r
         return i,j
 
 
