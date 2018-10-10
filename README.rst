@@ -62,7 +62,7 @@ or the generic ``EmbeddingComposite``:
     sampler = EmbeddingComposite(structsampler, minorminer)
 
 The composite is then compatible with the use of the ``sample()`` method as any other sampler.
-In addition, a method ``get_embedding()`` is provided as an interface for the user to obtain a new embedding or retrieve the resulting embedding from which the problem was sampled.
+In addition, a method ``get_embedding()`` is provided as an interface for the user to obtain a new embedding or retrieve the resulting embedding from which the problem was sampled. Using ``get_embedding(get_new=True)`` forces a a new run of the chosen embedding algorithm.
 
 .. dimod-end-marker
 
