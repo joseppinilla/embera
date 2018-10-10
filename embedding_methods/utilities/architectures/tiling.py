@@ -104,23 +104,26 @@ class Tile:
         m = self.m
         n = self.n
 
-        north = self._i2c(index - n, n)
-        south = self._i2c(index + n, n)
-        west =  self._i2c(index - 1, n)
-        east =  self._i2c(index + 1, n)
+        north = self._i2c(index - n, n)   if (j > 0)      else   None
+        south = self._i2c(index + n, n)   if (j < m-1)    else   None
+        west =  self._i2c(index - 1, n)   if (i > 0)      else   None
+        east =  self._i2c(index + 1, n)   if (i < n-1)    else   None
 
-        nw = self._i2c(index - n - 1, n)
-        ne = self._i2c(index - n + 1, n)
-        se = self._i2c(index + n + 1, n)
-        sw = self._i2c(index + n - 1, n)
+        nw = self._i2c(index - n - 1, n)  if (j > 0    and i > 0)    else None
+        ne = self._i2c(index - n + 1, n)  if (j > 0    and i < n-1)  else None
+        se = self._i2c(index + n + 1, n)  if (j < m-1  and i < n-1)  else None
+        sw = self._i2c(index + n - 1, n)  if (j < m-1  and i > 0)    else None
 
         neighbors = []
         for tile in [north, south, west, east, nw, ne, se, sw]:
-            (i,j) = tile
-            if (i >= 0 and i < n) and (j >= 0 and j < m):
-                neighbors.append(tile)
-            else:
+            if (tile is None):
                 neighbors.append(None)
+            else:
+                (i,j) = tile
+                if  (i >= 0 and i < n) and (j >= 0 and j < m):
+                    neighbors.append(tile)
+                else:
+                    neighbors.append(None)
         return neighbors
 
 class DummyTile:
