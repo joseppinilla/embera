@@ -47,17 +47,17 @@ def read(mtx_name, mm_dir=MM_DIR, data=True):
         Gname = base + prefix + 'name' + seq
         name_filepath = mm_dir + Gname + TXT_EXT
         name =  open(name_filepath) if isfile(name_filepath) else mtx_name
-        G.__dict__['name'] =  name
+        G.name =  name
 
         Gcoord = base + prefix + 'coord' + seq
         coord_filepath = mm_dir + Gcoord + MM_EXT
         coord = mmread(coord_filepath) if isfile(coord_filepath) else None
-        G.__dict__['coord'] =  coord
+        G.coord =  coord
 
         Gnodename = base + prefix + 'nodename' + seq
         nodename_filepath = mm_dir + Gnodename + TXT_EXT
-        nodename = open(nodename_filepath) if isfile(nodename_filepath) else []
-        G.__dict__['nodename'] =  nodename
+        nodename = mmread(nodename_filepath) if isfile(nodename_filepath) else []
+        G.nodename =  nodename
 
     return G
 
@@ -133,12 +133,26 @@ def write_networkx(Gnx, pos=None, mtx_name=None, mm_dir=MM_DIR, data=True, **par
 
     if data:
         base, prefix, seq = mtx_name.partition('_G')
+
+        if Gnx.name:
+            Gname = base + prefix + 'name' + seq
+            name_filepath = mm_dir + Gname + TXT_EXT
+            with open(name_filepath, 'w') as fp: fp.write(Gname)
+
         if pos:
             Gcoord = base + prefix + 'coord' + seq
             coord_filepath = mm_dir + Gcoord + MM_EXT
             coord = np.array( list(pos.values()) )
             mmwrite(coord_filepath, coord)
-        #TODO: nodename and name files
+
+        Gnodename = base + prefix + 'nodename' + seq
+        nodename_filepath = mm_dir + Gnodename + MM_EXT
+        Gnx_ints = np.array(nx.convert_node_labels_to_integers(Gnx).nodes())
+        nodename = np.ndarray(  shape=(len(Gnx),1),
+                                dtype=int,
+                                buffer=Gnx_ints)
+        mmwrite(nodename_filepath, nodename)
+
 
 
 if __name__ == "__main__":
@@ -151,7 +165,7 @@ if __name__ == "__main__":
     pos = {v:v for v in Gnx}
     write_networkx(Gnx, pos=pos)
 
-    #Read Graph from Matrix Market file
+    # Read Graph from Matrix Market file
     Gnx=read_networkx(TEST_GRAPH)
     nx.draw(Gnx, pos=Gnx.graph['pos'])
     plt.show()
