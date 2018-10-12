@@ -26,8 +26,8 @@ class DiffusionPlacer(Tiling):
         self.vicinity = params.pop('vicinity', 3)
 
         # Source graph layout
-        try: self.layout = params.pop('layout')
-        except KeyError:
+        self.layout = params.pop('layout', None)
+        if self.layout is None:
             self.layout = nx.spring_layout(nx.Graph(S))
             warnings.warn('A spring layout was generated using NetworkX.')
 

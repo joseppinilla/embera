@@ -68,7 +68,7 @@ def random_graph(size, max_degree=None, seed=None):
     return G
 
 """ When using graph generators, pruning edges of the source graph can be
-done using the following method.
+done using the following method. (Default to 5% of edges removed).
 Example:
 >> # Generate a K16 graph with 5% of the edges removed
 >> prune_graph(complete_graph)(16)
