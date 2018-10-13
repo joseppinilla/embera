@@ -29,7 +29,7 @@ Example Usage
 
 .. dimod-start-marker
 
-When using along with ``dimod``, either use the method-specific composites (i.e. ``MinorMinerEmbeddingComposite``, ``LayoutAwareEmbeddingComposite``, ...):
+When using along with ``dimod``, either use the method-specific composites (i.e. ``MinorMinerEmbeddingComposite``, ``LayoutAwareEmbeddingComposite``, ...) with the corresponding method parameters:
 
 .. code-block:: python
 
@@ -43,7 +43,7 @@ When using along with ``dimod``, either use the method-specific composites (i.e.
 
     # Use any sampler and make structured (i.e. Simulated Annealing, Exact) or use structured sampler if available (i.e. D-Wave machine)
     structsampler = StructureComposite(SimulatedAnnealingSampler(), target_graph.nodes, target_graph.edges)
-    sampler = MinorMinerEmbeddingComposite(structsampler)
+    sampler = MinorMinerEmbeddingComposite(structsampler, tries=20)
 
 or the generic ``EmbeddingComposite``:
 
@@ -59,7 +59,7 @@ or the generic ``EmbeddingComposite``:
     target_graph = generators.p6_graph()
 
     structsampler = StructureComposite(RandomSampler(), target_graph.nodes, target_graph.edges)
-    sampler = EmbeddingComposite(structsampler, minorminer)
+    sampler = EmbeddingComposite(structsampler, minorminer, random_seed=42)
 
 The composite is then compatible with the use of the ``sample()`` method as any other sampler.
 In addition, a method ``get_embedding()`` is provided as an interface for the user to obtain a new embedding or retrieve the resulting embedding from which the problem was sampled. Using ``get_embedding(get_new=True)`` forces a a new run of the chosen embedding algorithm.
