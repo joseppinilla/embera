@@ -178,13 +178,16 @@ Example of tiling a Pegasus architecture graph.
   from embedding_methods.utilities.architectures import drawing, generators
   from embedding_methods.utilities.architectures.tiling import Tiling
 
-  p=3
+  # Pegasus graph
   Tg = generators.p6_graph()
+  
+  # Tile graph and gather qubit assignments
   colours = {}
   for tile, data in Tiling(Tg).tiles.items():
       if data.qubits:
           colours[tile] = data.qubits
 
+  # Use embedding drawing to show qubit assignments
   drawing.draw_architecture_embedding(Tg, colours, show_labels=True)
   plt.show()
 
