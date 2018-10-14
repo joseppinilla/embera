@@ -21,6 +21,7 @@ class EmbeddingComposite(dimod.ComposedSampler):
             raise dimod.InvalidComposition("EmbeddingComposite should only be applied to a Structured sampler")
         self._children = [child_sampler]
         self._embedding = None
+        self._child_response = None
         self._embedding_method = embedding_method
         self._embedding_parameters = embedding_parameters
 
@@ -47,6 +48,9 @@ class EmbeddingComposite(dimod.ComposedSampler):
         # does not add or remove any parameters
         param = self.child.parameters.copy()
         param['chain_strength'] = []
+        param['force_embed'] = []
+        #TODO: Find a way to display embedding_method.find_embedding parameters
+
         return param
 
     @property
@@ -59,54 +63,26 @@ class EmbeddingComposite(dimod.ComposedSampler):
         .. _configuration: http://dwave-cloud-client.readthedocs.io/en/latest/#module-dwave.cloud.config
 
         """
-        return {'child_properties': self.child.properties.copy()}
+        properties = {'child_properties': self.child.properties.copy()}
+        properties['embedding_method'] = self._embedding_method.__name__
+        return
 
-    def get_ising_embedding(self, h, J, target_edgelist=None, force_embed=False, **embedding_parameters):
-        """Retrieve or create a minor-embedding
-
-        Args:
-            h (dict[variable, bias]/list[bias]):
-                Linear biases of the Ising problem. If a list, the list's indices are used
-                as variable labels.
-
-            J (dict[(variable, variable), bias]):
-                Quadratic biases of the Ising problem.
-
-            target_edgelist (list, optional, default=<Child Structure>):
-                An iterable of label pairs representing the edges in the target graph.
-
-            force_embed (bool, optional, default=False):
-                If the sampler has an embedding return it. Otherwise, embed problem.
-
-            **parameters:
-                Parameters for the embedding method.
-
-        Returns:
-            embedding (dict):
-                Dictionary that maps labels in S_edgelist to lists of labels in the
-                graph of the structured sampler.
+    def get_ising_embedding(self, h, J, **parameters):
+        """Retrieve or create a minor-embedding from Ising model
         """
+        bqm = BinaryQuadraticModel.from_ising(h,J)
+        embedding = self.get_embedding(bqm, **parameters)
+        return embedding
 
-        child = self.child
-        embedding_method = self._embedding_method
-        self._embedding_parameters = embedding_parameters
+    def get_qubo_embedding(self, Q, **parameters):
+        """Retrieve or create a minor-embedding from QUBO
+        """
+        bqm = BinaryQuadraticModel.from_qubo(Q)
+        embedding = self.get_embedding(bqm, **parameters)
+        return embedding
 
-
-        if target_edgelist is None:
-            _, target_edgelist, _ = child.structure
-
-        if force_embed or not self._embedding:
-            source_edgelist = list(J.keys())
-            embedding = embedding_method.find_embedding(source_edgelist, target_edgelist,**embedding_parameters)
-            self._embedding = embedding
-
-        if J and not self._embedding:
-            raise ValueError("no embedding found")
-
-        return self._embedding
-
-    def get_bqm_embedding(self, bqm, target_edgelist=None, force_embed=False, **embedding_parameters):
-        """Retrieve or create a minor-embedding
+    def get_embedding(self, bqm, target_edgelist=None, force_embed=False, **embedding_parameters):
+        """Retrieve or create a minor-embedding from BinaryQuadraticModel
 
         Args:
             bqm (:obj:`dimod.BinaryQuadraticModel`):
@@ -145,54 +121,8 @@ class EmbeddingComposite(dimod.ComposedSampler):
 
         return self._embedding
 
-    def sample_ising(self, h, J, chain_strength=1.0, **parameters):
-        """Sample from the provided Ising model.
-
-        Args:
-            h (dict[variable, bias]/list[bias]):
-                Linear biases of the Ising problem. If a list, the list's indices are used
-                as variable labels.
-
-            J (dict[(variable, variable), bias]):
-                Quadratic biases of the Ising problem.
-
-            chain_strength (float, optional, default=1.0):
-                Magnitude of the quadratic bias (in SPIN-space) applied between variables to create
-                chains. Note that the energy penalty of chain breaks is 2 * `chain_strength`.
-
-            **parameters:
-                Parameters for the sampling method, specified by the child sampler.
-
-        Returns:
-            :class:`dimod.Response`
-
-        """
-        # use the given embedding method with the given parameters
-        embedding_method = self._embedding_method
-        embedding_parameters = self._embedding_parameters
-
-        # solve the problem on the child system
-        child = self.child
-
-        # apply the embedding to the given problem to map it to the child sampler
-        __, target_edgelist, target_adjacency = child.structure
-
-        bqm =  BinaryQuadraticModel.from_ising(h, J)
-        source_edgelist = list(J.keys())
-
-        # get the embedding if not done yet
-        if force_embed or not self._embedding:
-            self._embedding = embedding_method.find_embedding(source_edgelist, target_edgelist, **embedding_parameters)
-        embedding = self._embedding
-
-        if bqm and not embedding:
-            raise ValueError("no embedding found")
-
-        bqm_embedded = dimod.embed_bqm(bqm, embedding, target_adjacency, chain_strength=chain_strength)
-
-        response = child.sample(bqm_embedded, **parameters)
-
-        return dimod.unembed_response(response, embedding, source_bqm=bqm)
+    def get_child_response(self):
+        return self._child_response
 
     def sample(self, bqm, chain_strength=1.0, force_embed=False, **parameters):
         """Sample from the provided binary quadratic model.
@@ -223,14 +153,11 @@ class EmbeddingComposite(dimod.ComposedSampler):
         # apply the embedding to the given problem to map it to the child sampler
         __, target_edgelist, target_adjacency = child.structure
 
-        # add self-loops to edgelist to handle singleton variables
-        source_edgelist = list(bqm.quadratic) + [(v, v) for v in bqm.linear]
-
         # get the embedding
-        if force_embed or not self._embedding:
-            self._embedding = embedding_method.find_embedding(source_edgelist, target_edgelist, **embedding_parameters)
-        embedding = self._embedding
-        
+        embedding = self.get_embedding(bqm, target_edgelist=target_edgelist,
+                                    force_embed=force_embed,
+                                    **embedding_parameters)
+
         if bqm and not embedding:
             raise ValueError("no embedding found")
 
@@ -240,5 +167,8 @@ class EmbeddingComposite(dimod.ComposedSampler):
             parameters['initial_state'] = _embed_state(embedding, parameters['initial_state'])
 
         response = child.sample(bqm_embedded, **parameters)
+
+        # Store embedded response
+        self._child_response = response
 
         return dimod.unembed_response(response, embedding, source_bqm=bqm)

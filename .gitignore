@@ -111,3 +111,6 @@ figs/
 # Visual Studio Code project settings
 .vscode/
 
+# Matrix Market graphs
+*.mtx
+graphs/
