@@ -81,6 +81,16 @@ class EmbeddingComposite(dimod.ComposedSampler):
         embedding = self.get_embedding(bqm, **parameters)
         return embedding
 
+    def set_embedding(self, embedding):
+        """Write to the embedding parameter. Useful if embedding is taken from
+        a file or independent method.
+        Args:
+            embedding (dict):
+                Dictionary that maps labels in S_edgelist to lists of labels in the
+                graph of the structured sampler.
+        """
+        self._embedding = embedding
+
     def get_embedding(self, bqm, target_edgelist=None, force_embed=False, **embedding_parameters):
         """Retrieve or create a minor-embedding from BinaryQuadraticModel
 
