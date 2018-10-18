@@ -13,6 +13,7 @@ D-Wave system's architecture is represented by a Chimera_ graph.
 """
 import dimod
 import minorminer
+from dimod.binary_quadratic_model import BinaryQuadraticModel
 
 class MinorMinerEmbeddingComposite(dimod.ComposedSampler):
 
@@ -21,6 +22,7 @@ class MinorMinerEmbeddingComposite(dimod.ComposedSampler):
             raise dimod.InvalidComposition("MinorMinerEmbeddingComposite should only be applied to a Structured sampler")
         self._children = [child_sampler]
         self._embedding = None
+        self._child_response = None
         self._embedding_parameters = embedding_parameters
 
     @property
@@ -46,6 +48,9 @@ class MinorMinerEmbeddingComposite(dimod.ComposedSampler):
         # does not add or remove any parameters
         param = self.child.parameters.copy()
         param['chain_strength'] = []
+        param['force_embed'] = []
+        #TODO: Find a way to display minorminer.find_embedding parameters
+
         return param
 
     @property
@@ -60,19 +65,73 @@ class MinorMinerEmbeddingComposite(dimod.ComposedSampler):
         """
         return {'child_properties': self.child.properties.copy()}
 
-    def get_embedding(self, S=None, T=None, force_embed=False, **embedding_parameters):
+    def get_ising_embedding(self, h, J, **parameters):
+        """Retrieve or create a minor-embedding from Ising model
         """
+        bqm = BinaryQuadraticModel.from_ising(h,J)
+        embedding = self.get_embedding(bqm, **parameters)
+        return embedding
 
+    def get_qubo_embedding(self, Q, **parameters):
+        """Retrieve or create a minor-embedding from QUBO
         """
+        bqm = BinaryQuadraticModel.from_qubo(Q)
+        embedding = self.get_embedding(bqm, **parameters)
+        return embedding
+
+    def set_embedding(self, embedding):
+        """Write to the embedding parameter. Useful if embedding is taken from
+        a file or independent method.
+        Args:
+            embedding (dict):
+                Dictionary that maps labels in S_edgelist to lists of labels in the
+                graph of the structured sampler.
+        """
+        self._embedding = embedding
+
+    def get_embedding(self, bqm, target_edgelist=None, force_embed=False, **embedding_parameters):
+        """Retrieve or create a minor-embedding from BinaryQuadraticModel
+
+        Args:
+            bqm (:obj:`dimod.BinaryQuadraticModel`):
+                Binary quadratic model to be sampled from.
+
+            target_edgelist (list, optional, default=<Child Structure>):
+                An iterable of label pairs representing the edges in the target graph.
+
+            force_embed (bool, optional, default=False):
+                If the sampler has an embedding return it. Otherwise, embed problem.
+
+            **parameters:
+                Parameters for the embedding method.
+
+        Returns:
+            embedding (dict):
+                Dictionary that maps labels in S_edgelist to lists of labels in the
+                graph of the structured sampler.
+        """
+        child = self.child
         self._embedding_parameters = embedding_parameters
 
+        # add self-loops to edgelist to handle singleton variables
+        source_edgelist = list(bqm.quadratic) + [(v, v) for v in bqm.linear]
+
+        if target_edgelist is None:
+            _, target_edgelist, _ = child.structure
+
         if force_embed or not self._embedding:
-            embedding = minorminer.find_embedding(S,T,**embedding_parameters)
+            embedding = minorminer.find_embedding(source_edgelist, target_edgelist,**embedding_parameters)
             self._embedding = embedding
+
+        if bqm and not self._embedding:
+            raise ValueError("no embedding found")
 
         return self._embedding
 
-    def sample(self, bqm, chain_strength=1.0, **parameters):
+    def get_child_response(self):
+        return self._child_response
+
+    def sample(self, bqm, chain_strength=1.0, force_embed=False, chain_break_fraction=True, **parameters):
         """Sample from the provided binary quadratic model.
 
         Args:
@@ -100,18 +159,23 @@ class MinorMinerEmbeddingComposite(dimod.ComposedSampler):
         # apply the embedding to the given problem to map it to the child sampler
         __, target_edgelist, target_adjacency = child.structure
 
-        # add self-loops to edgelist to handle singleton variables
-        source_edgelist = list(bqm.quadratic) + [(v, v) for v in bqm.linear]
-
         # get the embedding
-        embedding = minorminer.find_embedding(source_edgelist, target_edgelist, **embedding_parameters)
-        self._embedding = embedding
+        embedding = self.get_embedding(bqm, target_edgelist=target_edgelist,
+                                    force_embed=force_embed,
+                                    **embedding_parameters)
 
         if bqm and not embedding:
             raise ValueError("no embedding found")
 
         bqm_embedded = dimod.embed_bqm(bqm, embedding, target_adjacency, chain_strength=chain_strength)
 
+        if 'initial_state' in parameters:
+            parameters['initial_state'] = _embed_state(embedding, parameters['initial_state'])
+
         response = child.sample(bqm_embedded, **parameters)
 
-        return dimod.unembed_response(response, embedding, source_bqm=bqm)
+        # Store embedded response
+        self._child_response = response
+
+        return dimod.unembed_response(response, embedding, source_bqm=bqm,
+                                    chain_break_fraction=chain_break_fraction)
