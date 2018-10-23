@@ -142,6 +142,13 @@ class MinorMinerEmbeddingComposite(dimod.ComposedSampler):
                 Magnitude of the quadratic bias (in SPIN-space) applied between variables to create
                 chains. Note that the energy penalty of chain breaks is 2 * `chain_strength`.
 
+            force_embed (bool, optional, default=False):
+                If the sampler has an embedding return it. Otherwise, embed problem.
+
+            chain_break_fraction (bool, optional, default=True):
+                If True, a ‘chain_break_fraction’ field is added to the unembedded response which report
+                what fraction of the chains were broken before unembedding.
+
             **parameters:
                 Parameters for the sampling method, specified by the child sampler.
 

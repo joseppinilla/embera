@@ -65,7 +65,7 @@ class EmbeddingComposite(dimod.ComposedSampler):
         """
         properties = {'child_properties': self.child.properties.copy()}
         properties['embedding_method'] = self._embedding_method.__name__
-        return
+        return properties
 
     def get_ising_embedding(self, h, J, **parameters):
         """Retrieve or create a minor-embedding from Ising model
@@ -161,7 +161,6 @@ class EmbeddingComposite(dimod.ComposedSampler):
         """
 
         # use the given embedding method with the given parameters
-        embedding_method = self._embedding_method
         embedding_parameters = self._embedding_parameters
 
         # solve the problem on the child system
