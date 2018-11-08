@@ -83,7 +83,7 @@ def read_networkx(mtx_name, mm_dir=MM_DIR, data=True):
         Gnx.name = mtx.name
 
         labels = { i:int(label) for i, label in enumerate(mtx.nodename) }
-        if mtx.nodename: nx.relabel_nodes(Gnx, labels, copy=False)
+        if labels: nx.relabel_nodes(Gnx, labels, copy=False)
         pos = {}
         if mtx.coord is not None:
             _, dim = mtx.coord.shape
