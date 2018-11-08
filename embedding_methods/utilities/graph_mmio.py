@@ -47,7 +47,7 @@ def read(mtx_name, mm_dir=MM_DIR, data=True):
         Gname = base + prefix + 'name' + seq
         name_filepath = mm_dir + Gname + TXT_EXT
         name =  open(name_filepath) if isfile(name_filepath) else mtx_name
-        mtx.name =  name
+        mtx.name =  name.readline()[:-1]
 
         Gcoord = base + prefix + 'coord' + seq
         coord_filepath = mm_dir + Gcoord + MM_EXT
@@ -55,9 +55,12 @@ def read(mtx_name, mm_dir=MM_DIR, data=True):
         mtx.coord =  coord
 
         Gnodename = base + prefix + 'nodename' + seq
-        nodename_filepath = mm_dir + Gnodename + MM_EXT
-        nodename = mmread(nodename_filepath) if isfile(nodename_filepath) else []
-        mtx.nodename =  nodename
+        nodename_fp = mm_dir + Gnodename + TXT_EXT
+        nodename = open(nodename_fp).readlines() if isfile(nodename_fp) else []
+        if all(line[:-1].isdigit() for line in nodename):
+            mtx.nodename = [int(line[:-1]) for line in nodename]
+        else:
+            mtx.nodename = [line[:-1] for line in nodename]
 
     return mtx
 
@@ -82,7 +85,7 @@ def read_networkx(mtx_name, mm_dir=MM_DIR, data=True):
     if data:
         Gnx.name = mtx.name
 
-        labels = { i:int(label) for i, label in enumerate(mtx.nodename) }
+        labels = { i:label for i, label in enumerate(mtx.nodename) }
         if labels: nx.relabel_nodes(Gnx, labels, copy=False)
         pos = {}
         if mtx.coord is not None:
@@ -148,12 +151,10 @@ def write_networkx(Gnx, pos=None, mtx_name=None, mm_dir=MM_DIR, data=True, **par
             mmwrite(coord_filepath, coord)
 
         Gnodename = base + prefix + 'nodename' + seq
-        nodename_filepath = mm_dir + Gnodename + MM_EXT
-        Gnx_ints = np.array(Gnx.nodes())
-        nodename = np.ndarray(  shape=(len(Gnx),1),
-                                dtype=int,
-                                buffer=Gnx_ints)
-        mmwrite(nodename_filepath, nodename)
+        nodename_filepath = mm_dir + Gnodename + TXT_EXT
+        with open(nodename_filepath, 'w') as fp:
+            for nodename in Gnx.nodes:
+                fp.write('%s\n' % str(nodename))
 
 
 
@@ -168,6 +169,6 @@ if __name__ == "__main__":
     write_networkx(Gnx, pos=pos)
 
     # Read Graph from Matrix Market file
-    Gnx=read_networkx(TEST_GRAPH)
-    nx.draw(Gnx, pos=Gnx.graph['pos'])
+    G = read_networkx(TEST_GRAPH)
+    nx.draw(G, pos=G.graph['pos'], with_labels=True)
     plt.show()
