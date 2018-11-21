@@ -47,7 +47,7 @@ def read(mtx_name, mm_dir=MM_DIR, data=True):
         Gname = base + prefix + 'name' + seq
         name_filepath = mm_dir + Gname + TXT_EXT
         name =  open(name_filepath) if isfile(name_filepath) else mtx_name
-        mtx.name =  name.readline()[:-1]
+        mtx.name =  name.readline()
 
         Gcoord = base + prefix + 'coord' + seq
         coord_filepath = mm_dir + Gcoord + MM_EXT
@@ -84,21 +84,24 @@ def read_networkx(mtx_name, mm_dir=MM_DIR, data=True):
 
     if data:
         Gnx.name = mtx.name
-
-        labels = { i:label for i, label in enumerate(mtx.nodename) }
-        if labels: nx.relabel_nodes(Gnx, labels, copy=False)
         pos = {}
         if mtx.coord is not None:
             _, dim = mtx.coord.shape
-            for i, v in labels.items():
+            for i, coord in enumerate(mtx.coord):
                 if dim==3:
-                    x,y,z = mtx.coord[i]
-                    pos[v] = x+z, y+z
+                    x,y,z = coord
+                    pos[i] = x+z, y+z
                 elif dim==2:
-                    x,y = mtx.coord[i]
-                    pos[v] = x, y
+                    x,y = coord
+                    pos[i] = x, y
                 else:
                     raise ValueError("Invalid XY or XYZ coordinate dimensions")
+
+        labels = { i:label for i, label in enumerate(mtx.nodename) }
+        if labels:
+            Gnx = nx.relabel_nodes(Gnx, labels, copy=True)
+            if pos: pos = {labels[v]:pos[v] for v in labels}
+
         Gnx.graph['pos'] = pos
 
     return Gnx
@@ -139,16 +142,15 @@ def write_networkx(Gnx, pos=None, mtx_name=None, mm_dir=MM_DIR, data=True, **par
     if data:
         base, prefix, seq = mtx_name.partition('_G')
 
-        if Gnx.name:
-            Gname = base + prefix + 'name' + seq
-            name_filepath = mm_dir + Gname + TXT_EXT
-            with open(name_filepath, 'w') as fp: fp.write(Gname)
+        Gname = base + prefix + 'name' + seq
+        name_filepath = mm_dir + Gname + TXT_EXT
+        with open(name_filepath, 'w') as fp: fp.write(mtx_name)
 
         if pos:
+            coord = [ pos[v] for v in Gnx.nodes ]
             Gcoord = base + prefix + 'coord' + seq
             coord_filepath = mm_dir + Gcoord + MM_EXT
-            coord = np.array( list(pos.values()) )
-            mmwrite(coord_filepath, coord)
+            mmwrite(coord_filepath, np.array(coord))
 
         Gnodename = base + prefix + 'nodename' + seq
         nodename_filepath = mm_dir + Gnodename + TXT_EXT

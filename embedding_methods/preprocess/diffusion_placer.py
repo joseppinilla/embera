@@ -28,8 +28,9 @@ class DiffusionPlacer(Tiling):
         # Source graph layout
         self.layout = params.pop('layout', None)
         if self.layout is None:
-            self.layout = nx.spring_layout(nx.Graph(S))
-            warnings.warn('A spring layout was generated using NetworkX.')
+            self.layout = nx.spring_layout(nx.Graph(S), weight=None)
+            warnings.warn('A spring layout of the unweighted graph "\   
+                            "was generated using NetworkX.')
 
         # Diffusion hyperparameters
         self.enable_migration = params.pop('enable_migration', True)
