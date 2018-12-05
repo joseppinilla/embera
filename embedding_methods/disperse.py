@@ -67,7 +67,8 @@ def _bfs(sink_set, visited, visiting, queue, Tg):
     # Pop node out of Priority queue and its cost, parent, and distance.
     node_cost, node = heappop(queue)
     _, node_parent, node_dist = visiting[node]
-    found = False
+    # Avoid search if source and sink are mapped to the same target node
+    found = set([node]) == sink_set
     while (not found):
         neighbor_dist = node_dist + 1
         neighbor_parent = node
@@ -88,22 +89,26 @@ def _bfs(sink_set, visited, visiting, queue, Tg):
         node_cost, node = heappop(queue)
 
         _, node_parent, node_dist = visiting[node]
-        found = (node in sink_set) and (node_dist >= 2)
+        found = node in sink_set
 
     visited[node] = node_cost, node_parent, node_dist
     return node
 
-def _traceback(source, sink, reached, visited, unassigned, mapped, Tg):
+def _traceback(source, sink, reached, visited, unassigned, mapped, Tg, opts):
     """ Retrace steps from sink to source and populate target graph nodes
     accordingly. Use head and tail of chain as mapped nodes.
     """
-    # If
+    path = [reached]
+
     if sink not in mapped:
-        mapped[sink] = set([reached])
+        mapped[sink] = set(path)
         Tg.nodes[reached]['sharing'] += 1.0
 
-    path = [reached]
-    _, node_parent, _ = visited[reached]
+    _, node_parent, node_dist = visited[reached]
+    if node_dist==1:
+        Tg.nodes[reached]['sharing'] += 1.0
+        return path
+
     node = node_parent
     while(node not in mapped[source]):
         path.append(node)
@@ -112,20 +117,23 @@ def _traceback(source, sink, reached, visited, unassigned, mapped, Tg):
             if source in unassigned[node]:
                 del unassigned[node]
                 mapped[source].add(node)
+                Tg.nodes[node]['sharing'] -= 1.0
             elif sink in unassigned[node]:
                 del unassigned[node]
                 mapped[sink].add(node)
+                Tg.nodes[node]['sharing'] -= 1.0
             else:
                 unassigned[node].add(source)
                 unassigned[node].add(sink)
+                Tg.nodes[node]['sharing'] += 1.0
         else:
             unassigned[node] = set([source, sink])
+            Tg.nodes[node]['sharing'] += 1.0
 
-        Tg.nodes[node]['sharing'] += 1.0
         _, node_parent, _ = visited[node]
         node = node_parent
     path.append(node)
-
+    if opts.verbose: print(path[::-1])
     return path
 
 def _get_sink_set(sink, mapped, Sg):
@@ -150,13 +158,15 @@ def _init_queue(source, visiting, queue, mapped, Sg, Tg):
         visiting[node] = (node_cost, node_parent, node_dist)
         heappush(queue, (node_cost, node))
 
-def _steiner_tree(source, sinks, mapped, unassigned, Sg, Tg):
+def _steiner_tree(source, sinks, mapped, unassigned, Sg, Tg, opts):
     """ Steiner Tree Search
     """
     # Resulting tree dictionary keyed by edges and path values.
     tree = {}
     # Breadth-First Search
     for sink in sinks:
+        edge = (source,sink)
+        if opts.verbose: print('########################## Edge %s' % str(edge))
         # Breadth-First Search structures.
         visiting = {} # (cost, parent, distance) during search
         visited = {} # (parent, distance) after popped from queue
@@ -169,9 +179,8 @@ def _steiner_tree(source, sinks, mapped, unassigned, Sg, Tg):
         # BFS graph traversal
         reached = _bfs(sink_set, visited, visiting, queue, Tg)
         # Retrace steps from sink to source
-        path = _traceback(source, sink, reached, visited, unassigned, mapped, Tg)
+        path = _traceback(source, sink, reached, visited, unassigned, mapped, Tg, opts)
         # Update tree
-        edge = (source,sink)
         tree[edge] = path
 
     return tree
@@ -182,7 +191,7 @@ def _update_costs(mapped, Tg):
     """
 
     legal = True
-    for s_map in mapped.values():
+    for s_node, s_map in mapped.items():
         for t_node in s_map:
             Tg.nodes[t_node]['history'] += ALPHA_H
             sharing =  Tg.nodes[t_node]['sharing']
@@ -257,7 +266,7 @@ def _route(Sg, Tg, opts):
         _embed_node(source, mapped, Sg, Tg, opts)
         while pending_set:
             sinks = [sink for sink in Sg[source] if sink in pending_set]
-            tree = _steiner_tree(source, sinks, mapped, unassigned, Sg, Tg)
+            tree = _steiner_tree(source, sinks, mapped, unassigned, Sg, Tg, opts)
             paths.update(tree)
             source = _get_node(pending_set, pre_sel=sinks)
         legal = _update_costs(mapped, Tg)

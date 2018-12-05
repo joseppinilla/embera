@@ -14,55 +14,62 @@ import random as rand
 import networkx as nx
 
 
-def complete_graph(size):
-    G = nx.complete_graph(size)
+def complete_graph(n):
+    G = nx.complete_graph(n)
     G.name = 'complete'
     return G
 
-def complete_bipartite_graph(size):
-    m = n = round(size/2)
+def complete_bipartite_graph(n, m=None):
+    if m is None:
+        m = n = round(n/2)
     G = nx.complete_bipartite_graph(m,n)
     G.name = 'bipartite'
     return G
 
-def grid_2d_graph(size):
-    m = n = round(math.sqrt(size))
+def grid_2d_graph(n, m=None):
+    if m is None:
+        m = n = round(math.sqrt(n))
     G = nx.grid_2d_graph(m,n)
     G.name = 'grid2d'
     G.graph['pos'] = {v:list(v) for v in G}
     return G
 
-def hypercube_graph(size):
-    n = round(math.log(size,2))
-    G = nx.hypercube_graph(n)
+def hypercube_graph(n=None, dim=None):
+    if n is None and dim is None:
+        raise ValueError('Expected either n or dim')
+    if dim is None:
+        dim = round(math.log(n,2))
+    G = nx.hypercube_graph(dim)
     G.name = 'hypercube'
     return G
 
-def rooks_graph(size):
-    n = round(math.sqrt(size))
+def rooks_graph(n, m=None):
+    if m is None:
+        n = m = round(math.sqrt(n))
     G = nx.complete_graph(n)
-    H = nx.complete_graph(n)
+    H = nx.complete_graph(m)
     F = nx.cartesian_product(G,H)
     F.name = 'rooks'
     F.graph['pos'] = {v:list(v) for v in F}
     return F
 
-def grid_3d_graph(size):
-    m = n = t = round(size**(1./3.))
+def grid_3d_graph(n, m=None, t=2):
+    if m is None:
+        m = n = t = round(n**(1./3.))
     G = nx.grid_graph(dim=[m,n,t])
     G.name = 'grid3d'
     G.graph['pos'] = {(x,y,z):[x+z,y+z] for (x,y,z) in G}
     return G
 
-def random_graph(size, max_degree=None, seed=None):
-    if not max_degree: max_degree=round(size/4)
-    G = nx.empty_graph(size)
+def random_graph(n, max_degree=None, seed=None):
+    if not max_degree: max_degree=round(n/4)
+    G = nx.empty_graph(n)
     rand.seed(seed)
     for v in G:
-         N = rand.randrange(1, max_degree)
+         n = rand.randrange(1, max_degree)
          node_set = set(G.nodes)
          node_set.remove(v)
-         randedges = [ (v,n) for n in rand.sample(node_set, N)]
+         randedges = [ (v,n) for n in rand.sample(node_set, n)]
          G.add_edges_from(randedges)
     G.name = 'random%s' % max_degree
     return G

@@ -18,7 +18,7 @@ from scipy.io import mmread, mminfo, mmwrite
 
 __all__ = ['read', 'read_networkx', 'write_networkx']
 
-MM_DIR = './graphs/'
+MM_DIR = './graphs'
 TXT_EXT = '.txt'
 MM_EXT = '.mtx'
 
@@ -40,22 +40,26 @@ def read(mtx_name, mm_dir=MM_DIR, data=True):
     """
     base, prefix, seq = mtx_name.partition('_G')
 
-    mtx_filepath = mm_dir + mtx_name + MM_EXT
+    if not os.path.isdir(mm_dir):
+        raise ValueError("Given directory name does not exist.")
+    dir_abspath = os.path.abspath(mm_dir)
+
+    mtx_filepath = os.path.join(dir_abspath, mtx_name + MM_EXT)
     mtx = mmread(mtx_filepath)
 
     if data:
         Gname = base + prefix + 'name' + seq
-        name_filepath = mm_dir + Gname + TXT_EXT
+        name_filepath = os.path.join(dir_abspath, Gname + TXT_EXT)
         name =  open(name_filepath) if isfile(name_filepath) else mtx_name
         mtx.name =  name.readline()
 
         Gcoord = base + prefix + 'coord' + seq
-        coord_filepath = mm_dir + Gcoord + MM_EXT
+        coord_filepath = os.path.join(dir_abspath, Gcoord + MM_EXT)
         coord = mmread(coord_filepath) if isfile(coord_filepath) else None
         mtx.coord =  coord
 
         Gnodename = base + prefix + 'nodename' + seq
-        nodename_fp = mm_dir + Gnodename + TXT_EXT
+        nodename_fp = os.path.join(dir_abspath, Gnodename + TXT_EXT)
         nodename = open(nodename_fp).readlines() if isfile(nodename_fp) else []
         if all(line[:-1].isdigit() for line in nodename):
             mtx.nodename = [int(line[:-1]) for line in nodename]
@@ -134,7 +138,10 @@ def write_networkx(Gnx, pos=None, mtx_name=None, mm_dir=MM_DIR, data=True, **par
         else:
             raise RuntimeError("Name of Graph not found.")
 
-    mtx_filepath = mm_dir + mtx_name + MM_EXT
+    if not os.path.isdir(mm_dir):
+        os.makedirs(mm_dir)
+    dir_abspath = os.path.abspath(mm_dir)
+    mtx_filepath = os.path.join(dir_abspath, mtx_name + MM_EXT)
 
     mtx = coo_matrix(nx.to_numpy_matrix(Gnx))
     mmwrite(mtx_filepath, mtx, **params)
@@ -143,17 +150,17 @@ def write_networkx(Gnx, pos=None, mtx_name=None, mm_dir=MM_DIR, data=True, **par
         base, prefix, seq = mtx_name.partition('_G')
 
         Gname = base + prefix + 'name' + seq
-        name_filepath = mm_dir + Gname + TXT_EXT
+        name_filepath = os.path.join(dir_abspath, Gname + TXT_EXT)
         with open(name_filepath, 'w') as fp: fp.write(mtx_name)
 
         if pos:
             coord = [ pos[v] for v in Gnx.nodes ]
             Gcoord = base + prefix + 'coord' + seq
-            coord_filepath = mm_dir + Gcoord + MM_EXT
+            coord_filepath = os.path.join(dir_abspath, Gcoord + MM_EXT)
             mmwrite(coord_filepath, np.array(coord))
 
         Gnodename = base + prefix + 'nodename' + seq
-        nodename_filepath = mm_dir + Gnodename + TXT_EXT
+        nodename_filepath = os.path.join(dir_abspath, Gnodename + TXT_EXT)
         with open(nodename_filepath, 'w') as fp:
             for nodename in Gnx.nodes:
                 fp.write('%s\n' % str(nodename))
@@ -161,16 +168,24 @@ def write_networkx(Gnx, pos=None, mtx_name=None, mm_dir=MM_DIR, data=True, **par
 
 
 if __name__ == "__main__":
+    import random
     import matplotlib.pyplot as plt
-    TEST_GRAPH='grid_2d_graph'
+
+    J_RANGE = [-2.0,2.0]
+    name ='GRID_2D_16X16'
+    mm_dir = './'
 
     # Write graph to Matrix Market file
-    Gnx = nx.grid_2d_graph(4,4)
-    Gnx.name = TEST_GRAPH
+    Gnx = nx.grid_2d_graph(16,16)
+    Gnx.name = name
     pos = {v:v for v in Gnx}
-    write_networkx(Gnx, pos=pos)
+    for (u, v, data) in Gnx.edges(data=True):
+        data['weight'] = random.uniform(*J_RANGE)
 
-    # Read Graph from Matrix Market file
-    G = read_networkx(TEST_GRAPH)
+    comments = "2D Grid 16x16"
+    write_networkx(Gnx, pos=pos, mtx_name=name, mm_dir=mm_dir, comment=comments)
+
+    # Read Graph from Matrix Market file to visually verify pos
+    G = read_networkx(name, mm_dir=mm_dir)
     nx.draw(G, pos=G.graph['pos'], with_labels=True)
     plt.show()
