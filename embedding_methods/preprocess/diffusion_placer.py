@@ -103,7 +103,7 @@ class DiffusionPlacer(Tiling):
             Sy_min = min(sy, Sy_min)
             Sy_max = max(sy, Sy_max)
         s_width =  (Sx_max - Sx_min)
-        s_height = (Sx_max - Sx_min)
+        s_height = (Sy_max - Sy_min)
 
         center_x, center_y = n/2.0, m/2.0
         dist_accum = 0.0

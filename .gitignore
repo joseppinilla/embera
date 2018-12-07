@@ -103,14 +103,11 @@ venv.bak/
 # mypy
 .mypy_cache/
 
-# JSON and Pickled data
-results/
-figs/
-*.zip
-
 # Visual Studio Code project settings
 .vscode/
 
-# Matrix Market graphs
-*.mtx
+# Generated data
+results/
+*.zip
 graphs/
+*.png

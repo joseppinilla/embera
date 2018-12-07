@@ -173,7 +173,7 @@ if __name__ == "__main__":
 
     J_RANGE = [-2.0,2.0]
     name ='GRID_2D_16X16'
-    mm_dir = './'
+    mm_dir = './graphs'
 
     # Write graph to Matrix Market file
     Gnx = nx.grid_2d_graph(16,16)
