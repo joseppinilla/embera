@@ -15,6 +15,8 @@ class DiffusionPlacer(Tiling):
     def __init__(self, S, Tg, **params):
         Tiling.__init__(self, Tg)
 
+        self.p_size = len(S)
+
         self.tries = params.pop('tries', 1)
         self.verbose = params.pop('verbose', 0)
 
@@ -22,7 +24,7 @@ class DiffusionPlacer(Tiling):
         self.random_seed = params.pop('random_seed', None)
         self.rng = random.Random(self.random_seed)
 
-        # Choice of vicinity. See below.
+        # Choice of vicinity (Default: Directed). See _assign_candidates()
         self.vicinity = params.pop('vicinity', 3)
 
         # Source graph layout
@@ -34,6 +36,7 @@ class DiffusionPlacer(Tiling):
 
         # Diffusion hyperparameters
         self.enable_migration = params.pop('enable_migration', True)
+        self.downscale = params.pop('downscale', False)
         self.delta_t = params.pop('delta_t', 0.20)
         self.d_lim = params.pop('d_lim', 0.75)
         self.viscosity = params.pop('viscosity', 0.00)
@@ -70,11 +73,11 @@ class DiffusionPlacer(Tiling):
                 # Directed  = (Single) + 3 tiles closest to the node coordinates
                 x_coord, y_coord = self.layout[s_node]
                 i_index, j_index = s_tile
-                if x_coord >= i_index:
-                    if y_coord >= j_index: neighbor_tiles = (e,s,se)
+                if x_coord >= j_index+0.5:
+                    if y_coord >= i_index+0.5: neighbor_tiles = (e,s,se)
                     else: neighbor_tiles = (e,n,ne)
                 else:
-                    if y_coord >= j_index: neighbor_tiles = (w,s,sw)
+                    if y_coord >= i_index+0.5: neighbor_tiles = (w,s,sw)
                     else: neighbor_tiles = (w,n,nw)
 
                 for tile in neighbor_tiles:
@@ -88,16 +91,20 @@ class DiffusionPlacer(Tiling):
         """ Assign node locations to in-scale values of the dimension
         of the target graph.
         """
-        m = self.m
+        P = self.p_size
+        T = self.t_size
         n = self.n
-        layout = self.layout
-        P = len(layout)
+        m = self.m
+        t_width = n if not self.downscale else 2 + (n*(P*2.5/T))
+        t_height = m if not self.downscale else 2 + (m*(P*2.5/T))
+        offset_x = (n-t_width)/2.0
+        offset_y = (m-t_height)/2.0
 
         # Find dimensions of source graph S
         Sx_min = Sy_min = float("inf")
         Sx_max = Sy_max = 0.0
         # Loop through all source graph nodes to find dimensions
-        for sx, sy in layout.values():
+        for sx, sy in self.layout.values():
             Sx_min = min(sx, Sx_min)
             Sx_max = max(sx, Sx_max)
             Sy_min = min(sy, Sy_min)
@@ -105,24 +112,28 @@ class DiffusionPlacer(Tiling):
         s_width =  (Sx_max - Sx_min)
         s_height = (Sy_max - Sy_min)
 
-        center_x, center_y = n/2.0, m/2.0
+        t_center_x, t_center_y = n/2.0, m/2.0
         dist_accum = 0.0
         # Normalize, scale and accumulate initial distances
-        for s_node, s_coords in layout.items():
+        for s_node, s_coords in self.layout.items():
             (sx, sy) = s_coords
             norm_x = (sx-Sx_min) / s_width
             norm_y = (sy-Sy_min) / s_height
-            scaled_x = norm_x * (n-1) + 0.5
-            scaled_y = norm_y * (m-1) + 0.5
-            layout[s_node] = (scaled_x, scaled_y)
+            scaled_x = offset_x + norm_x * (t_width-1) + 0.5
+            scaled_y = offset_y + norm_y * (t_height-1) + 0.5
+            self.layout[s_node] = (scaled_x, scaled_y)
             tile = self._coords_to_tile(scaled_x, scaled_y)
             self.mapping[s_node] = tile
             self.tiles[tile].nodes.add(s_node)
-            dist_accum += (scaled_x-center_x)**2 + (scaled_y-center_y)**2
+            dist_accum += (scaled_x-t_center_x)**2 + (scaled_y-t_center_y)**2
 
         # Initial dispersion
         dispersion = dist_accum/P
         self.dispersion_accum = [dispersion] * 3
+
+        if self.verbose==4:
+            draw_tiled_graph(m, n, self.tiles, self.layout)
+            plt.show()
 
     def _coords_to_tile(self, x_coord, y_coord):
         """ Tile values are restricted.
@@ -130,8 +141,8 @@ class DiffusionPlacer(Tiling):
         Vertically 0<=j<=m
 
         """
-        i = max(min(round(x_coord), self.n-1), 0)
-        j = max(min(round(y_coord), self.m-1), 0)
+        j = max(min(round(x_coord), self.n-1), 0)
+        i = max(min(round(y_coord), self.m-1), 0)
         tile = (i,j)
         return tile
 
@@ -141,8 +152,8 @@ class DiffusionPlacer(Tiling):
             of the center of the tile array.
         """
         n, s, w, e, nw, ne, se, sw = self.tiles[(i,j)].neighbors
-        lh = (i >= 0.5*self.n)
-        lv = (j >= 0.5*self.m)
+        lh = (j >= 0.5*self.n)
+        lv = (i >= 0.5*self.m)
 
         if lh:
             return (w, n, nw) if lv else (w, s, sw)
@@ -176,17 +187,17 @@ class DiffusionPlacer(Tiling):
         # Target graph dimensions
         m = self.m
         n = self.n
-        t_size = self.size
+        T = self.size
+        P = self.p_size
         # Migration hyperparameters
         delta_t = self.delta_t
         viscosity = self.viscosity
 
         # Problem size
         layout = self.layout
-        P = float(len(layout))
 
-        # Diffusivity
-        D = min((viscosity*P) / t_size, 1.0)
+        # Diffusivity with expected average occupancy = 3.0
+        D = min((viscosity*P*3.0)/T, 1.0)
 
         # Iterate over tiles
         center_x, center_y = n/2.0, m/2.0
@@ -215,11 +226,8 @@ class DiffusionPlacer(Tiling):
             Using verbose==4, a call to draw_tiled_graph() plots
             source nodes over a tile grid.
         """
-        m = self.m
-        n = self.n
-        layout = self.layout
 
-        for s_node, s_coords in layout.items():
+        for s_node, s_coords in self.layout.items():
             tile = self.mapping[s_node]
             new_tile = self._coords_to_tile(*s_coords)
             self.tiles[tile].nodes.remove(s_node)
@@ -254,7 +262,7 @@ class DiffusionPlacer(Tiling):
         return spread and not increasing
 
     def run(self):
-        """ Run two-stage global placement.
+        """ Run two-stage global placement. Scale & Migrate.
         """
         self._scale()
         migrating = self.enable_migration
@@ -268,7 +276,7 @@ class DiffusionPlacer(Tiling):
 
 def find_candidates(S, Tg, **params):
     """ find_candidates(S, Tg, **params)
-    Given an arbitrary source graph and a target graph belonging to a
+    Given an arbitrary source graph and a target graph belonging to an MxN
     tiled architecture (i.e. Chimera Graph), find a mapping from source
     nodes to target nodes, so that this mapping assists in a subsequent
     minor embedding.
@@ -297,19 +305,32 @@ def find_candidates(S, Tg, **params):
             candidates: a dict that maps labels in S to lists of labels in T
 
         Optional parameters:
-            verbose (int): Verbosity level
+
+            tries (int, default=1):
+
+            verbose (int, default=0): Verbosity level
                 0: Quiet mode
                 1: Print statements
                 4: Tile drawings with concentration
 
-            layout ({<node>:(<x>,<y>),...}):
+            layout ({<node>:(<x>,<y>),...}, default=None):
                 Dict of 2D positions assigned to the source graph nodes.
 
-            vicinity (int): Granularity of the candidate assignment.
+            vicinity (int, default=3): Granularity of the candidate assignment.
                 0: Single tile
                 1: Immediate neighbors = (north, south, east, west)
                 2: Extended neighbors = (Immediate) + diagonals
                 3: Directed  = (Single) + 3 tiles closest to the node coordinates
+
+            viscosity (float, default=0.00):
+
+            delta_t (float, default=0.20): Time delta for every diffusion step.
+
+            d_lim (float<=1.0, default=0.75): Density limity for each tile.
+
+            downscale (bool, default=False): Scale of initial overlay is calculated
+                from the problem/target size ratio, and expected occupancy of 2.5
+                i.e. (Y,X) = 2 + (M,N)*(P_size*2.5/T_size))
 
     """
 

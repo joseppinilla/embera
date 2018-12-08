@@ -16,10 +16,10 @@ class Tiling:
     def __init__(self, Tg):
         # Support for different target architectures
         self.family = Tg.graph['family']
-        self.m = Tg.graph['columns']
+        self.m = Tg.graph['rows']
         self.t = Tg.graph['tile']
         self.labels = Tg.graph['labels']
-        self.size = float(len(Tg))
+        self.t_size = float(len(Tg))
         # Mapping of source nodes to tile
         self.mapping = {}
 
@@ -38,8 +38,8 @@ class Tiling:
 
         # Add Tile objects
         self.tiles = {}
-        for i in range(self.n):
-            for j in range(self.m):
+        for j in range(self.n):
+            for i in range(self.m):
                 tile = (i,j)
                 self.tiles[tile] = TileClass(Tg, i, j, self.m, self.n)
 
@@ -64,15 +64,14 @@ class Tiling:
             if u ==0:
                 q = w
                 r = k//4
-                i = q*3+r
-                j = z+1 if i%3 else z
+                j = q*3+r
+                i = z+1 if j%3 else z
             else:
-                j = w
+                i = w
                 r = (2-k//4)
                 q = z+1 if r==0 else z
-                i = q*3+r
+                j = q*3+r
         return i,j
-
 
 class Tile:
     """ Tile Class
@@ -84,14 +83,14 @@ class Tile:
         self.labels = Tg.graph['labels']
         self.name = (i,j)
         self.nodes = set()
-        index = j*self.n + i
+        index = i*self.n + j
         self.index = index
         self.neighbors = self._get_neighbors(i, j, index)
 
     def _i2c(self, index, n):
         """ Convert tile array index to coordinate
         """
-        j, i = divmod(index,n)
+        i, j = divmod(index,n)
         return i, j
 
     def _get_neighbors(self, i, j, index):
@@ -104,15 +103,15 @@ class Tile:
         m = self.m
         n = self.n
 
-        north = self._i2c(index - n, n)   if (j > 0)      else   None
-        south = self._i2c(index + n, n)   if (j < m-1)    else   None
-        west =  self._i2c(index - 1, n)   if (i > 0)      else   None
-        east =  self._i2c(index + 1, n)   if (i < n-1)    else   None
+        north = self._i2c(index - n, n)   if (i > 0)      else   None
+        south = self._i2c(index + n, n)   if (i < m-1)    else   None
+        west =  self._i2c(index - 1, n)   if (j > 0)      else   None
+        east =  self._i2c(index + 1, n)   if (j < n-1)    else   None
 
-        nw = self._i2c(index - n - 1, n)  if (j > 0    and i > 0)    else None
-        ne = self._i2c(index - n + 1, n)  if (j > 0    and i < n-1)  else None
-        se = self._i2c(index + n + 1, n)  if (j < m-1  and i < n-1)  else None
-        sw = self._i2c(index + n - 1, n)  if (j < m-1  and i > 0)    else None
+        nw = self._i2c(index - n - 1, n)  if (i > 0    and j > 0)    else None
+        ne = self._i2c(index - n + 1, n)  if (i > 0    and j < n-1)  else None
+        se = self._i2c(index + n + 1, n)  if (i < m-1  and j < n-1)  else None
+        sw = self._i2c(index + n - 1, n)  if (i < m-1  and j > 0)    else None
 
         neighbors = [north, south, west, east, nw, ne, se, sw]
 
@@ -191,16 +190,16 @@ class PegasusTile(Tile):
         self.qubits = set()
 
         for u in range(2):
-            for k_i in range(4):
+            for k_j in range(4):
                 if u==0:
-                    k = (i%3)*4 + k_i
-                    w = i//3
-                    z = j if i%3==0 else j-1
+                    k = (j%3)*4 + k_j
+                    w = j//3
+                    z = i if j%3==0 else i-1
                     pegasus_index = (0, w, k, z)
                 else:
-                    k = (2-i%3)*4 + k_i
-                    w = j
-                    z = (i-1)//3
+                    k = (2-j%3)*4 + k_j
+                    w = i
+                    z = (j-1)//3
                     pegasus_index = (1, w, k, z)
 
                 if self.labels == 'coordinate':

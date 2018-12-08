@@ -159,13 +159,21 @@ This example uses the diffusion placer without migration to demonstrate the anch
   T_edgelist = list(Tg.edges())
   # Find a global placement for problem graph
   candidates = find_candidates(S_edgelist, Tg, layout=layout, enable_migration=False)
+
+  # Draw candidates as if embedded
+  plt.figure(0)
+  drawing.draw_architecture_embedding(Tg, candidates, show_labels=True)
+  plt.title('Candidates')
+
   # Find a minor-embedding using the disperse router method
   embedding = find_embedding(S_edgelist, T_edgelist, initial_chains=candidates)
 
   print('sum: %s' % sum(len(v) for v in embedding.values()))
   print('max: %s' % max(len(v)for v in embedding.values()))
 
-  drawing.draw_architecture_embedding(Tg, embedding)
+  # Draw embedding (colours may vary from candidates.)
+  plt.figure(1)
+  drawing.draw_architecture_embedding(Tg, embedding, show_labels=True)
   plt.title('Disperse Router')
   plt.show()
 

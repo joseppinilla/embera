@@ -53,7 +53,8 @@ def draw_tiled_graph(m, n, tiles, topology, **kwargs):
     G.add_nodes_from(topology.keys())
 
     dnx.drawing.qubit_layout.draw_qubit_graph(G, topology,**kwargs)
-    fig = plt.figure(1)
+    cf = plt.gcf()
+    ax = plt.gca()
     plt.grid('on')
     plt.axis('on')
     plt.axis([0,n,0,m])
@@ -63,5 +64,6 @@ def draw_tiled_graph(m, n, tiles, topology, **kwargs):
     plt.yticks(y_ticks)
     # Label tiles
     for (i,j), label in concentrations.items():
-        plt.text(i, j, label)
-        plt.text(i+0.5, j+0.5, '%s,%s'%(i,j))
+        plt.text(j, i, label)
+        plt.text(j+0.5, i+0.5, '%s,%s'%(i,j))
+    ax.invert_yaxis()
