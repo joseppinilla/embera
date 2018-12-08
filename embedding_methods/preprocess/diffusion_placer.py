@@ -40,6 +40,7 @@ class DiffusionPlacer(Tiling):
         self.delta_t = params.pop('delta_t', 0.20)
         self.d_lim = params.pop('d_lim', 0.75)
         self.viscosity = params.pop('viscosity', 0.00)
+        self.expected_occupancy = params.pop('expected_occupancy', 2.50)
 
         # Check if all parameters have been parsed.
         for name in params:
@@ -95,8 +96,9 @@ class DiffusionPlacer(Tiling):
         T = self.t_size
         n = self.n
         m = self.m
-        t_width = n if not self.downscale else 2 + (n*(P*2.5/T))
-        t_height = m if not self.downscale else 2 + (m*(P*2.5/T))
+        exp_occ = self.expected_occupancy
+        t_width = n if not self.downscale else 2 + (n*(P*exp_occ/T))
+        t_height = m if not self.downscale else 2 + (m*(P*exp_occ/T))
         offset_x = (n-t_width)/2.0
         offset_y = (m-t_height)/2.0
 
@@ -127,7 +129,7 @@ class DiffusionPlacer(Tiling):
             self.tiles[tile].nodes.add(s_node)
             dist_accum += (scaled_x-t_center_x)**2 + (scaled_y-t_center_y)**2
 
-        # Initial dispersion
+        # Initial dispersion over 3 samples
         dispersion = dist_accum/P
         self.dispersion_accum = [dispersion] * 3
 
@@ -141,8 +143,8 @@ class DiffusionPlacer(Tiling):
         Vertically 0<=j<=m
 
         """
-        j = max(min(round(x_coord), self.n-1), 0)
-        i = max(min(round(y_coord), self.m-1), 0)
+        j = max(min(math.floor(x_coord), self.n-1), 0)
+        i = max(min(math.floor(y_coord), self.m-1), 0)
         tile = (i,j)
         return tile
 
@@ -192,12 +194,13 @@ class DiffusionPlacer(Tiling):
         # Migration hyperparameters
         delta_t = self.delta_t
         viscosity = self.viscosity
+        exp_occ = self.expected_occupancy
 
         # Problem size
         layout = self.layout
 
-        # Diffusivity with expected average occupancy = 3.0
-        D = min((viscosity*P*3.0)/T, 1.0)
+        # Diffusivity with expected average occupancy
+        D = min((viscosity*P*exp_occ)/T, 1.0)
 
         # Iterate over tiles
         center_x, center_y = n/2.0, m/2.0
@@ -245,7 +248,7 @@ class DiffusionPlacer(Tiling):
     def _condition(self, dispersion):
         """ The algorithm iterates until the dispersion, or average distance of
             the nodes from the centre of the tile array, increases or has a
-            cumulative variance lower than 1%
+            cumulative variance lower than 1% over 3 samples.
         """
         self.dispersion_accum.pop(0)
         self.dispersion_accum.append(dispersion)
@@ -329,8 +332,11 @@ def find_candidates(S, Tg, **params):
             d_lim (float<=1.0, default=0.75): Density limity for each tile.
 
             downscale (bool, default=False): Scale of initial overlay is calculated
-                from the problem/target size ratio, and expected occupancy of 2.5
-                i.e. (Y,X) = 2 + (M,N)*(P_size*2.5/T_size))
+                from the problem/target size ratio, and expected occupancy _a
+                i.e. (Y,X) = 2 + (M,N)*(P_size*_a/T_size))
+
+            expected_occupancy (float, default=2.5): Number of qubits expected
+                to be used per problem node on average.
 
     """
 

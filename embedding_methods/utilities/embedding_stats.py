@@ -54,13 +54,13 @@ def get_chain_stats(embedding):
     return max_chain, min_chain, total, avg_chain, std_dev
 
 
-def get_interactions_stats(bqm, embedding, target_adjacency):
+def get_interactions_stats(S_edgelist, embedding, target_adjacency):
     """ Interactions are edges between chains that are connected in
     the source adjacency.
 
     Args:
-        bqm (:obj:`dimod.BinaryQuadraticModel`):
-            Binary quadratic model to be sampled from.
+        S (iterable):
+            An iterable of label pairs representing the edges in the source graph.
 
         embedding (dict):
             Mapping from source graph to target graph as a dict of form
@@ -81,7 +81,7 @@ def get_interactions_stats(bqm, embedding, target_adjacency):
 
     # Get max min and total
     interactions_dict = {}
-    for edge, _ in bqm.quadratic.items():
+    for edge in S_edgelist:
         (u, v) = edge
         available_interactions = {(s, t) for s in embedding[u] for t in embedding[v] if s in target_adjacency[t]}
         if not available_interactions:

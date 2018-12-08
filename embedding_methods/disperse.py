@@ -41,12 +41,17 @@ def _init_graphs(Sg, Tg, initial_chains, opts):
         t_data['history'] =  1.0
         t_data['sharing'] = 0.0
 
-def _get_cost(neighbor_name, Tg):
+def _get_cost(neighbor, source, Tg, mapped={}, unassigned={}):
     """ The cost of using one target node is defined to depend on a base cost,
     a present-sharing cost, and a historical-sharing cost.
     """
 
-    next_node = Tg.nodes[neighbor_name]
+    if neighbor in mapped.get(source,set()):
+        return 0.0
+    if neighbor in unassigned.get(source,set()):
+        return 1.0
+
+    next_node = Tg.nodes[neighbor]
 
     sharing_cost = 1.0 + next_node['sharing'] * ALPHA_P
 
@@ -60,7 +65,7 @@ def _get_cost(neighbor_name, Tg):
 
     return base_cost * sharing_cost * history_cost
 
-def _bfs(sink_set, visited, visiting, queue, Tg):
+def _bfs(source, sink_set, visited, visiting, queue, mapped, unassigned, Tg):
     """ Breadth-First Search
     """
 
@@ -74,7 +79,7 @@ def _bfs(sink_set, visited, visiting, queue, Tg):
         neighbor_parent = node
         for neighbor in Tg[node]:
             if neighbor not in visited:
-                neighbor_cost = node_cost + _get_cost(neighbor, Tg)
+                neighbor_cost = node_cost + _get_cost(neighbor, source, Tg, mapped, unassigned)
 
                 heappush(queue, (neighbor_cost, neighbor))
                 neighbor_data = neighbor_cost, neighbor_parent, neighbor_dist
@@ -117,11 +122,11 @@ def _traceback(source, sink, reached, visited, unassigned, mapped, Tg, opts):
             if source in unassigned[node]:
                 del unassigned[node]
                 mapped[source].add(node)
-                Tg.nodes[node]['sharing'] -= 1.0
+                # Tg.nodes[node]['sharing'] -= 1.0
             elif sink in unassigned[node]:
                 del unassigned[node]
                 mapped[sink].add(node)
-                Tg.nodes[node]['sharing'] -= 1.0
+                # Tg.nodes[node]['sharing'] -= 1.0
             else:
                 unassigned[node].add(source)
                 unassigned[node].add(sink)
@@ -177,7 +182,7 @@ def _steiner_tree(source, sinks, mapped, unassigned, Sg, Tg, opts):
         # Search for sink candidates, or nodes assigned to sink
         sink_set = _get_sink_set(sink, mapped, Sg)
         # BFS graph traversal
-        reached = _bfs(sink_set, visited, visiting, queue, Tg)
+        reached = _bfs(source, sink_set, visited, visiting, queue, mapped, unassigned, Tg)
         # Retrace steps from sink to source
         path = _traceback(source, sink, reached, visited, unassigned, mapped, Tg, opts)
         # Update tree
@@ -185,20 +190,24 @@ def _steiner_tree(source, sinks, mapped, unassigned, Sg, Tg, opts):
 
     return tree
 
-def _update_costs(mapped, Tg):
+def _update_costs(mapped, Tg, opts):
     """ Update present-sharing and history-sharing costs.
     If a target node is shared, the embedding is not legal.
     """
 
     legal = True
+    conflicts = set()
     for s_node, s_map in mapped.items():
         for t_node in s_map:
             Tg.nodes[t_node]['history'] += ALPHA_H
             sharing =  Tg.nodes[t_node]['sharing']
             if sharing > 1.0:
                 legal = False
+                conflicts.add(s_node)
 
-    return legal
+    if opts.verbose: print('%s conflicts: %s' % ( len(conflicts), conflicts))
+
+    return legal, conflicts
 
 def _embed_node(source, mapped, Sg, Tg, opts={}):
     """ Given a source node and the current mapping from source nodes to target
@@ -210,14 +219,36 @@ def _embed_node(source, mapped, Sg, Tg, opts={}):
 
     # Get best candidate
     candidates = s_node['candidates']
-    t_index = min( candidates, key=lambda t: _get_cost(t, Tg) )
+    t_index = min( candidates, key=lambda t: _get_cost(t, source, Tg) )
 
     # Populate target node
     t_node = Tg.nodes[t_index]
     t_node['sharing'] += 1.0
     mapped[source] = set([t_index])
 
-def _rip_up(Tg):
+def _rip_up(Sg, Tg, pending_set, paths, mapped, unassigned, conflicts):
+    """ Rip Up current embedding
+    paths = { Sg edge : Tg nodes path }
+    mapped = { Sg node: set(Tg nodes) }
+    unassigned = { Tg node : set(Sg nodes) }
+    """
+
+    for node in conflicts:
+        _ = mapped.pop(node, None)
+        for sink in Sg[node]:
+            edge = (node,sink) if (node,sink) in paths else (sink,node)
+            path = paths.pop(edge, [])
+            for t_node in path:
+                Tg.nodes[t_node]['sharing'] -= 1.0
+                t_set = unassigned.pop(t_node, set()) - set([node, sink])
+                if t_set: unassigned[t_node] = t_set
+
+            sink_set = mapped.pop(sink, set()) - set(path)
+            if sink_set: mapped[sink] = sink_set
+            pending_set.add(sink)
+        pending_set.add(node)
+
+def _rip_all(Sg, Tg):
     """ Rip Up current embedding
     paths = { Sg edge : Tg nodes path }
     mapped = { Sg node: set(Tg nodes) }
@@ -226,12 +257,13 @@ def _rip_up(Tg):
     paths={}
     mapped={}
     unassigned={}
+    pending_set = set(Sg)
 
     # BFS
     for t_node in Tg.nodes():
         Tg.nodes[t_node]['sharing'] = 0.0
 
-    return paths, mapped, unassigned
+    return pending_set, paths, mapped, unassigned
 
 def _get_node(pending_set, pre_sel=[], opts={}):
     """ Next node preferably in pre-selected nodes
@@ -256,23 +288,31 @@ def _route(Sg, Tg, opts):
     legal = False
     tries = opts.tries
     # Negotiated Congestion
+    paths = {}
+    mapped = {}
+    unassigned = {}
+    conflicts = set([])
+    pending_set = set(Sg)
     while (not legal) and (tries > 0):
         if opts.verbose: print('############# TRIES LEFT: %s' % tries)
-        # First node selection
-        pending_set = set(Sg)
-        source = _get_node(pending_set)
         # Route Rip Up
-        paths, mapped, unassigned = _rip_up(Tg)
+        if opts.rip_all:
+            pending_set, paths, mapped, unassigned = _rip_all(Sg, Tg)
+        else:
+            _rip_up(Sg, Tg, pending_set, paths, mapped, unassigned, conflicts)
+        # First node selection
+        source = _get_node(pending_set)
         _embed_node(source, mapped, Sg, Tg, opts)
         while pending_set:
             sinks = [sink for sink in Sg[source] if sink in pending_set]
             tree = _steiner_tree(source, sinks, mapped, unassigned, Sg, Tg, opts)
             paths.update(tree)
             source = _get_node(pending_set, pre_sel=sinks)
-        legal = _update_costs(mapped, Tg)
+        legal, conflicts = _update_costs(mapped, Tg, opts)
         ALPHA_P += opts.delta_p
         ALPHA_H += opts.delta_h
         tries -= 1
+
     return legal, paths, mapped, unassigned
 
 
@@ -407,13 +447,17 @@ class RouterOptions(object):
     """ Option parser for negotiated congestion based detailed router.
         Optional parameters:
 
-            random_seed (int): Used as an argument for the RNG.
+            random_seed (int, default=None):
+                Used as an argument for the RNG.
 
-            tries (int): the algorithm iteratively tries to find an embedding
+            tries (int, default=100):
+                The algorithm iteratively tries to find an embedding.
 
-            delta_p (float):
+            delta_p (float, default=0.45):
 
-            delta_h (float):
+            delta_h (float, default=0.10):
+
+            rip_all (bool, default=False):
 
             verbose (int): Verbosity level
                 0: Quiet mode
@@ -429,6 +473,8 @@ class RouterOptions(object):
 
         self.delta_p =  params.pop('delta_p', 0.45)
         self.delta_h =  params.pop('delta_h', 0.10)
+
+        self.rip_all = params.pop('rip_all', False)
 
         self.verbose =  params.pop('verbose', 0)
 
