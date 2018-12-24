@@ -31,7 +31,7 @@ plt.title('Candidates')
 embedding = find_embedding(S_edgelist, T_edgelist, initial_chains=candidates)
 
 print('sum: %s' % sum(len(v) for v in embedding.values()))
-print('max: %s' % max(len(v)for v in embedding.values()))
+print('max: %s' % max(len(v) for v in embedding.values()))
 
 # Draw embedding (colours may vary from candidates.)
 plt.figure(1)

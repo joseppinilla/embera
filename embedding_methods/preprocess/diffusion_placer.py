@@ -37,6 +37,7 @@ class DiffusionPlacer(Tiling):
         # Diffusion hyperparameters
         self.enable_migration = params.pop('enable_migration', True)
         self.downscale = params.pop('downscale', False)
+        self.keep_ratio = params.pop('keep_ratio', False)
         self.delta_t = params.pop('delta_t', 0.20)
         self.d_lim = params.pop('d_lim', 0.75)
         self.viscosity = params.pop('viscosity', 0.00)
@@ -96,12 +97,10 @@ class DiffusionPlacer(Tiling):
         T = self.t_size
         n = self.n
         m = self.m
+        # Downscale according to size of problem P/T and expected occupancy
         exp_occ = self.expected_occupancy
-        t_width = n if not self.downscale else 2 + (n*(P*exp_occ/T))
-        t_height = m if not self.downscale else 2 + (m*(P*exp_occ/T))
-        offset_x = (n-t_width)/2.0
-        offset_y = (m-t_height)/2.0
-
+        t_width = n if not self.downscale else min(2 + (n*(P*exp_occ/T)), n)
+        t_height = m if not self.downscale else min(2 + (m*(P*exp_occ/T)), m)
         # Find dimensions of source graph S
         Sx_min = Sy_min = float("inf")
         Sx_max = Sy_max = 0.0
@@ -114,15 +113,29 @@ class DiffusionPlacer(Tiling):
         s_width =  (Sx_max - Sx_min)
         s_height = (Sy_max - Sy_min)
 
-        t_center_x, t_center_y = n/2.0, m/2.0
-        dist_accum = 0.0
+        # Define scaling factor
+        scale_x = (t_width) / s_width
+        scale_y = (t_height) / s_height
+
+
+        if self.keep_ratio:
+            keep_ratio = 0.0 if (self.keep_ratio is True) else self.keep_ratio
+            if (scale_y > scale_x):
+                scale_y = scale_x + (scale_y - scale_x ) * keep_ratio
+                t_height = s_height*scale_y
+            elif (scale_x > scale_y):
+                scale_x = scale_y + (scale_x - scale_y ) * keep_ratio
+                t_width = s_width*scale_x
+
+        offset_x = ((n-t_width)/2.0) + 0.5
+        offset_y = ((m-t_height)/2.0) + 0.5
         # Normalize, scale and accumulate initial distances
+        dist_accum = 0.0
+        t_center_x, t_center_y = n/2.0, m/2.0
         for s_node, s_coords in self.layout.items():
             (sx, sy) = s_coords
-            norm_x = (sx-Sx_min) / s_width
-            norm_y = (sy-Sy_min) / s_height
-            scaled_x = offset_x + norm_x * (t_width-1) + 0.5
-            scaled_y = offset_y + norm_y * (t_height-1) + 0.5
+            scaled_x = offset_x + ((sx-Sx_min) * scale_x)
+            scaled_y = offset_y + ((sy-Sy_min) * scale_y)
             self.layout[s_node] = (scaled_x, scaled_y)
             tile = self._coords_to_tile(scaled_x, scaled_y)
             self.mapping[s_node] = tile
@@ -189,7 +202,7 @@ class DiffusionPlacer(Tiling):
         # Target graph dimensions
         m = self.m
         n = self.n
-        T = self.size
+        T = self.t_size
         P = self.p_size
         # Migration hyperparameters
         delta_t = self.delta_t
@@ -200,7 +213,7 @@ class DiffusionPlacer(Tiling):
         layout = self.layout
 
         # Diffusivity with expected average occupancy
-        D = min((viscosity*P*exp_occ)/T, 1.0)
+        D = 1.0 - min((viscosity*P*exp_occ)/T, 1.0)
 
         # Iterate over tiles
         center_x, center_y = n/2.0, m/2.0
@@ -214,8 +227,8 @@ class DiffusionPlacer(Tiling):
                 l_y = (2.0*y/m)-1.0
                 v_x = l_x * gradient_x
                 v_y = l_y * gradient_y
-                x_1 = x + (1.0 - D) * v_x * delta_t
-                y_1 = y + (1.0 - D) * v_y * delta_t
+                x_1 = x + D * v_x * delta_t
+                y_1 = y + D * v_y * delta_t
                 layout[node] = (x_1, y_1)
                 dist_accum += (x_1-center_x)**2 + (y_1-center_y)**2
 
@@ -334,6 +347,11 @@ def find_candidates(S, Tg, **params):
             downscale (bool, default=False): Scale of initial overlay is calculated
                 from the problem/target size ratio, and expected occupancy _a
                 i.e. (Y,X) = 2 + (M,N)*(P_size*_a/T_size))
+
+            keep_ratio (bool or float<=1.0, default=False): When scaling, keep
+                aspect ratio. If a float is given, the value is used to scale
+                the problem layout in the dimension that is not restricted by
+                the target dimensions.
 
             expected_occupancy (float, default=2.5): Number of qubits expected
                 to be used per problem node on average.

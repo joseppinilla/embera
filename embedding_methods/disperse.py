@@ -268,6 +268,7 @@ def _rip_all(Sg, Tg):
 def _get_node(pending_set, pre_sel=[], opts={}):
     """ Next node preferably in pre-selected nodes
     """
+    random.shuffle(pre_sel)
     for node in pre_sel:
         if node in pending_set:
             pending_set.remove(node)
