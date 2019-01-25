@@ -11,7 +11,7 @@ packages = ['embedding_methods',
 
 install_requires = ['networkx>=2.0,<3.0',
                     'decorator>=4.1.0,<5.0.0',
-                    'dimod>=0.6.8,<0.8.0',
+                    'dimod>=0.8.2,<0.9.0',
                     'pulp>=1.6.0,<2.0.0',
                     'minorminer>=0.1.5,<0.2.0',
                     'dwave-networkx>=0.6.4,<0.7.0']

@@ -7,7 +7,11 @@ import networkx as nx
 import dwave_networkx as dnx
 import matplotlib.pyplot as plt
 
-__all__ = ['draw_architecture', 'draw_architecture_embedding']
+
+__all__ = ['draw_architecture', 'draw_architecture_embedding', 'draw_architecture_yield']
+
+unused_color=(0.9,0.9,0.9,1.0)
+faulty_color=(1.0,0.0,0.0,1.0)
 
 def draw_architecture(target_graph, **kwargs):
     """ Draws graph G according to G's family layout.
@@ -23,6 +27,42 @@ def draw_architecture(target_graph, **kwargs):
     else:
         nx.draw_spring(target_graph)
         warnings.warn("Graph family not available. Using NetworkX spring layout")
+
+
+def draw_architecture_yield(target_graph, **kwargs):
+    """ Draws graph G according to G's family layout and highlights
+        faulty qubits.
+    """
+    family = target_graph.graph['family']
+
+    try:
+        m = target_graph.graph['columns']
+        n = target_graph.graph['rows']
+        t = target_graph.graph['tile']
+        coordinates = target_graph.graph['labels'] == 'coordinate'
+    except:
+        raise ValueError("Target graph needs to have columns, rows, and tile \
+        attributes to dientify faulty qubits.")
+
+    if family == 'chimera':
+        perfect_graph = dnx.chimera_graph(m,n,t, coordinates=coordinates)
+        node_color = [unused_color if v in target_graph else faulty_color for v in perfect_graph.nodes()]
+        edge_color = [unused_color if v in target_graph.edges() else faulty_color for v in perfect_graph.edges()]
+        kwargs['node_color'] = node_color
+        kwargs['edge_color'] = edge_color
+        dnx.draw_chimera(perfect_graph, **kwargs)
+
+    elif family == 'pegasus':
+        perfect_graph = dnx.pegasus_graph(m, coordinates=coordinates)
+        color_map = [unused_color if v in target_graph else faulty_color for v in perfect_graph.nodes()]
+        edge_color = [unused_color if v in target_graph.edges() else faulty_color for v in perfect_graph.edges()]
+        kwargs['node_color'] = color_map
+        dnx.draw_pegasus(perfect_graph, **kwargs)
+
+    else:
+        nx.draw_spring(target_graph)
+        warnings.warn("Graph family not available. Using NetworkX spring layout")
+
 
 def draw_architecture_embedding(target_graph, *args, **kwargs):
     """ Draws an embedding onto the target graph G,

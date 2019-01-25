@@ -13,6 +13,7 @@ D-Wave system's architecture is represented by a Chimera_ graph.
 """
 import dimod
 import minorminer
+from dwave.embedding.transforms import embed_bqm, unembed_sampleset
 from dimod.binary_quadratic_model import BinaryQuadraticModel
 
 class MinorMinerEmbeddingComposite(dimod.ComposedSampler):
@@ -174,7 +175,7 @@ class MinorMinerEmbeddingComposite(dimod.ComposedSampler):
         if bqm and not embedding:
             raise ValueError("no embedding found")
 
-        bqm_embedded = dimod.embed_bqm(bqm, embedding, target_adjacency, chain_strength=chain_strength)
+        bqm_embedded = embed_bqm(bqm, embedding, target_adjacency, chain_strength=chain_strength)
 
         if 'initial_state' in parameters:
             parameters['initial_state'] = _embed_state(embedding, parameters['initial_state'])
@@ -184,5 +185,5 @@ class MinorMinerEmbeddingComposite(dimod.ComposedSampler):
         # Store embedded response
         self._child_response = response
 
-        return dimod.unembed_response(response, embedding, source_bqm=bqm,
+        return unembed_sampleset(response, embedding, source_bqm=bqm,
                                     chain_break_fraction=chain_break_fraction)

@@ -18,8 +18,8 @@ from embedding_methods import disperse
 from embedding_methods.preprocess import diffusion_placer
 from embedding_methods.utilities.architectures.generators import dw2000q_graph
 
+from dwave.embedding.transforms import embed_bqm, unembed_sampleset
 from dimod.binary_quadratic_model import BinaryQuadraticModel
-
 
 class LayoutAwareEmbeddingComposite(dimod.ComposedSampler):
 
@@ -210,7 +210,7 @@ class LayoutAwareEmbeddingComposite(dimod.ComposedSampler):
         if bqm and not embedding:
             raise ValueError("no embedding found")
 
-        bqm_embedded = dimod.embed_bqm(bqm, embedding, target_adjacency, chain_strength=chain_strength)
+        bqm_embedded = embed_bqm(bqm, embedding, target_adjacency, chain_strength=chain_strength)
 
         if 'initial_state' in parameters:
             parameters['initial_state'] = _embed_state(embedding, parameters['initial_state'])
@@ -220,5 +220,5 @@ class LayoutAwareEmbeddingComposite(dimod.ComposedSampler):
         # Store embedded response
         self._child_response = response
 
-        return dimod.unembed_response(response, embedding, source_bqm=bqm,
+        return unembed_sampleset(response, embedding, source_bqm=bqm,
                                     chain_break_fraction=chain_break_fraction)
