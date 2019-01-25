@@ -177,9 +177,6 @@ class MinorMinerEmbeddingComposite(dimod.ComposedSampler):
 
         bqm_embedded = embed_bqm(bqm, embedding, target_adjacency, chain_strength=chain_strength)
 
-        if 'initial_state' in parameters:
-            parameters['initial_state'] = _embed_state(embedding, parameters['initial_state'])
-
         response = child.sample(bqm_embedded, **parameters)
 
         # Store embedded response

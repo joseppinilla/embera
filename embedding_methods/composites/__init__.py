@@ -12,3 +12,6 @@ from embedding_methods.composites.layout_aware import *
 
 import embedding_methods.composites.minorminer
 from embedding_methods.composites.minorminer import *
+
+import embedding_methods.composites.lenient_embedding
+from embedding_methods.composites.lenient_embedding import *
