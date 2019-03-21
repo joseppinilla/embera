@@ -40,7 +40,7 @@ class CompleteBipartitePlacer():
 
         # Parse Source graph.
         try:
-            self.P, self.Q = nx.bipartite.sets(nx.Graph(S))
+            P, Q = nx.bipartite.sets(nx.Graph(S))
         except:
             try:
                 Sg = nx.complete_bipartite_graph(*S)
@@ -98,18 +98,6 @@ class CompleteBipartitePlacer():
         candidates, faults = self._assign_window_nodes(best_origin, width, height)
         return candidates, faults
 
-    def _check_qubit(self, chimera_index):
-        Tg = self.Tg
-        if self.coordinates:
-            chimera_label = chimera_index
-        else:
-            chimera_label = self.c2i.int(chimera_index)
-
-        if chimera_label in Tg.nodes:
-            return chimera_label
-        else:
-            return None
-
     def _find_faults(self, origin, width, height):
         """ Traverse the target graph, starting at the given "origin" and count
         the number of faults found.
@@ -125,8 +113,11 @@ class CompleteBipartitePlacer():
             j_end =  (origin_j+height-1) // t + 1
             for j in range(j_init, j_end):
                 chimera_index = (j, i, 0, k)
-                if self._check_qubit(chimera_index) is None:
-                    faults += 1
+                if self.coordinates:
+                    faults += chimera_index not in Tg
+                else:
+                    chimera_label = self.c2i.int(chimera_index)
+                    faults += chimera_label not in Tg
 
         for row in range(origin_j, origin_j+height):
             j, k = divmod(row, t)
@@ -134,8 +125,11 @@ class CompleteBipartitePlacer():
             i_end =  (origin_i+width-1) // t + 1
             for i in range(i_init, i_end):
                 chimera_index = (j, i, 1, k)
-                if self._check_qubit(chimera_index) is None:
-                    faults += 1
+                if self.coordinates:
+                    faults += chimera_index not in Tg
+                else:
+                    chimera_label = self.c2i.int(chimera_index)
+                    faults += chimera_label not in Tg
 
         return faults
 
@@ -147,7 +141,7 @@ class CompleteBipartitePlacer():
         Tg = self.Tg
 
         candidates = {}
-        faults = []
+        faults = {}
 
         origin_i, origin_j = origin
         for node, col in enumerate(range(origin_i, origin_i+width)):
@@ -157,11 +151,15 @@ class CompleteBipartitePlacer():
             candidates.setdefault(node, [])
             for j in range(j_init, j_end):
                 chimera_index = (j, i, 0, k)
-                chimera_label = self._check_qubit(chimera_index)
-                if chimera_label is not None:
+                if self.coordinates: chimera_label = chimera_index
+                else: chimera_label = self.c2i.int(chimera_index)
+                # Check qubit
+                if chimera_label in Tg:
                     candidates[node].append(chimera_label)
+                elif node in faults:
+                    faults[node].append(chimera_label)
                 else:
-                    faults.append(chimera_index)
+                    faults[node] = [chimera_label]
 
         for node, row in enumerate(range(origin_j, origin_j+height), width):
             j, k = divmod(row, t)
@@ -170,11 +168,15 @@ class CompleteBipartitePlacer():
             candidates.setdefault(node, [])
             for i in range(i_init, i_end):
                 chimera_index = (j, i, 1, k)
-                chimera_label = self._check_qubit(chimera_index)
-                if chimera_label is not None:
+                if self.coordinates: chimera_label = chimera_index
+                else: chimera_label = self.c2i.int(chimera_index)
+                # Check qubit
+                if chimera_label in Tg:
                     candidates[node].append(chimera_label)
+                elif node in faults:
+                    faults[node].append(chimera_label)
                 else:
-                    faults.append(chimera_index)
+                    faults[node] = [chimera_label]
 
         return candidates, faults
 
@@ -235,7 +237,7 @@ def find_candidates(S, Tg, **params):
         Returns:
             candidates: a dict that maps labels in S to lists of labels in T.
 
-            (optional) faults: a list of faulty qubits given in chimera indices
+            (optional) faults: a list of faulty qubits
 
 
     """
