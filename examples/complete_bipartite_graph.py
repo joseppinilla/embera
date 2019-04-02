@@ -20,7 +20,7 @@ drawing.draw_architecture_embedding(Tg, candidates, node_size=20, show_labels=Tr
 plt.show()
 
 # Create placer object from candidates and perform transformations
-placer = CompleteBipartitePlacer.from_candidates((p,q), Tg, P, Q)
+placer = CompleteBipartitePlacer.from_candidates((p,q), Tg, candidates)
 assert(placer.origin==origin)
 placer.rotate()
 placer.shuffle()
@@ -28,3 +28,7 @@ assert(placer.origin==origin)
 plt.figure(1)
 drawing.draw_architecture_embedding(Tg, {**placer.P, **placer.Q}, node_size=20, show_labels=True)
 plt.show()
+
+plt.figure(2)
+placer.sort()
+drawing.draw_architecture_embedding(Tg, {**placer.P, **placer.Q}, node_size=20, show_labels=True)

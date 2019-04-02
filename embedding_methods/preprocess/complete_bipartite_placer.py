@@ -251,11 +251,59 @@ class CompleteBipartitePlacer():
 
         return (rows, cols), faults
 
-    def shuffle(self, axis=None):
-        """ Shuffle the order of nodes assigned each set.
+    def sort(self, axis=None):
+        """ Sort the order of nodes assigned to each row or column.
             Args: (optional)
                 axis: (0,1,or None)
+                    If None, both axes are sorted.
+        """
 
+        # If it has been ran, faults is a dictionary
+        if self.faults is None:
+            self.run()
+
+        # Determine which axis to sort, or both
+        if axis is None:
+            sort_p = True; sort_q = True
+        elif axis==0:
+            sort_p = True; sort_q = False
+        elif axis==1:
+            sort_p = False; sort_q = True
+        else:
+            raise ValueError('Value must be 0 or 1, or None for both.')
+
+        def sort_qubit(q):
+            # u==0 use column i, u==1 use row j
+            (j,i,u,k) = q if self.coordinates else self.c2i.tuple(q)
+            return i*self.t+k if u==0 else j*self.t+k
+
+        if sort_p:
+            keys_p = list(self.P.keys())
+            keys_p.sort()
+            chains_p = []
+            for v in  keys_p:
+                chain = self.P[v]
+                chain.sort()
+                chains_p.append(chain)
+            chains_p.sort(key=lambda x: sort_qubit(x[0]))
+            self.P = {k: chains_p[i] for i, k in enumerate(keys_p)}
+
+        if sort_q:
+            keys_q = list(self.Q.keys())
+            keys_q.sort()
+            chains_q = []
+            for v in  keys_q:
+                chain = self.Q[v]
+                chain.sort()
+                chains_q.append(chain)
+            chains_q.sort(key=lambda x: sort_qubit(x[0]))
+            self.Q = {k: chains_q[i] for i, k in enumerate(keys_q)}
+
+    def shuffle(self, axis=None):
+        """ Shuffle the order of nodes assigned each row or column.
+            Args: (optional)
+                axis: (0,1,or None)
+                    If None, both axes are shuffled.
         """
 
         # If it has been ran, faults is a dictionary
@@ -308,7 +356,7 @@ class CompleteBipartitePlacer():
         return {**self.P, **self.Q}
 
     @classmethod
-    def from_candidates(cls, S, Tg, P, Q):
+    def from_candidates(cls, S, Tg, candidates):
         """ Populate attributes from given candidates.
             Args:
                 P: dict of lists
@@ -325,8 +373,10 @@ class CompleteBipartitePlacer():
         """
 
         K_pq = cls(S, Tg)
-        K_pq.P = P
-        K_pq.Q = Q
+        P = { p:candidates[p] for p in K_pq.P }
+        Q = { q:candidates[q] for q in K_pq.Q }
+
+        K_pq.P, K_pq.Q = P,Q
 
         # Determine orientation and origin from candidates
         origin_j, origin_i = (K_pq.qubit_rows, K_pq.qubit_cols)
