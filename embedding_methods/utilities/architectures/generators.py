@@ -106,29 +106,39 @@ def h20k_graph(data=True, coordinates=False):
 
     return target_graph
 
-def faulty_arch(arch_method, arch_yield=0.95):
-    """ Generate a graph generator method of the given architecture with
-    (size*yield) of the original nodes.
+def faulty_arch(arch_method, node_yield=0.995, edge_yield=0.9995):
+    """ Create a graph generator method of the given architecture with
+        size*yield elements of the original graph.
 
     Args:
-        arch_method (function):
+        arch_method: (method)
             One of the graph generator function
 
-        arch_yield (optional, float, default=0.95):
+        node_yield: (optional, float, default=0.995)
             Ratio of nodes over original size.
-            i.e. The original graph has yield=1.0
+            i.e. The original graph has node_yield=1.0
+
+        edge_yield: (optional, float, default=0.9995)
+            Ratio of edges over original size.
+            i.e. The original graph has edge_yield=1.0
     """
 
-    def _faults(arch_method, arch_yield, **kwargs):
+    def _faults(arch_method, node_yield, edge_yield, **kwargs):
         target_graph =  arch_method(**kwargs)
+        # Remove nodes
         node_set = set(target_graph.nodes)
-        target_size = len(target_graph)
-        num_faults = target_size - round(target_size * arch_yield)
-        randnodes = random.sample(node_set, int(num_faults))
+        num_node_faults = len(node_set) - round(len(node_set) * node_yield)
+        randnodes = random.sample(node_set, int(num_node_faults))
         target_graph.remove_nodes_from(randnodes)
-        target_graph.name = target_graph.name + '%s' % arch_yield
+        # Remove edges
+        edge_set = set(target_graph.edges)
+        num_edge_faults = len(edge_set) - round(len(edge_set) * edge_yield)
+        randedges = random.sample(edge_set, int(num_edge_faults))
+        target_graph.remove_edges_from(randedges)
+        # Rename graph
+        target_graph.name = target_graph.name + 'node_yield %s edge_yield %s' % (node_yield, edge_yield)
         return target_graph
 
-    arch_gen = lambda **kwargs: _faults(arch_method, arch_yield, **kwargs)
-    arch_gen.__name__ = arch_method.__name__ + str(arch_yield)
+    arch_gen = lambda **kwargs: _faults(arch_method, node_yield, edge_yield, **kwargs)
+    arch_gen.__name__ = arch_method.__name__ + 'node_yield %s edge_yield %s' % (node_yield, edge_yield)
     return arch_gen

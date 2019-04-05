@@ -155,7 +155,7 @@ This example uses the diffusion placer without migration to demonstrate the anch
   layout = {v:v for v in Sg}
 
   # The corresponding graph of the D-Wave C4 annealer with 0.95 qubit yield
-  Tg = generators.faulty_arch(generators.rainier_graph, arch_yield=0.95)()
+  Tg = generators.faulty_arch(generators.rainier_graph, node_yield=0.95)()
   T_edgelist = list(Tg.edges())
   # Find a global placement for problem graph
   candidates = find_candidates(S_edgelist, Tg, layout=layout, enable_migration=False)

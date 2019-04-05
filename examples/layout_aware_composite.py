@@ -13,7 +13,7 @@ from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampl
 
 # The corresponding graph of the D-Wave annealer with 0.95 qubit yield
 J_RANGE = [-2.0,2.0]
-Tg = generators.faulty_arch(generators.rainier_graph, arch_yield=0.95)()
+Tg = generators.faulty_arch(generators.rainier_graph, node_yield=0.95)()
 
 # A 4x4 grid problem graph
 p = 4

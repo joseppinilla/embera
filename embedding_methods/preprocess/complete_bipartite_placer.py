@@ -154,12 +154,12 @@ class CompleteBipartitePlacer():
         Tg =  self.Tg
 
         faults = 0
-        origin_i, origin_j = origin
+        origin_col, origin_row = origin
 
-        for col in range(origin_i, origin_i+width):
+        for col in range(origin_col, origin_col+width):
             i, k = divmod(col, t)
-            j_init = (origin_j) // t
-            j_end =  (origin_j+height-1) // t + 1
+            j_init = (origin_row) // t
+            j_end =  (origin_row+height-1) // t + 1
             for j in range(j_init, j_end):
                 chimera_index = (j, i, 0, k)
                 if self.coordinates:
@@ -168,10 +168,10 @@ class CompleteBipartitePlacer():
                     chimera_label = self.c2i.int(chimera_index)
                     faults += chimera_label not in Tg
 
-        for row in range(origin_j, origin_j+height):
+        for row in range(origin_row, origin_row+height):
             j, k = divmod(row, t)
-            i_init = (origin_i) // t
-            i_end =  (origin_i+width-1) // t + 1
+            i_init = (origin_col) // t
+            i_end =  (origin_col+width-1) // t + 1
             for i in range(i_init, i_end):
                 chimera_index = (j, i, 1, k)
                 if self.coordinates:
@@ -185,15 +185,13 @@ class CompleteBipartitePlacer():
     def _assign_window_nodes(self):
         """ Traverse the target graph, starting at the given "origin" and assign
         the valid qubits found.
-            Args:
-                origin: Tuple(int, int)
-                    Coordinates of the initial assignment of (row, col)
 
-                width: int
-                    Number of columns being assigned.
+            Returns:
+                (rows, cols): Tuple of dictionaries of lists
+                    Keys are numbers from 0 to len(P) and 0 to len(Q), and values are chains
+                    of qubits.
 
-                height: int
-                    Number of rows being assigned.
+                faults: Dictionary of lists
         """
 
         p = len(self.P)
@@ -204,48 +202,67 @@ class CompleteBipartitePlacer():
         origin = self.origin
         orientation = self.orientation
 
-        width, height = (q, p) if orientation else (p, q)
+        width, height = (q, p) if orientation==1 else (p, q)
 
-        rows = {}
         cols = {}
         faults = {}
 
-        origin_j, origin_i = origin
-        for node, col in enumerate(range(origin_i, origin_i+width)):
+        # Explore all columns of qubits
+        # j,i = tile coordinates in y,x
+        origin_row, origin_col = origin
+        for node, col in enumerate(range(origin_col, origin_col+width)):
             i, k = divmod(col, t)
-            j_init = (origin_j) // t
-            j_end =  (origin_j+height-1) // t + 1
+            j_init = (origin_row) // t
+            final_row = (origin_row + height - 1)
+            j_end = final_row // t + 1
             cols.setdefault(node, [])
             for j in range(j_init, j_end):
                 chimera_index = (j, i, 0, k)
                 if self.coordinates: chimera_label = chimera_index
                 else: chimera_label = self.c2i.int(chimera_index)
+
                 # Check qubit
                 if chimera_label in Tg:
                     cols[node].append(chimera_label)
-                elif node in faults:
-                    faults[node].append(chimera_label)
-                else:
-                    faults[node] = [chimera_label]
+
+                # Check couplers
+                for neighbour_k in range(t):
+                    neighbour_index = (j, i, 1, neighbour_k)
+                    row = j*t + neighbour_k
+                    # Skip unused coupler
+                    if row > final_row: continue
+                    # Check coupler
+                    if self.coordinates: neighbour_label = neighbour_index
+                    else: neighbour_label = self.c2i.int(neighbour_index)
+                    if (chimera_label, neighbour_label) not in Tg.edges:
+                        # Use orientation to represent edge always as (p,q)
+                        if orientation==0:
+                            edge = (node, row-origin_row)
+                            chimera_edge = (chimera_label, neighbour_label)
+                        elif orientation==1:
+                            edge = (row-origin_row, node)
+                            chimera_edge = (neighbour_label, chimera_label)
+                        faults[edge] = chimera_edge
+
             if not cols[node]:
                 raise RuntimeError('Column %s is empty.' % col)
 
-        for node, row in enumerate(range(origin_j, origin_j+height)):
+        rows = {}
+        for node, row in enumerate(range(origin_row, origin_row+height)):
             j, k = divmod(row, t)
-            i_init = (origin_i) // t
-            i_end =  (origin_i+width-1) // t + 1
+            i_init = (origin_col) // t
+            i_end =  (origin_col+width-1) // t + 1
             rows.setdefault(node, [])
             for i in range(i_init, i_end):
                 chimera_index = (j, i, 1, k)
                 if self.coordinates: chimera_label = chimera_index
                 else: chimera_label = self.c2i.int(chimera_index)
+
                 # Check qubit
                 if chimera_label in Tg:
                     rows[node].append(chimera_label)
-                elif node in faults:
-                    faults[node].append(chimera_label)
-                else:
-                    faults[node] = [chimera_label]
+                # All coupler faults have been checked in the previous loop
+
             if not rows[node]:
                 raise RuntimeError('Row %s is empty.' % row)
 
@@ -369,7 +386,7 @@ class CompleteBipartitePlacer():
 
             Returns:
                 K_pq: CompleteBipartitePlacer object
-                    object had been initialized with the provided/found values.
+                    object initialized with the provided/found values.
         """
 
         K_pq = cls(S, Tg)
@@ -379,7 +396,7 @@ class CompleteBipartitePlacer():
         K_pq.P, K_pq.Q = P,Q
 
         # Determine orientation and origin from candidates
-        origin_j, origin_i = (K_pq.qubit_rows, K_pq.qubit_cols)
+        origin_row, origin_col = (K_pq.qubit_rows, K_pq.qubit_cols)
         orientation = None
 
         # Note: qubit index is (row, col, shore, index). I preserve my
@@ -392,12 +409,12 @@ class CompleteBipartitePlacer():
             for (j,i,u,k) in chain:
                 if u==0:
                     col = i*K_pq.t + k
-                    if col < origin_i:
-                        origin_i = col
+                    if col < origin_col:
+                        origin_col = col
                 else:
                     row = j*K_pq.t + k
-                    if row < origin_j:
-                        origin_j = row
+                    if row < origin_row:
+                        origin_row = row
                 if orientation is None:
                     orientation = u
                 elif u!=orientation:
@@ -410,24 +427,26 @@ class CompleteBipartitePlacer():
             for (j,i,u,k) in chain:
                 if u==0:
                     col = i*K_pq.t + k
-                    if col < origin_i:
-                        origin_i = col
+                    if col < origin_col:
+                        origin_col = col
                 else:
                     row = j*K_pq.t + k
-                    if row < origin_j:
-                        origin_j = row
+                    if row < origin_row:
+                        origin_row = row
                 if u!=orientation^1:
                     raise ValueError('Same shore nodes are in rows and cols.')
 
         K_pq.orientation = orientation
-        K_pq.origin = (origin_j, origin_i)
+        K_pq.origin = (origin_row, origin_col)
         _, faults = K_pq._assign_window_nodes()
 
         # To recover original graph node names in faults
         names_p = list(K_pq.P.keys())
         names_q = list(K_pq.Q.keys())
-        names_list = list(names_p + names_q)
-        K_pq.faults = {names_list[v]:qubits for v, qubits in faults.items()}
+        K_pq.faults = {}
+        for edge, coupler in faults.items():
+            p, q = edge
+            K_pq.faults[(names_p[p], names_q[q])] = coupler
 
         return K_pq
 
@@ -451,11 +470,13 @@ class CompleteBipartitePlacer():
         for j, (k, v) in enumerate(self.Q.items()):
             self.Q[k] = cols[j] if orientation==1 else rows[j]
 
-        # To recover original graph node names
+        # To recover original graph node names in faults
         names_p = list(self.P.keys())
         names_q = list(self.Q.keys())
-        names_list = list(names_p + names_q)
-        self.faults = {names_list[v]:qubits for v, qubits in faults.items()}
+        self.faults = {}
+        for edge, coupler in faults.items():
+            p,q = edge
+            self.faults[(names_p[p], names_q[q])] = coupler
 
         return (self.P, self.Q), self.faults
 
@@ -496,10 +517,13 @@ def find_candidates(S, Tg, **params):
                     and their faulty qubits.
 
         Returns:
-            candidates: a tuple of dictionaries that map labels in S to
+            candidates: Dictionary of nodes mapping to qubits.
+                If shores: A tuple of dictionaries that map labels in S to
                 lists of labels in T.
 
-            (optional) faults: a list of faulty qubits
+            (optional) faults: Dictionary of faults in the graph.
+                If show_faults: A dictionary keyed by edges in the source graph,
+                with values for qubits without edges in the target graph.
     """
 
     shores = params.pop('shores', False)
