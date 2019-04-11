@@ -97,9 +97,6 @@ class CompleteBipartitePlacer():
         # immediately adjacent. But naive exploration of these mappings is too
         # expensive. Can be formulated as Linear Program, or greedy.
 
-        # TODO: A different cost should be number of gaps. Or number of detached
-        # nodes.
-
         p = len(self.P)
         q = len(self.Q)
         origin = self.origin
@@ -132,16 +129,21 @@ class CompleteBipartitePlacer():
                 for i in origins_i(width):
                     if (j+height) <= qubit_rows and (i+width) <= qubit_cols:
                         count_faults = self._find_faults((j, i), width, height)
+                        if count_faults == 0:
+                            self.origin = (i, j) if orientation else (j, i)
+                            self.orientation = orientation
+                            (rows, cols), faults = self._assign_window_nodes()
+                            return (rows, cols), orientation, faults
                         if count_faults < best_count:
-                            best_origin = j, i
+                            best_origin = (i, j) if orientation else (j, i)
                             best_count = count_faults
                             best_orientation = orientation
 
         if best_origin is None:
             raise RuntimeError('Cannot fit problem in target graph.')
 
-        self.orientation = best_orientation
         self.origin = best_origin
+        self.orientation = best_orientation
 
         (rows, cols), faults = self._assign_window_nodes()
         return (rows, cols), best_orientation, faults
@@ -154,31 +156,28 @@ class CompleteBipartitePlacer():
         Tg =  self.Tg
 
         faults = 0
-        origin_col, origin_row = origin
+        origin_row, origin_col = origin
 
         for col in range(origin_col, origin_col+width):
             i, k = divmod(col, t)
             j_init = (origin_row) // t
-            j_end =  (origin_row+height-1) // t + 1
+            final_row = (origin_row + height - 1)
+            j_end = final_row // t + 1
             for j in range(j_init, j_end):
                 chimera_index = (j, i, 0, k)
-                if self.coordinates:
-                    faults += chimera_index not in Tg
-                else:
-                    chimera_label = self.c2i.int(chimera_index)
-                    faults += chimera_label not in Tg
+                if self.coordinates: chimera_label = chimera_index
+                else: chimera_label = self.c2i.int(chimera_index)
 
-        for row in range(origin_row, origin_row+height):
-            j, k = divmod(row, t)
-            i_init = (origin_col) // t
-            i_end =  (origin_col+width-1) // t + 1
-            for i in range(i_init, i_end):
-                chimera_index = (j, i, 1, k)
-                if self.coordinates:
-                    faults += chimera_index not in Tg
-                else:
-                    chimera_label = self.c2i.int(chimera_index)
-                    faults += chimera_label not in Tg
+                # Check couplers
+                for neighbour_k in range(t):
+                    neighbour_index = (j, i, 1, neighbour_k)
+                    row = j*t + neighbour_k
+                    # Skip unused coupler
+                    if row > final_row: continue
+                    # Check coupler
+                    if self.coordinates: neighbour_label = neighbour_index
+                    else: neighbour_label = self.c2i.int(neighbour_index)
+                    faults += (chimera_label, neighbour_label) not in Tg.edges
 
         return faults
 
@@ -215,7 +214,7 @@ class CompleteBipartitePlacer():
             j_init = (origin_row) // t
             final_row = (origin_row + height - 1)
             j_end = final_row // t + 1
-            cols.setdefault(node, [])
+
             for j in range(j_init, j_end):
                 chimera_index = (j, i, 0, k)
                 if self.coordinates: chimera_label = chimera_index
@@ -223,7 +222,7 @@ class CompleteBipartitePlacer():
 
                 # Check qubit
                 if chimera_label in Tg:
-                    cols[node].append(chimera_label)
+                    cols.setdefault(node, []).append(chimera_label)
 
                 # Check couplers
                 for neighbour_k in range(t):
@@ -252,7 +251,6 @@ class CompleteBipartitePlacer():
             j, k = divmod(row, t)
             i_init = (origin_col) // t
             i_end =  (origin_col+width-1) // t + 1
-            rows.setdefault(node, [])
             for i in range(i_init, i_end):
                 chimera_index = (j, i, 1, k)
                 if self.coordinates: chimera_label = chimera_index
@@ -260,7 +258,7 @@ class CompleteBipartitePlacer():
 
                 # Check qubit
                 if chimera_label in Tg:
-                    rows[node].append(chimera_label)
+                    rows.setdefault(node, []).append(chimera_label)
                 # All coupler faults have been checked in the previous loop
 
             if not rows[node]:
