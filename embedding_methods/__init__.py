@@ -5,7 +5,6 @@ import embedding_methods.composites
 from embedding_methods.composites import *
 from embedding_methods.composites.embedding import *
 from embedding_methods.composites.lenient_embedding import *
-from embedding_methods.composites.checkerboard_transform import *
 
 import embedding_methods.preprocess
 from embedding_methods.preprocess import *
