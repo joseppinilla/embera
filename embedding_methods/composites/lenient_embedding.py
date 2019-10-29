@@ -221,50 +221,6 @@ def lenient_embed_bqm(source_bqm, embedding, target_adjacency, chain_strength=1.
     Returns:
         :obj:`.BinaryQuadraticModel`: Target binary quadratic model.
 
-    Examples:
-        This example embeds a fully connected :math:`K_3` graph onto a square target graph.
-        Embedding is accomplished by an edge contraction operation on the target graph:
-        target-nodes 2 and 3 are chained to represent source-node c.
-
-        >>> import dimod
-        >>> import networkx as nx
-        >>> # Binary quadratic model for a triangular source graph
-        >>> bqm = dimod.BinaryQuadraticModel.from_ising({}, {('a', 'b'): 1, ('b', 'c'): 1, ('a', 'c'): 1})
-        >>> # Target graph is a graph
-        >>> target = nx.cycle_graph(4)
-        >>> # Embedding from source to target graphs
-        >>> embedding = {'a': {0}, 'b': {1}, 'c': {2, 3}}
-        >>> # Embed the BQM
-        >>> target_bqm = dimod.embed_bqm(bqm, embedding, target)
-        >>> target_bqm.quadratic[(0, 1)] == bqm.quadratic[('a', 'b')]
-        True
-        >>> target_bqm.quadratic   # doctest: +SKIP
-        {(0, 1): 1.0, (0, 3): 1.0, (1, 2): 1.0, (2, 3): -1.0}
-
-        This example embeds a fully connected :math:`K_3` graph onto the target graph
-        of a dimod reference structured sampler, `StructureComposite`, using the dimod reference
-        `ExactSolver` sampler with a square graph specified. Target-nodes 2 and 3
-        are chained to represent source-node c.
-
-        >>> import dimod
-        >>> # Binary quadratic model for a triangular source graph
-        >>> bqm = dimod.BinaryQuadraticModel.from_ising({}, {('a', 'b'): 1, ('b', 'c'): 1, ('a', 'c'): 1})
-        >>> # Structured dimod sampler with a structure defined by a square graph
-        >>> sampler = dimod.StructureComposite(dimod.ExactSolver(), [0, 1, 2, 3], [(0, 1), (1, 2), (2, 3), (0, 3)])
-        >>> # Embedding from source to target graph
-        >>> embedding = {'a': {0}, 'b': {1}, 'c': {2, 3}}
-        >>> # Embed the BQM
-        >>> target_bqm = dimod.embed_bqm(bqm, embedding, sampler.adjacency)
-        >>> # Sample
-        >>> samples = sampler.sample(target_bqm)
-        >>> samples.record.sample   # doctest: +SKIP
-        array([[-1, -1, -1, -1],
-               [ 1, -1, -1, -1],
-               [ 1,  1, -1, -1],
-               [-1,  1, -1, -1],
-               [-1,  1,  1, -1],
-        >>> # Snipped above samples for brevity
-
     """
     if smear_vartype is dimod.SPIN and source_bqm.vartype is dimod.BINARY:
         return embed_bqm(source_bqm.spin, embedding, target_adjacency,
@@ -316,7 +272,7 @@ def lenient_embed_bqm(source_bqm, embedding, target_adjacency, chain_strength=1.
             target_bqm.add_variable(v, 0.0)
             continue
 
-        quadratic_chain_biases = chain_to_quadratic(chain, target_adjacency, chain_strength)
+        quadratic_chain_biases = lenient_chain_to_quadratic(chain, target_adjacency, chain_strength)
         target_bqm.add_interactions_from(quadratic_chain_biases, vartype=dimod.SPIN)  # these are spin
 
         # add the energy for satisfied chains to the offset
@@ -325,7 +281,7 @@ def lenient_embed_bqm(source_bqm, embedding, target_adjacency, chain_strength=1.
 
     return target_bqm
 
-def chain_to_quadratic(chain, target_adjacency, chain_strength):
+def lenient_chain_to_quadratic(chain, target_adjacency, chain_strength):
     """Determine the quadratic biases that induce the given chain.
 
     Args:

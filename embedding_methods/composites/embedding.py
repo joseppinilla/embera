@@ -84,7 +84,7 @@ class EmbeddingComposite(dimod.ComposedSampler):
 
     def set_embedding(self, embedding):
         """Write to the embedding parameter. Useful if embedding is taken from
-        a file or independent method.
+        a file or a separate method.
         Args:
             embedding (dict):
                 Dictionary that maps labels in S_edgelist to lists of labels in the

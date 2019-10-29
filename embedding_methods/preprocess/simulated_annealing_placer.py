@@ -2,7 +2,7 @@ import random
 import warnings
 from embedding_methods.utilities.architectures.tiling import Tiling
 
-__all__ = ['find_candidates']
+__all__ = ['find_candidates', 'SimulatedAnnealingPlacer']
 
 class SimulatedAnnealingPlacer(Tiling):
     """ A simulated annealing based global placement
