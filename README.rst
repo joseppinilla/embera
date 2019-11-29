@@ -1,9 +1,9 @@
 .. index-start-marker
 
-embedding-methods
+embera
 =============
 
-``embedding-methods`` offers a collection of minor-embedding methods and utilities. These can be used as composites making part of the `D-Wave Ocean <https://ocean.dwavesys.com/>`_ software stack, or from the interface functions, such as ``find_embedding()``. Additional resources are provided to generate graphs for existing and conceptual architectures of Ising samplers (e.g. D-Wave's Quantum Annealers) and preprocessing of the source and/or target graphs.
+``embera`` offers a collection of embedding resources and algorithms. These can be used as composites making part of the `D-Wave Ocean <https://ocean.dwavesys.com/>`_ software stack, or from the interface functions, such as ``find_embedding()``. Additional resources are provided to generate graphs for existing and conceptual architectures of Ising samplers (e.g. D-Wave's Quantum Annealers) and preprocessing of the source and/or target graphs.
 
 **Definition:**
 
@@ -33,9 +33,9 @@ When using along with ``dimod``, either use the method-specific composites (i.e.
 
 .. code-block:: python
 
-    from embedding_methods.utilities.architectures import generators
+    from embera.utilities.architectures import generators
     from dimod.reference.composites.structure import StructureComposite
-    from embedding_methods.composites.minorminer import MinorMinerEmbeddingComposite
+    from embera.composites.minorminer import MinorMinerEmbeddingComposite
     from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampler
 
     # Use the provided architectures
@@ -50,10 +50,10 @@ or the generic ``EmbeddingComposite``:
 .. code-block:: python
 
     import minorminer
-    from embedding_methods.utilities.architectures import generators
+    from embera.utilities.architectures import generators
     from dimod.reference.samplers.random_sampler import RandomSampler
     from dimod.reference.composites.structure import StructureComposite
-    from embedding_methods.composites.embedding import EmbeddingComposite
+    from embera.composites.embedding import EmbeddingComposite
 
     # Use the provided architectures
     target_graph = generators.p6_graph()
@@ -78,9 +78,9 @@ Example comparing the embeddings obtained from a Layout-Agnostic and a Layout-Aw
   import dwave_networkx as dnx
   import matplotlib.pyplot as plt
   from minorminer import find_embedding
-  from embedding_methods.utilities.architectures import generators
-  from embedding_methods.utilities.architectures import drawing
-  from embedding_methods.preprocess.diffusion_placer import find_candidates
+  from embera.utilities.architectures import generators
+  from embera.utilities.architectures import drawing
+  from embera.preprocess.diffusion_placer import find_candidates
 
   # A 16x16 grid problem graph
   Sg = nx.grid_2d_graph(16, 16)
@@ -143,9 +143,9 @@ This example uses the diffusion placer without migration to demonstrate the anch
 
   import networkx as nx
   import matplotlib.pyplot as plt
-  from embedding_methods.disperse import find_embedding
-  from embedding_methods.utilities.architectures import drawing, generators
-  from embedding_methods.preprocess.diffusion_placer import find_candidates
+  from embera.disperse import find_embedding
+  from embera.utilities.architectures import drawing, generators
+  from embera.preprocess.diffusion_placer import find_candidates
 
   # A 2x2 grid problem graph
   p = 2
@@ -183,8 +183,8 @@ Example of tiling a Pegasus architecture graph.
 
   import dwave_networkx as dnx
   import matplotlib.pyplot as plt
-  from embedding_methods.utilities.architectures import drawing, generators
-  from embedding_methods.utilities.architectures.tiling import Tiling
+  from embera.utilities.architectures import drawing, generators
+  from embera.utilities.architectures.tiling import Tiling
 
   # Pegasus graph
   Tg = generators.p6_graph()
