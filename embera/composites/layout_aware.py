@@ -13,10 +13,10 @@ Ising solver architecture is represented by a graph.
 """
 import dimod
 import minorminer
-from embedding_methods import disperse
+from embera import disperse
 
-from embedding_methods.preprocess import diffusion_placer
-from embedding_methods.utilities.architectures.generators import dw2000q_graph
+from embera.preprocess import diffusion_placer
+from embera.utilities.architectures.generators import dw2000q_graph
 
 from dwave.embedding.transforms import embed_bqm, unembed_sampleset
 from dimod.binary_quadratic_model import BinaryQuadraticModel

@@ -2,8 +2,8 @@
 """
 
 import matplotlib.pyplot as plt
-from embedding_methods.utilities.architectures import drawing, generators
-from embedding_methods.preprocess.complete_bipartite_placer import CompleteBipartitePlacer, find_candidates
+from embera.utilities.architectures import drawing, generators
+from embera.preprocess.complete_bipartite_placer import CompleteBipartitePlacer, find_candidates
 
 # Problem dimensions
 p, q = 10, 6
@@ -13,7 +13,7 @@ plt.figure(0)
 drawing.draw_architecture_yield(Tg, node_size=20)
 
 # Systematically find the best candidates for K_{10,16} starting at row 3, col 6
-origin = (6,4)
+origin = (3,6)
 (P, Q), faults = find_candidates((p, q), Tg, origin=origin, shores=True, show_faults=True)
 print('Faults at: %s' % faults)
 candidates = {**P, **Q}

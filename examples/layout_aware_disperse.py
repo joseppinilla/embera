@@ -5,9 +5,9 @@ without migration to demonstrate the nodes anchored to their candidates.
 
 import networkx as nx
 import matplotlib.pyplot as plt
-from embedding_methods.disperse import find_embedding
-from embedding_methods.utilities.architectures import drawing, generators
-from embedding_methods.preprocess.diffusion_placer import find_candidates
+from embera.disperse import find_embedding
+from embera.utilities.architectures import drawing, generators
+from embera.preprocess.diffusion_placer import find_candidates
 
 # A 2x2 grid problem graph
 p = 2

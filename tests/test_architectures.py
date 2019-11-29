@@ -4,12 +4,12 @@ import minorminer
 
 import networkx as nx
 
-from embedding_methods.utilities.graph_topologies import *
-from embedding_methods.utilities.architectures import generators
+from embera.utilities.graph_topologies import *
+from embera.utilities.architectures import generators
 
-from embedding_methods.preprocess.diffusion_placer import find_candidates
+from embera.preprocess.diffusion_placer import find_candidates
 
-from embedding_methods.composites.embedding import EmbeddingComposite
+from embera.composites.embedding import EmbeddingComposite
 
 from dimod.reference.composites.structure import StructureComposite
 from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampler
