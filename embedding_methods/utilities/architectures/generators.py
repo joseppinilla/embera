@@ -109,6 +109,10 @@ def h20k_graph(data=True, coordinates=False):
 def faulty_arch(arch_method, node_yield=0.995, edge_yield=0.9995):
     """ Create a graph generator method of the given architecture with
         size*yield elements of the original graph.
+        
+    Example:
+        # DWave graph with 95% yield
+        >>> Tg = generators.faulty_arch(generators.dw2x_graph, node_yield=0.95)()
 
     Args:
         arch_method: (method)
