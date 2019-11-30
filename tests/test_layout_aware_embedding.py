@@ -2,8 +2,8 @@ import unittest
 import dimod.testing as dtest
 
 
-from embedding_methods.utilities.architectures import generators
-from embedding_methods.composites.layout_aware import LayoutAwareEmbeddingComposite
+from embera.utilities.architectures import generators
+from embera.composites.layout_aware import LayoutAwareEmbeddingComposite
 
 from dimod.reference.composites.structure import StructureComposite
 from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampler

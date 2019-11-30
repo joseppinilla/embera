@@ -5,8 +5,8 @@ import random
 import networkx as nx
 import matplotlib.pyplot as plt
 
-from embedding_methods.utilities.architectures import drawing, generators
-from embedding_methods.composites.layout_aware import LayoutAwareEmbeddingComposite
+from embera.utilities.architectures import drawing, generators
+from embera.composites.layout_aware import LayoutAwareEmbeddingComposite
 
 from dimod.reference.composites.structure import StructureComposite
 from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampler

@@ -4,8 +4,8 @@ import warnings
 import networkx as nx
 import matplotlib.pyplot as plt
 
-from embedding_methods.utilities.architectures.tiling import Tiling
-from embedding_methods.utilities.architectures.drawing import draw_tiled_graph
+from embera.utilities.architectures.tiling import Tiling
+from embera.utilities.architectures.drawing import draw_tiled_graph
 
 __all__ = ['find_candidates']
 
