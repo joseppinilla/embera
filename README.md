@@ -134,7 +134,7 @@ plt.show()
 
 | Agnostic | Aware w/ Migration | Aware w/o Migration |
 :----------:|:--------------:|:-----:|
-| ![](/docs/layout\_agnostic.png)| ![](/docs/layout\_aware\_enable\_migration.png)|![](/docs/layout\_aware\_disable\_migration.png)|
+| ![](/docs/layout_agnostic.png)| ![](/docs/layout_aware_enable_migration.png)|![](/docs/layout_aware_disable_migration.png)|
 
 Example of a Layout-Aware embedding flow using disperse routing on a
 smaller target graph with 5% of the nodes removed. This example uses the
