@@ -1,9 +1,9 @@
 .. index-start-marker
 
-embedding-methods
+embera
 =============
 
-``embedding-methods`` offers a collection of minor-embedding methods and utilities. These can be used as composites making part of the `D-Wave Ocean <https://ocean.dwavesys.com/>`_ software stack, or from the interface functions, such as ``find_embedding()``. Additional resources are provided to generate graphs for existing and conceptual architectures of Ising samplers (e.g. D-Wave's Quantum Annealers) and preprocessing of the source and/or target graphs.
+``embera`` offers a collection of Embedding Resources and Algorithms. These can be used as composites making part of the `D-Wave Ocean <https://ocean.dwavesys.com/>`_ software stack, or from the interface functions, such as ``find_embedding()``. Additional resources are provided to generate graphs for existing and conceptual architectures of Ising samplers (e.g. D-Wave's Quantum Annealers) and preprocessing of the source and/or target graphs.
 
 **Definition:**
 
