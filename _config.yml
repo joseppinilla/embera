@@ -1,4 +1,4 @@
 theme: jekyll-theme-cayman
 include:
   - README.md
-  - docs/
+  - /docs/
