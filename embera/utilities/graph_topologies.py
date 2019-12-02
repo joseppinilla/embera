@@ -19,30 +19,43 @@ def embera_bench():
             | ------------- |:---------:| ---------:|
             | D-Wave [1]    | See below | See below |
             | QCA [2]       | See below | See below |
+            | Geometry      | See below | See below |
+            | Misc          | See below | See below |
+    """
+    benchmark_set = []
+    benchmark_set.extend(qca_bench())
+    benchmark_set.extend(dwave_bench(N=1))
+    benchmark_set.extend(geometry_bench())
+
+    return benchmark_set
+
+def geometry_bench():
+    """ Set of benchmarks for geometric graphs:
+            | name          | node      | edges     |
+            | ------------- |:---------:| ---------:|
             | grid_16x16    | 256       | 480       |
             | rooks_8x8     | 64        | 448       |
             | grid3d_10x10  | 200       | 460       |
             | hypercube     | 128       | 448       |
 
-            TODO:
-
-            | LANL1*        | 269           | 490    |
-
     """
-    benchmark_set = dwave_bench()
-    benchmark_set.extend(qca_bench())
-
+    benchmark_set = []
     benchmark_set.append(rooks_graph(8,8))
     benchmark_set.append(grid_2d_graph(16,16))
     benchmark_set.append(grid_3d_graph(10,10))
     benchmark_set.append(hypercube_graph(128))
-    # TODO: LANL1
+    # TODO: Add Maze
     return benchmark_set
 
 
-def dwave_bench():
-    """ Set of benchmarks to replicate results in [1]:
+def dwave_bench(N=10):
+    """ Set of benchmarks to replicate results in [1].
 
+    Parameters:
+        N: (int, default=10)
+            Number of samples from each type of benchmark, with increasing size.
+
+    Benchmarks:
         clique: complete graphs, Kn for n = 20 to n = 29
 
         biclique: complete bipartite graphs, Kn,n for n = 22 to n = 31
@@ -54,8 +67,10 @@ def dwave_bench():
         nae3sat: not-all-equal-3SAT graphs near the critical threshold; 10
         instances with size 35,
 
-        Erdös-Rényi random graphs, G(n, p), with 10 instances each of – gnp25:
-        G(70,.25), – gnp50: G(60, .50), and – gnp75: G(50, .75).
+        Erdös-Rényi random graphs, G(n, p), with 10 instances each of
+            – gnp25: G(70,.25),
+            – gnp50: G(60, .50), and
+            – gnp75: G(50, .75).
 
     In [1] the authors clain that "Pegasus consistently achieves around a 50-60%
     reduction in chainlength over Chimera." on this set of benchmarks.
@@ -65,34 +80,36 @@ def dwave_bench():
     https://www.dwavesys.com/sites/default/files/14-1026A-C_Next-Generation-Topology-of-DW-Quantum-Processors.pdf
     """
     benchmark_set = []
-    for n in range(20,29):
+    for n in range(20, 20+N):
         G = nx.complete_graph(n)
         G.name = 'clique'
         benchmark_set.append(G)
 
-    for n in range(22,31):
+    for n in range(22, 22+N):
         G = nx.complete_bipartite_graph(n,n)
         G.name = 'biclique'
+        G.graph['pos'] = nx.bipartite_layout(G, nx.bipartite.sets(G)[0])
         benchmark_set.append(G)
 
-    for n in range(10,19):
+    for n in range(10,10+N):
         G = nx.empty_graph(4*n)
         for i in range(2*n):
             for j in range(2*n):
                 u = (i+n+j)%(4*n)
                 G.add_edge(i,u)
         G.name = 'circular'
+        G.graph['pos'] = nx.circular_layout(G)
+        benchmark_set.append(G)
 
-    for _ in range(10):
+    for _ in range(N):
         G = nx.generators.k_random_intersection_graph(2*35, 35, 3)
         G.name = 'nae3sat'
         benchmark_set.append(G)
 
     for n,p in [(70,25),(60,50),(50,75)]:
-        for _ in range(10):
+        for _ in range(N):
             G = nx.erdos_renyi_graph(n,p/100)
             G.name = f'gnp{p}'
-            print(G.name)
             benchmark_set.append(G)
 
     return benchmark_set
@@ -114,13 +131,16 @@ def qca_bench():
     quantum annealing processors. In Lecture Notes in Computer Science
     (Vol. 11501 LNCS, pp. 121–139). https://doi.org/10.1007/978-3-030-20656-7_7
     """
-
-    # Copy MNIST download
     # Download
+    benchmark_file = embera.download_mm
     # Unzip
     # Unpickle
-    pass
+    return []
 
+def misc_bench():
+    # LANL1
+    # Others
+    return []
 
 def complete_graph(n):
     G = nx.complete_graph(n)
