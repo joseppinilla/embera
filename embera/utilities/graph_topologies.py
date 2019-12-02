@@ -10,6 +10,9 @@ Graph Attributes:
 """
 
 import math
+import tarfile
+import requests
+
 import random as rand
 import networkx as nx
 
@@ -23,9 +26,10 @@ def embera_bench():
             | Misc          | See below | See below |
     """
     benchmark_set = []
-    benchmark_set.extend(qca_bench())
     benchmark_set.extend(dwave_bench(N=1))
+    benchmark_set.extend(qca_bench())
     benchmark_set.extend(geometry_bench())
+    benchmark_set.extend(misc_bench())
 
     return benchmark_set
 
@@ -131,16 +135,58 @@ def qca_bench():
     quantum annealing processors. In Lecture Notes in Computer Science
     (Vol. 11501 LNCS, pp. 121–139). https://doi.org/10.1007/978-3-030-20656-7_7
     """
+    benchmark_set = []
+    path = "./qca.tar.gz"
+    url = "http://www.ece.ubc.ca/~jpinilla/resources/embera/qca/qca.tar.gz"
+
     # Download
-    benchmark_file = embera.download_mm
-    # Unzip
-    # Unpickle
-    return []
+    print(f"-> Downloading QCA benchmarks to {path}")
+    with open(path, 'wb') as f:
+        response = requests.get(url)
+        f.write(response.content)
+
+    # Unzip, untar, unpickle
+    with tarfile.open(path) as contents:
+        for member in contents.getmembers():
+            f = contents.extractfile(member)
+            G = nx.read_gpickle(f)
+            benchmark_set.append(G)
+
+    return benchmark_set
 
 def misc_bench():
-    # LANL1
-    # Others
-    return []
+    """ Set of miscellaneous benchmark graphs:
+                | name          | node      | edges     |
+                | ------------- |:---------:| ---------:|
+                | LANL1 [2]     | 269       | 490       |
+                | Maze (6x6)    | 326       | 564       |
+    """
+    benchmark_set = []
+    path = "./lanl1.pkl"
+    url = "http://www.ece.ubc.ca/~jpinilla/resources/embera/misc/lanl1.pkl"
+    # Download
+    print(f"-> Downloading LANL1 benchmark to {path}")
+    with open(path, 'wb') as f:
+        response = requests.get(url)
+        f.write(response.content)
+    # Unpickle
+    with open(path, 'rb') as pkl:
+        G = nx.read_gpickle(pkl)
+        benchmark_set.append(G)
+
+    path = "./maze.pkl"
+    url = "http://www.ece.ubc.ca/~jpinilla/resources/embera/misc/maze.pkl"
+    # Download
+    print(f"-> Downloading Maze benchmark to {path}")
+    with open(path, 'wb') as f:
+        response = requests.get(url)
+        f.write(response.content)
+    # Unpickle
+    with open(path, 'rb') as pkl:
+        G = nx.read_gpickle(pkl)
+        benchmark_set.append(G)
+
+    return benchmark_set
 
 def complete_graph(n):
     G = nx.complete_graph(n)
