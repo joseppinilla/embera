@@ -9,12 +9,13 @@ packages = ['embera',
             'embera.utilities.architectures'
             ]
 
-install_requires = ['networkx>=2.0,<3.0',
-                    'decorator>=4.1.0,<5.0.0',
+install_requires = ['decorator>=4.1.0,<5.0.0',
                     'dimod>=0.8.2,<0.9.0',
-                    'pulp>=1.6.0,<2.0.0',
+                    'dwave-networkx>=0.8.2,<0.9.0',
+                    'matplotlib>=2.1.0,<3.0.0',
                     'minorminer>=0.1.5,<0.2.0',
-                    'dwave-networkx>=0.8.2,<0.9.0']
+                    'networkx>=2.0,<3.0',
+                    'pulp>=1.6.0,<2.0.0',]
 
 
 setup(name='embera',
