@@ -8,7 +8,7 @@ Graph Attributes:
     pos: dictionary with (x,y) values for
 
 """
-
+import os
 import math
 import tarfile
 import requests
@@ -20,8 +20,8 @@ def embera_bench():
     """ Set of benchmarks used to evaluate embera:
             | name          | node      | edges     |
             | ------------- |:---------:| ---------:|
-            | D-Wave [1]    | See below | See below |
-            | QCA [2]       | See below | See below |
+            | D-Wave        | See below | See below |
+            | QCA           | See below | See below |
             | Geometry      | See below | See below |
             | Misc          | See below | See below |
     """
@@ -45,10 +45,10 @@ def geometry_bench():
     """
     benchmark_set = []
     benchmark_set.append(rooks_graph(8,8))
+    benchmark_set.append(prism_graph(24,12))
     benchmark_set.append(grid_2d_graph(16,16))
     benchmark_set.append(grid_3d_graph(10,10))
     benchmark_set.append(hypercube_graph(128))
-    # TODO: Add Maze
     return benchmark_set
 
 
@@ -140,11 +140,11 @@ def qca_bench():
     url = "http://www.ece.ubc.ca/~jpinilla/resources/embera/qca/qca.tar.gz"
 
     # Download
-    print(f"-> Downloading QCA benchmarks to {path}")
-    with open(path, 'wb') as f:
-        response = requests.get(url)
-        f.write(response.content)
-
+    if not os.path.isfile(path):
+        print(f"-> Downloading QCA benchmarks to {path}")
+        with open(path, 'wb') as f:
+            response = requests.get(url)
+            f.write(response.content)
     # Unzip, untar, unpickle
     with tarfile.open(path) as contents:
         for member in contents.getmembers():
@@ -159,32 +159,28 @@ def misc_bench():
                 | name          | node      | edges     |
                 | ------------- |:---------:| ---------:|
                 | LANL1 [2]     | 269       | 490       |
-                | Maze (6x6)    | 326       | 564       |
+                | Maze(6x6) [3] | 326       | 564       |
+
+    [3] Scott Pakin. "A Quantum Macro Assembler". In Proceedings of the 20th Annual
+    IEEE High Performance Extreme Computing Conference (HPEC 2016), Waltham,
+    Massachusetts, USA, 13–15 September 2016. DOI: 10.1109/HPEC.2016.7761637.
     """
     benchmark_set = []
-    path = "./lanl1.pkl"
-    url = "http://www.ece.ubc.ca/~jpinilla/resources/embera/misc/lanl1.pkl"
-    # Download
-    print(f"-> Downloading LANL1 benchmark to {path}")
-    with open(path, 'wb') as f:
-        response = requests.get(url)
-        f.write(response.content)
-    # Unpickle
-    with open(path, 'rb') as pkl:
-        G = nx.read_gpickle(pkl)
-        benchmark_set.append(G)
+    path = "./misc.tar.gz"
+    url = "http://www.ece.ubc.ca/~jpinilla/resources/embera/misc/misc.tar.gz"
 
-    path = "./maze.pkl"
-    url = "http://www.ece.ubc.ca/~jpinilla/resources/embera/misc/maze.pkl"
     # Download
-    print(f"-> Downloading Maze benchmark to {path}")
-    with open(path, 'wb') as f:
-        response = requests.get(url)
-        f.write(response.content)
-    # Unpickle
-    with open(path, 'rb') as pkl:
-        G = nx.read_gpickle(pkl)
-        benchmark_set.append(G)
+    if not os.path.isfile(path):
+        print(f"-> Downloading miscellaneous benchmarks to {path}")
+        with open(path, 'wb') as f:
+            response = requests.get(url)
+            f.write(response.content)
+    # Unzip, untar, unpickle
+    with tarfile.open(path) as contents:
+        for member in contents.getmembers():
+            f = contents.extractfile(member)
+            G = nx.read_gpickle(f)
+            benchmark_set.append(G)
 
     return benchmark_set
 
@@ -234,6 +230,21 @@ def grid_3d_graph(n, m=None, t=2):
     G.name = 'grid3d'
     G.graph['pos'] = {(x,y,z):[x+z,y+z] for (x,y,z) in G}
     return G
+
+def prism_graph(k,m):
+    G = nx.grid_2d_graph(k,m)
+    for i in range(m):
+        G.add_edge((0,i),(k-1,i))
+    nlist = [[] for _ in range(m)]
+    for j, i in G:
+        nlist[i].append((j,i))
+    G.name = 'prism'
+    nlist = [[] for _ in range(m)]
+    for j, i in G:
+        nlist[i].append((j,i))
+    G.graph['pos'] = nx.shell_layout(G,nlist=nlist)
+    return G
+
 
 def random_graph(n, max_degree=None, seed=None):
     if not max_degree: max_degree=round(n/4)
