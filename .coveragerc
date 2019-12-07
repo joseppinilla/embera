@@ -1,0 +1,3 @@
+[run]
+source = embera
+omit = */site-packages/*, */venv/*, */virtualenv/*, */tests/*

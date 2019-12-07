@@ -232,12 +232,7 @@ def grid_3d_graph(n, m=None, t=2):
     return G
 
 def prism_graph(k,m):
-    G = nx.grid_2d_graph(k,m)
-    for i in range(m):
-        G.add_edge((0,i),(k-1,i))
-    nlist = [[] for _ in range(m)]
-    for j, i in G:
-        nlist[i].append((j,i))
+    G = nx.grid_2d_graph(k,m,periodic=True)
     G.name = 'prism'
     nlist = [[] for _ in range(m)]
     for j, i in G:
