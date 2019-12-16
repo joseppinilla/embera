@@ -184,6 +184,17 @@ def misc_bench():
 
     return benchmark_set
 
+def download_pickle(path, url):
+    # Download
+    if not os.path.isfile(path):
+        print(f"-> Downloading {url} to {path}")
+        with open(path, 'wb') as f:
+            response = requests.get(url)
+            f.write(response.content)
+    # Unpickle
+    G = nx.read_gpickle(path)
+    return G
+
 def complete_graph(n):
     G = nx.complete_graph(n)
     G.name = 'complete'
