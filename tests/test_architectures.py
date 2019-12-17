@@ -4,7 +4,8 @@ import minorminer
 
 import networkx as nx
 
-from embera.utilities.graph_topologies import *
+from embera.benchmark.topologies import *
+
 from embera.utilities.architectures import generators
 
 from embera.preprocess.diffusion_placer import find_candidates
