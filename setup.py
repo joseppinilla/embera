@@ -3,6 +3,7 @@
 from setuptools import setup
 
 packages = ['embera',
+            'embera.accessors',
             'embera.benchmark',
             'embera.composites',
             'embera.preprocess',
@@ -18,6 +19,7 @@ install_requires = ['decorator>=4.1.0,<5.0.0',
                     'minorminer>=0.1.5,<0.2.0',
                     'networkx>=2.0,<3.0',
                     'numpy>=1.15.2,<1.16',
+                    'pandas>=0.24.0,<0.25.0',
                     'pulp>=1.6.0,<2.0.0',
                     ]
 

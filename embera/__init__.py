@@ -1,3 +1,6 @@
+# Pandas DataFrame accessors
+import embera.accessors
+
 # Benchmark
 import embera.benchmark
 
