@@ -1,26 +1,15 @@
-import math
+import embera
 import unittest
 import minorminer
 
-import networkx as nx
-
-from embera.benchmark.topologies import *
-
 from embera.utilities.architectures import generators
 
-from embera.preprocess.diffusion_placer import find_candidates
-
-from embera.composites.embedding import EmbeddingComposite
-
-from dimod.reference.composites.structure import StructureComposite
-from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampler
-
-GRAPH_SIZE = 16
-GRAPHS = [complete_graph, complete_bipartite_graph, grid_2d_graph,
-            hypercube_graph, rooks_graph, grid_3d_graph,
-            random_graph]
-
-
+GRAPHS = [embera.benchmark.complete_graph(16),
+          embera.benchmark.complete_bipartite_graph(8,8),
+          embera.benchmark.grid_2d_graph(4,4),
+          embera.benchmark.rooks_graph(4,4),
+          embera.benchmark.hypercube_graph(n=16)
+          ]
 
 class TestArchitectures(unittest.TestCase):
 
@@ -32,17 +21,12 @@ class TestArchitectures(unittest.TestCase):
         target_gen = generators.__dict__[self.target]
         target_graph = target_gen()
 
-        for source_gen in GRAPHS:
-            if callable(source_gen):
-                source_graph = source_gen(GRAPH_SIZE)
-                print('graph %s' % source_graph.name)
-                source_edgelist = source_graph.edges()
-                target_edgelist = target_graph.edges()
-                embedding = self.method.find_embedding(source_edgelist, target_edgelist)
-                self.assertEqual(set(source_graph), set(embedding),'Invalid embedding.')
-                print('sum: %s' % sum(len(v) for v in embedding.values()))
-                print('max: %s' % max(len(v)for v in embedding.values()))
-
+        for source_graph in GRAPHS:
+            print('graph %s' % source_graph.name)
+            embedding = self.method.find_embedding(source_graph, target_graph)
+            self.assertEqual(set(source_graph), set(embedding),'Invalid embedding.')
+            print('sum: %s' % sum(len(v) for v in embedding.values()))
+            print('max: %s' % max(len(v)for v in embedding.values()))
 
     def test_rainier(self):
         """ Rainier """
