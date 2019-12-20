@@ -58,6 +58,16 @@ def dwave_bench(N=10):
     Parameters:
         N: (int, default=10)
             Number of samples from each type of benchmark, with increasing size.
+            For N==1 to N==10:
+                | name          | node      | edges     |
+                | ------------- |:---------:| ---------:|
+                | clique        | 20-29     | 190-406   |
+                | biclique      | 44-62     | 484-961   |
+                | circular      | 40-76     | 355-1273  |
+                | nae3sat       | 70        | ~581      |
+                | gnp25         | 70        | ~604      |
+                | gnp50         | 60        | ~872      |
+                | gnp75         | 50        | ~919      |
 
     Benchmarks:
         clique: complete graphs, Kn for n = 20 to n = 29
@@ -160,10 +170,16 @@ def misc_bench():
                 | ------------- |:---------:| ---------:|
                 | LANL1 [2]     | 269       | 490       |
                 | Maze(6x6) [3] | 326       | 564       |
+                | MNIST [4]     | 74        | 1664      |
 
-    [3] Scott Pakin. "A Quantum Macro Assembler". In Proceedings of the 20th Annual
-    IEEE High Performance Extreme Computing Conference (HPEC 2016), Waltham,
-    Massachusetts, USA, 13–15 September 2016. DOI: 10.1109/HPEC.2016.7761637.
+    [3] Scott Pakin. "A Quantum Macro Assembler". In Proceedings of the 20th
+    Annual IEEE High Performance Extreme Computing Conference (HPEC 2016),
+    Waltham, Massachusetts, USA, 13–15 September 2016. DOI:
+    10.1109/HPEC.2016.7761637.
+    [4] Adachi, S. H., & Henderson, M. P. (2015). Application of Quantum
+    Annealing to Training of Deep Neural Networks. ArXiv Preprint
+    ArXiv:1510.00635, 18. https://doi.org/10.1038/nature10012
+
     """
     benchmark_set = []
     path = "./misc.tar.gz"
@@ -202,14 +218,21 @@ def complete_graph(n):
 
 def complete_bipartite_graph(n, m=None):
     if m is None:
-        m = n = round(n/2)
+        m = n
     G = nx.complete_bipartite_graph(m,n)
     G.name = 'bipartite'
     return G
 
+def complete_multipartite_graph(n,m=None,o=10):
+    if m is None:
+        m = n
+    G = nx.complete_multipartite_graph(n,m,o)
+    G.name = 'multipartite'
+    return G
+
 def grid_2d_graph(n, m=None):
     if m is None:
-        m = n = round(math.sqrt(n))
+        m = n
     G = nx.grid_2d_graph(m,n)
     G.name = 'grid2d'
     G.graph['pos'] = {v:list(v) for v in G}
@@ -226,7 +249,7 @@ def hypercube_graph(n=None, dim=None):
 
 def rooks_graph(n, m=None):
     if m is None:
-        n = m = round(math.sqrt(n))
+        n = m
     G = nx.complete_graph(n)
     H = nx.complete_graph(m)
     F = nx.cartesian_product(G,H)
@@ -236,7 +259,7 @@ def rooks_graph(n, m=None):
 
 def grid_3d_graph(n, m=None, t=2):
     if m is None:
-        m = n = t = round(n**(1./3.))
+        m = n
     G = nx.grid_graph(dim=[m,n,t])
     G.name = 'grid3d'
     G.graph['pos'] = {(x,y,z):[x+z,y+z] for (x,y,z) in G}
