@@ -1,6 +1,9 @@
 embera
 ======
 
+[![Build Status](https://travis-ci.org/joseppinilla/embera.svg?branch=master)](https://travis-ci.org/joseppinilla/embera)
+[![Coverage Status](https://coveralls.io/repos/github/joseppinilla/embera/badge.svg?branch=master)](https://coveralls.io/github/joseppinilla/embera?branch=master)
+
 `embera` offers a collection of Embedding Resources and Algorithms.
 These can be used as composites making part of the [D-Wave
 Ocean](https://ocean.dwavesys.com/) software stack, or from the
