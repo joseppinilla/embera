@@ -62,7 +62,7 @@ class TestArchitectures(unittest.TestCase):
         self.target = 'p16_graph'
         self.parse_and_test()
 
-    def test_h20k_graph(self):
+    def test_h20k(self):
         self.target = 'h20k_graph'
         self.parse_and_test()
 
