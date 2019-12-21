@@ -274,20 +274,6 @@ def prism_graph(k,m):
     G.graph['pos'] = nx.shell_layout(G,nlist=nlist)
     return G
 
-
-def random_graph(n, max_degree=None, seed=None):
-    if not max_degree: max_degree=round(n/4)
-    G = nx.empty_graph(n)
-    rand.seed(seed)
-    for v in G:
-         n = rand.randrange(1, max_degree)
-         node_set = set(G.nodes)
-         node_set.remove(v)
-         randedges = [ (v,n) for n in rand.sample(node_set, n)]
-         G.add_edges_from(randedges)
-    G.name = 'random%s' % max_degree
-    return G
-
 """ When using graph generators, pruning edges of the source graph can be
 done using the following method. (Default to 5% of edges removed).
 Example:
