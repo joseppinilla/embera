@@ -2,13 +2,14 @@
 """
 
 import matplotlib.pyplot as plt
+from embera.benchmark.topologies import pruned_graph_gen
 from embera.utilities.architectures import drawing, generators
 from embera.preprocess.complete_bipartite_placer import CompleteBipartitePlacer, find_candidates
 
 # Problem dimensions
 p, q = 10, 6
 # The corresponding graph of the D-Wave C4 (Rainier) annealer with 0.95 qubit yield
-Tg = generators.faulty_arch(generators.rainier_graph, node_yield=0.95)(coordinates=True)
+Tg = pruned_graph_gen(generators.rainier_graph, node_yield=0.95)(coordinates=True)
 plt.figure(0)
 drawing.draw_architecture_yield(Tg, node_size=20)
 
@@ -24,9 +25,11 @@ plt.show()
 # Create placer object from candidates and perform transformations
 placer = CompleteBipartitePlacer.from_candidates((p,q), Tg, candidates)
 assert(placer.origin==origin)
+print(placer.origin, origin)
 placer.rotate()
 placer.shuffle()
 assert(placer.origin==origin)
+print(placer.origin, origin)
 plt.figure(2)
 drawing.draw_architecture_embedding(Tg, {**placer.P, **placer.Q}, node_size=20, show_labels=True)
 plt.show()

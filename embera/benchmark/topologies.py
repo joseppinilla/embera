@@ -10,10 +10,10 @@ Graph Attributes:
 """
 import os
 import math
+import random
 import tarfile
 import requests
 
-import random as rand
 import networkx as nx
 
 def embera_bench():
@@ -223,11 +223,12 @@ def complete_bipartite_graph(n, m=None):
     G.name = 'bipartite'
     return G
 
-def complete_multipartite_graph(n,m=None,o=10):
+def complete_multipartite_graph(n,m=None,o=10): #TODO: More than 3 layers?
     if m is None:
         m = n
     G = nx.complete_multipartite_graph(n,m,o)
     G.name = 'multipartite'
+    #TODO: pos based on multipartite_layout gist
     return G
 
 def grid_2d_graph(n, m=None):
@@ -274,24 +275,45 @@ def prism_graph(k,m):
     G.graph['pos'] = nx.shell_layout(G,nlist=nlist)
     return G
 
-""" When using graph generators, pruning edges of the source graph can be
-done using the following method. (Default to 5% of edges removed).
-Example:
->> # Generate a K16 graph with 5% of the edges removed
->> prune_graph(complete_graph)(16)
->> # Generate a K8,8 (16 vertices) with 10% of the edges removed
->> prune_graph(complete_bipartite_graph, edge_yield=0.90)(16)
-"""
-def _prune(graph, edge_yield):
-    num_edges = round( (1.0 - edge_yield) * len(graph))
-    for val in range(num_edges):
-        while (True):
-            u, v = rand.choice(list(graph.edges))
-            if len(graph[u]) > 1 and len(graph[v]) > 1:
-                break
-        graph.remove_edge(u,v)
-    return graph
-def prune_graph(graph_method, edge_yield=0.95):
-    graph_gen = lambda x: _prune(graph_method(x), edge_yield)
-    graph_gen.__name__ = graph_method.__name__ + str(edge_yield)
-    return graph_gen
+def prune_graph(G, node_yield, edge_yield):
+    # Remove nodes
+    node_set = set(G.nodes)
+    num_node_faults = len(node_set) - round(len(node_set) * node_yield)
+    randnodes = random.sample(node_set, int(num_node_faults))
+    G.remove_nodes_from(randnodes)
+    # Remove edges
+    edge_set = set(G.edges)
+    num_edge_faults = len(edge_set) - round(len(edge_set) * edge_yield)
+    randedges = random.sample(edge_set, int(num_edge_faults))
+    G.remove_edges_from(randedges)
+    # Rename graph
+    G.name = G.name + ' node_yield %s edge_yield %s' % (node_yield, edge_yield)
+    return G
+
+def pruned_graph_gen(graph_method, node_yield=0.995, edge_yield=0.9995):
+    """ Create a graph generator method of the given topology with
+        size*yield elements of the original graph.
+
+    Example:
+        # DWave graph with 95% yield
+        >>> Tg = pruned_graph_gen(generators.dw2x_graph, node_yield=0.95)()
+        # Prune 5% of the edges of a bipartite grap at random
+        >>> G = pruned_graph_gen(nx.complete_bipartite_graph, edge_yield=0.95)(8,8)
+
+    Args:
+        arch_method: (method)
+            One of the graph generator function
+
+        node_yield: (optional, float, default=0.995)
+            Ratio of nodes over original size.
+            i.e. The original graph has node_yield=1.0
+
+        edge_yield: (optional, float, default=0.9995)
+            Ratio of edges over original size.
+            i.e. The original graph has edge_yield=1.0
+    """
+
+
+    arch_gen = lambda *args, **kwargs: prune_graph(graph_method(*args,**kwargs), node_yield, edge_yield)
+    arch_gen.__name__ = graph_method.__name__ + 'node_yield %s edge_yield %s' % (node_yield, edge_yield)
+    return arch_gen

@@ -1,5 +1,5 @@
 from numpy import concatenate
-from numpy.random import multinomial, normal, uniform, seed, shuffle
+from numpy.random import multinomial, normal, uniform, seed, sample, shuffle
 
 """ Probability functions and distributions useful in embedding and testing
     Ising models.

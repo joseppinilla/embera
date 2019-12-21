@@ -3,6 +3,7 @@ import unittest
 import minorminer
 
 from embera.utilities.architectures import generators
+from embera.benchmark.topologies import pruned_graph_gen
 
 GRAPHS = [embera.benchmark.complete_graph(16),
           embera.benchmark.complete_bipartite_graph(8),
@@ -17,11 +18,13 @@ class TestArchitectures(unittest.TestCase):
     def setUp(self):
         self.method = minorminer
 
-    def all_graphs(self):
+    def parse_and_test(self):
         print('target %s' % self.target)
         target_gen = generators.__dict__[self.target]
         target_graph = target_gen()
+        self.all_graphs(target_graph)
 
+    def all_graphs(self,target_graph):
         for source_graph in GRAPHS:
             print('graph %s' % source_graph.name)
             embedding = self.method.find_embedding(source_graph, target_graph)
@@ -32,29 +35,37 @@ class TestArchitectures(unittest.TestCase):
     def test_rainier(self):
         """ Rainier """
         self.target = 'rainier_graph'
-        self.all_graphs()
+        self.parse_and_test()
 
     def test_vesuvius(self):
         """ Vesuvius """
         self.target = 'vesuvius_graph'
-        self.all_graphs()
+        self.parse_and_test()
 
     def test_dw2000q(self):
         """ D-Wave 2000Q """
         self.target = 'dw2000q_graph'
-        self.all_graphs()
+        self.parse_and_test()
 
     def test_dw2x(self):
         """ D-Wave 2X """
         self.target = 'dw2x_graph'
-        self.all_graphs()
+        self.parse_and_test()
 
     def test_p6(self):
         """ D-Wave P6 """
         self.target = 'p6_graph'
-        self.all_graphs()
+        self.parse_and_test()
 
     def test_p16(self):
         """ D-Wave P16 """
         self.target = 'p16_graph'
-        self.all_graphs()
+        self.parse_and_test()
+
+    def test_h20k_graph(self):
+        self.target = 'h20k_graph'
+        self.parse_and_test()
+
+    def test_pruned_graph(self):
+        target_graph = embera.benchmark.topologies.pruned_graph_gen(generators.dw2000q_graph)()
+        self.all_graphs(target_graph)

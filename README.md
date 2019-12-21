@@ -147,6 +147,7 @@ diffusion placer without migration to demonstrate the anchored nodes.
 import networkx as nx
 import matplotlib.pyplot as plt
 from embera.disperse import find_embedding
+from embera.benchmark.topologies import pruned_graph_gen
 from embera.utilities.architectures import drawing, generators
 from embera.preprocess.diffusion_placer import find_candidates
 
@@ -158,7 +159,7 @@ S_edgelist = list(Sg.edges())
 layout = {v:v for v in Sg}
 
 # The corresponding graph of the D-Wave C4 annealer with 0.95 qubit yield
-Tg = generators.faulty_arch(generators.rainier_graph, node_yield=0.95)()
+Tg = pruned_graph_gen(generators.rainier_graph, node_yield=0.95)()
 T_edgelist = list(Tg.edges())
 # Find a global placement for problem graph
 candidates = find_candidates(S_edgelist, Tg, layout=layout, enable_migration=False)
