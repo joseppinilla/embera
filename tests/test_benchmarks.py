@@ -24,8 +24,12 @@ class TestBenchmarks(unittest.TestCase):
         path = "./mnist.pkl"
         url = "http://www.ece.ubc.ca/~jpinilla/resources/embera/misc/mnist.pkl"
         mnist = embera.benchmark.topologies.download_pickle(path,url)
-        G = embera.benchmark.topologies.complete_multipartite_graph(32,32,10)
+        G = embera.benchmark.topologies.complete_multipartite_graph(32,o=10)
         self.assertEqual(G.edges,mnist.edges)
+
+    def test_hypercube(self):
+        G = embera.benchmark.topologies.hypercube_graph()
+        self.assertEqual(len(G),0)
 
     def test_embera(self):
         benchmarks = embera.benchmark.topologies.embera_bench()

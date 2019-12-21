@@ -240,7 +240,7 @@ def grid_2d_graph(n, m=None):
 
 def hypercube_graph(n=None, dim=None):
     if n is None and dim is None:
-        raise ValueError('Expected either n or dim')
+        return nx.empty_graph()
     if dim is None:
         dim = round(math.log(n,2))
     G = nx.hypercube_graph(dim)
@@ -249,7 +249,7 @@ def hypercube_graph(n=None, dim=None):
 
 def rooks_graph(n, m=None):
     if m is None:
-        n = m
+        m = n
     G = nx.complete_graph(n)
     H = nx.complete_graph(m)
     F = nx.cartesian_product(G,H)

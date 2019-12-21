@@ -5,9 +5,10 @@ import minorminer
 from embera.utilities.architectures import generators
 
 GRAPHS = [embera.benchmark.complete_graph(16),
-          embera.benchmark.complete_bipartite_graph(8,8),
-          embera.benchmark.grid_2d_graph(4,4),
-          embera.benchmark.rooks_graph(4,4),
+          embera.benchmark.complete_bipartite_graph(8),
+          embera.benchmark.grid_2d_graph(4),
+          embera.benchmark.grid_3d_graph(4),
+          embera.benchmark.rooks_graph(4),
           embera.benchmark.hypercube_graph(n=16)
           ]
 
