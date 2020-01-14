@@ -1,5 +1,6 @@
 # Benchmark
 import embera.benchmark
+from embera.benchmark.database import *
 
 # Methods
 import embera.disperse

@@ -1,4 +1,5 @@
 import os
+import json
 
 from json import load as _load
 from json import dump as _dump
@@ -6,20 +7,29 @@ from json import dump as _dump
 from networkx.readwrite.json_graph import node_link_data as _serialize_graph
 from networkx.readwrite.json_graph import node_link_graph as _deserialize_graph
 
+__all__ = ["EmberaDataBase","Embedding","EmberaEncoder","EmberaEncoder"]
+
 def validate_graphs(func):
     def func_wrapper(self, source, target, *args, **kwargs):
-        source_id = hash(tuple(sorted((tuple(sorted(e)) for e in source))))
+        source_id = hash(tuple(source))
         assert(self.source_id==source_id), "Source ID does not match."
-        target_id = hash(tuple(sorted((tuple(sorted(e)) for e in target))))
+
+        target_id = hash(tuple(target))
         assert(self.target_id==target_id), "Target ID does not match."
+
         res = func(self, source, target, *args, **kwargs)
         return res
+
     return func_wrapper
 
-def parse_graphs(func):
+def parse_edges(func):
     def func_wrapper(self, source, target, *args, **kwargs):
-        source_edgelist = source.edges() if hasattr(source, 'edges') else source
-        target_edgelist = target.edges() if hasattr(target, 'edges') else target
+        if hasattr(source, 'edges'): source_edgelist = source.edges()
+        else: source_edgelist = sorted((tuple(sorted(e)) for e in source))
+
+        if hasattr(target, 'edges'): target_edgelist = target.edges()
+        else: target_edgelist = sorted((tuple(sorted(e)) for e in target))
+
         res = func(self, source_edgelist, target_edgelist, *args, **kwargs)
         return res
     return func_wrapper
@@ -29,11 +39,11 @@ class Embedding(dict):
     source_id = None
     target_id = None
 
-    @parse_graphs
+    @parse_edges
     def __init__(self, source, target, embedding):
         self.update(embedding)
-        self.source_id = hash(tuple(sorted((tuple(sorted(e)) for e in source))))
-        self.target_id = hash(tuple(sorted((tuple(sorted(e)) for e in target))))
+        self.source_id = hash(tuple(source))
+        self.target_id = hash(tuple(target))
 
     def chain_histogram(self):
         # Based on dwavesystems/minorminer quality_key by Boothby, K.
@@ -43,13 +53,20 @@ class Embedding(dict):
             hist[s] = 1 + hist.get(s, 0)
         return hist
 
-    @parse_graphs
+    @parse_edges
     @validate_graphs
     def interactions_histogram(self, source, target):
         interactions = {}
         for u, v in source:
-            interactions[(u,v)] = {(s,t) for s in self[u] for t in self[v] if (s,t) in target}
-        print(interactions)
+            source_edge = tuple(sorted((u,v)))
+            edge_interactions = []
+            for s in self[u]:
+                for t in self[v]:
+                    target_edge = tuple(sorted((s,t)))
+                    if target_edge in target:
+                        edge_interactions.append(target_edge)
+            interactions[(u,v)] = edge_interactions
+
         sizes = [len(i) for i in interactions.values()]
         hist = {}
         for s in sizes:
@@ -90,9 +107,49 @@ class Embedding(dict):
     def __ge__(self, other):
         return self.quality_key() >= other.quality_key()
 
+def parse_graph_names(func):
+    def func_wrapper(self, source, target, *args, **kwargs):
+        if hasattr(source, 'name'): source_name = source.name
+        elif isinstance(source,str): source_name = source
+        else: source_name = str(hash(tuple(sorted((tuple(sorted(e)) for e in source)))))
 
-""" DataBase class to store embeddings, and samplesets. """
+        if hasattr(target, 'name'): target_name = target.name
+        elif isinstance(target,str): target_name = target
+        else: target_name = str(hash(tuple(sorted((tuple(sorted(e)) for e in target)))))
+
+        res = func(self, source_name, target_name, *args, **kwargs)
+        return res
+    return func_wrapper
+
+def parse_embedding(func):
+    def func_wrapper(self, source, target, embedding, *args, **kwargs):
+        if isinstance(embedding,Embedding): embedding_obj = embedding
+        else: embedding_obj = Embedding(source,target,embedding)
+
+        res = func(self, source, target, embedding_obj, *args, **kwargs)
+        return res
+    return func_wrapper
+
+class EmberaEncoder(json.JSONEncoder):
+    def iterencode(self, obj):
+        if isinstance(obj, dict):
+            s = [f"\"{k}\":\"{v}\"" for k,v in obj.items()]
+            formatted = ",".join(s)
+            return f"{{{formatted}}}"
+        return super(EmberaEncoder, self).iterencode(obj)
+
+class EmberaDecoder(json.JSONDecoder):
+    def __init__(self, *args, **kwargs):
+        json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
+
+    def object_hook(self, obj):
+        if isinstance(obj,dict):
+            format_eval = lambda k: k if k.isalpha() else eval(k)
+            return {format_eval(key):eval(value) for key, value in obj.items()}
+        return obj
+
 class EmberaDataBase:
+    """ DataBase class to store embeddings, and samplesets. """
 
     def __init__(self, path="./EmberaDB/"):
 
@@ -186,39 +243,89 @@ class EmberaDataBase:
     def dump_samplesets(self,input_name,sampler_name,embedding):
         pass
 
-    """ Embeddings """
-    def load_embedding(self, source_name, target_name, method_name=None, rank=0):
-        embeddings_path = os.path.join(self.embeddings_path,sampler_name)
+    """ ######################### Embeddings ########################## """
+    @parse_graph_names
+    def load_embedding(self, source_name, target_name, embedding_tag="", rank=0):
+        """ Load an embedding object from JSON format, filed under:
+            <EmberaDB>/<target_name>/<source_name>/<embedding_id>.json
+            or, if tag is provided:
+            <EmberaDB>/<target_name>/<source_name>/<tag>/<embedding_id>.json
 
 
-    def dump_embedding(self, source_name, target_name, method_name, embedding):
+        """
+        if not target_name: raise ValueError("Target graph name is empty")
         target_path = os.path.join(self.embeddings_path,target_name)
         if not os.path.isdir(target_path):
             os.mkdir(target_path)
 
+        if not source_name: raise ValueError("Source graph name is empty")
         source_path = os.path.join(target_path,source_name)
         if not os.path.isdir(source_path):
             os.mkdir(source_path)
 
-        method_path = os.path.join(source_path,method_name)
-        if not os.path.isdir(method_path):
-            os.mkdir(method_path)
+        tag_path = os.path.join(source_path, embedding_tag)
+        if not os.path.isdir(tag_path):
+            os.mkdir(tag_path)
 
-        embedding_key = Embedding(embedding)
-        embedding_path = os.path.join(sampler_path,)
+        embeddings = os.listdir(tag_path)
+        embedding_filename = embeddings.pop(0)
+        embedding_path = os.path.join(tag_path, embedding_filename)
 
-        ,source_name)
-        source_path = os.path.join(self.embeddings_path,source_name)
+        with open(embedding_path,'r') as fp:
+            embedding = _load(fp,cls=EmberaDecoder)
 
-        target_path = os.path.join(source_path,target_name)
-        if not os.path.isdir(self.path):
-            os.mkdir(self.path)
+        return embedding
 
-        embeddings_path = os.path.join(sampler_path,input_name)
-        with open(embeddings_path,'w+') as fp:
-            embeddings = _load(fp)
-            embeddings += [embedding]
-            _dump(embeddings,fp)
+    @parse_embedding
+    @parse_graph_names
+    def dump_embedding(self, source_name, target_name, embedding_obj, embedding_tag=""):
+        """ Store an embedding object in JSON format, filed under:
+            <EmberaDB>/<target_name>/<source_name>/<embedding_id>.json
+            or, if tag is provided:
+            <EmberaDB>/<target_name>/<source_name>/<tag>/<embedding_id>.json
+
+            `source_name` and `target_name` can be provided in `source` and
+            `target`, in NetworkX graph, or will be automatically generated
+            using `hash` as decribed below.
+
+            Arguments:
+                source: (str, list of edges, or NetworkX graph)
+                    If `str`, embedding must be an Embedding object.
+                    If list of edges, name will be taken from hash of sorted
+                    tuple of sorted tuples.
+
+                target: (str, list of edges, or NetworkX graph)
+                    If `str`, embedding must be an Embedding object.
+                    If list of edges, name will be taken from hash of sorted
+                    tuple of sorted tuples.
+
+                embedding: (dictionary, or Embedding object)
+                    If `Embedding`, source and targets can be `str`.
+                    Otherwise, source and targets must be list of edges or NetworkX
+
+            Optional Arguments:
+                embedding_tag: (str)
+                    If provided, embedding is stored under a directory ./<tag>/
+        """
+        if not target_name: raise ValueError("Target graph name is empty")
+        target_path = os.path.join(self.embeddings_path,target_name)
+        if not os.path.isdir(target_path):
+            os.mkdir(target_path)
+
+        if not source_name: raise ValueError("Source graph name is empty")
+        source_path = os.path.join(target_path,source_name)
+        if not os.path.isdir(source_path):
+            os.mkdir(source_path)
+
+        tag_path = os.path.join(source_path, embedding_tag)
+        if not os.path.isdir(tag_path):
+            os.mkdir(tag_path)
+
+        embedding_filename = embedding_obj.id() + ".json"
+        embedding_path = os.path.join(tag_path, embedding_filename)
+
+        with open(embedding_path,'w+') as fp:
+            _dump(embedding_obj,fp,cls=EmberaEncoder)
 
 
     def load_embeddings(self,input_name,sampler_name):
@@ -226,17 +333,3 @@ class EmberaDataBase:
 
     def dump_embeddings(self,input_name,sampler_name,embeddings):
         pass
-
-
-db = EmberaDataBase()
-import minorminer
-import networkx as nx
-S = nx.Graph([(1,2),(2,3),(3,1)])
-T = nx.Graph([(1,2),(2,3),(3,4),(4,1)])
-embedding = minorminer.find_embedding(S,T)
-embedding
-emb1 = Embedding([(1,2),(2,3),(3,1)],[(1,2),(2,3),(3,4),(4,1)],embedding)
-emb1.source_id
-emb1.target_id
-emb1.interactions_histogram([(1,2),(2,3),(3,1)],[(1,2),(2,3),(3,4),(4,1)])
-emb1.interactions_histogram(S,T)
