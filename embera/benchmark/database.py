@@ -251,6 +251,30 @@ class EmberaDataBase:
             or, if tag is provided:
             <EmberaDB>/<target_name>/<source_name>/<tag>/<embedding_id>.json
 
+            `source_name` and `target_name` can be provided in `source` and
+            `target`, in NetworkX graph, or will be automatically generated
+            using `hash` as decribed below.
+
+            Arguments:
+                source_name: (str, list of edges, or NetworkX graph)
+                    If `str`, embedding must be an Embedding object.
+                    If list of edges, name will be taken from hash of sorted
+                    tuple of sorted tuples.
+
+                target_name: (str, list of edges, or NetworkX graph)
+                    If `str`, embedding must be an Embedding object.
+                    If list of edges, name will be taken from hash of sorted
+                    tuple of sorted tuples.
+
+            Optional Arguments:
+                embedding_tag: (str, default="")
+                    If provided, embedding is stored under a directory ./<tag>/
+
+                rank: (int, default=0)
+                    Due to the naming convention used in the Embedding class,
+                    embeddings are stored sorted by `quality_key`. Therefore,
+                    `rank==0` is the "best" embedding of that source, in that
+                    target, with that `tag`.
 
         """
         if not target_name: raise ValueError("Target graph name is empty")
@@ -268,7 +292,9 @@ class EmberaDataBase:
             os.mkdir(tag_path)
 
         embeddings = os.listdir(tag_path)
-        embedding_filename = embeddings.pop(0)
+        if not embeddings: return {}
+
+        embedding_filename = embeddings.pop(rank)
         embedding_path = os.path.join(tag_path, embedding_filename)
 
         with open(embedding_path,'r') as fp:
@@ -304,7 +330,7 @@ class EmberaDataBase:
                     Otherwise, source and targets must be list of edges or NetworkX
 
             Optional Arguments:
-                embedding_tag: (str)
+                embedding_tag: (str, default="")
                     If provided, embedding is stored under a directory ./<tag>/
         """
         if not target_name: raise ValueError("Target graph name is empty")
@@ -326,10 +352,3 @@ class EmberaDataBase:
 
         with open(embedding_path,'w+') as fp:
             _dump(embedding_obj,fp,cls=EmberaEncoder)
-
-
-    def load_embeddings(self,input_name,sampler_name):
-        pass
-
-    def dump_embeddings(self,input_name,sampler_name,embeddings):
-        pass
