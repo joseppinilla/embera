@@ -10,11 +10,12 @@ Graph Attributes:
 """
 import os
 import math
-import random
 import tarfile
 import requests
 
 import networkx as nx
+
+from random import sample
 
 def embera_bench():
     """ Set of benchmarks used to evaluate embera:
@@ -279,12 +280,12 @@ def prune_graph(G, node_yield, edge_yield):
     # Remove nodes
     node_set = set(G.nodes)
     num_node_faults = len(node_set) - round(len(node_set) * node_yield)
-    randnodes = random.sample(node_set, int(num_node_faults))
+    randnodes = sample(node_set, int(num_node_faults))
     G.remove_nodes_from(randnodes)
     # Remove edges
     edge_set = set(G.edges)
     num_edge_faults = len(edge_set) - round(len(edge_set) * edge_yield)
-    randedges = random.sample(edge_set, int(num_edge_faults))
+    randedges = sample(edge_set, int(num_edge_faults))
     G.remove_edges_from(randedges)
     # Rename graph
     G.name = G.name + ' node_yield %s edge_yield %s' % (node_yield, edge_yield)

@@ -1,9 +1,10 @@
 """ Example of a Layout-Aware embedding flow using a layout-aware flow on a
 target graph with 5% of the nodes removed.
 """
-import random
 import networkx as nx
 import matplotlib.pyplot as plt
+
+from random import uniform
 
 from embera.benchmark.topologies import pruned_graph_gen
 
@@ -23,7 +24,7 @@ Sg = nx.grid_2d_graph(p, p)
 S_edgelist = list(Sg.edges())
 # Create problem random values
 for (u, v, data) in Sg.edges(data=True):
-    data['weight'] = random.uniform(*J_RANGE)
+    data['weight'] = uniform(*J_RANGE)
 h = {v:0.0 for v in Sg}
 J = {(u,v):data['weight'] for u,v,data in Sg.edges(data=True)}
 # Layout of the problem graph

@@ -4,7 +4,8 @@ import minorminer
 
 import networkx as nx
 
-from embera import EmberaDataBase, Embedding
+from embera import Embedding
+from embera.interfaces.database import EmberaDataBase
 
 class TestDataBase(unittest.TestCase):
 

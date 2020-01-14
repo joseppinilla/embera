@@ -1,8 +1,9 @@
 import math
-import random
 import warnings
 import networkx as nx
 import matplotlib.pyplot as plt
+
+from random import Random
 
 from embera.utilities.architectures.tiling import Tiling
 from embera.utilities.architectures.drawing import draw_tiled_graph
@@ -22,7 +23,7 @@ class DiffusionPlacer(Tiling):
 
         # Random Number Generator Configuration
         self.random_seed = params.pop('random_seed', None)
-        self.rng = random.Random(self.random_seed)
+        self.rng = Random(self.random_seed)
 
         # Choice of vicinity (Default: Directed). See _assign_candidates()
         self.vicinity = params.pop('vicinity', 3)

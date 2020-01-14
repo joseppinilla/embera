@@ -4,108 +4,16 @@ import json
 from json import load as _load
 from json import dump as _dump
 
+from embera.interfaces.embedding import Embedding
+from embera.interfaces.json import EmberaEncoder, EmberaDecoder
+
+from dimod.serialization.json import DimodEncoder, DimodDecoder
+
 from networkx.readwrite.json_graph import node_link_data as _serialize_graph
 from networkx.readwrite.json_graph import node_link_graph as _deserialize_graph
 
-__all__ = ["EmberaDataBase","Embedding","EmberaEncoder","EmberaEncoder"]
+__all__ = ["EmberaDataBase"]
 
-def validate_graphs(func):
-    def func_wrapper(self, source, target, *args, **kwargs):
-        source_id = hash(tuple(source))
-        assert(self.source_id==source_id), "Source ID does not match."
-
-        target_id = hash(tuple(target))
-        assert(self.target_id==target_id), "Target ID does not match."
-
-        res = func(self, source, target, *args, **kwargs)
-        return res
-
-    return func_wrapper
-
-def parse_edges(func):
-    def func_wrapper(self, source, target, *args, **kwargs):
-        if hasattr(source, 'edges'): source_edgelist = source.edges()
-        else: source_edgelist = sorted((tuple(sorted(e)) for e in source))
-
-        if hasattr(target, 'edges'): target_edgelist = target.edges()
-        else: target_edgelist = sorted((tuple(sorted(e)) for e in target))
-
-        res = func(self, source_edgelist, target_edgelist, *args, **kwargs)
-        return res
-    return func_wrapper
-
-class Embedding(dict):
-
-    source_id = None
-    target_id = None
-
-    @parse_edges
-    def __init__(self, source, target, embedding):
-        self.update(embedding)
-        self.source_id = hash(tuple(source))
-        self.target_id = hash(tuple(target))
-
-    def chain_histogram(self):
-        # Based on dwavesystems/minorminer quality_key by Boothby, K.
-        sizes = [len(c) for c in self.values()]
-        hist = {}
-        for s in sizes:
-            hist[s] = 1 + hist.get(s, 0)
-        return hist
-
-    @parse_edges
-    @validate_graphs
-    def interactions_histogram(self, source, target):
-        interactions = {}
-        for u, v in source:
-            source_edge = tuple(sorted((u,v)))
-            edge_interactions = []
-            for s in self[u]:
-                for t in self[v]:
-                    target_edge = tuple(sorted((s,t)))
-                    if target_edge in target:
-                        edge_interactions.append(target_edge)
-            interactions[(u,v)] = edge_interactions
-
-        sizes = [len(i) for i in interactions.values()]
-        hist = {}
-        for s in sizes:
-            hist[s] = 1 + hist.get(s, 0)
-        return hist
-
-    def quality_key(self):
-        #TEMP: Can be better
-        hist = self.chain_histogram()
-        return [value for item in sorted(hist.items(), reverse=True) for value in item]
-
-    def id(self):
-        # To create a unique ID we use the quality key as an ID string ...
-        quality_id = "".join([str(v) for v in self.quality_key()])
-        # ...and the last 8 digits of this object's hash.
-        hash_id = f"{self.__hash__():08}"[-8:]
-        return f"{quality_id}_{hash_id}"
-
-    def __embedding_key(self):
-        return tuple((k,tuple(self[k])) for k in sorted(self))
-
-    def __key(self):
-        return (self.source_id, self.target_id, self.__embedding_key())
-
-    def __hash__(self):
-        return hash(self.__key())
-
-    def __eq__(self, other):
-        return self.__key() == other.__key()
-    def __ne__(self, other):
-        return self.__key() != other.__key()
-    def __lt__(self, other):
-        return self.quality_key() < other.quality_key()
-    def __le__(self, other):
-        return self.quality_key() <= other.quality_key()
-    def __gt__(self, other):
-        return self.quality_key() > other.quality_key()
-    def __ge__(self, other):
-        return self.quality_key() >= other.quality_key()
 
 def parse_graph_names(func):
     def func_wrapper(self, source, target, *args, **kwargs):
@@ -130,24 +38,6 @@ def parse_embedding(func):
         return res
     return func_wrapper
 
-class EmberaEncoder(json.JSONEncoder):
-    def iterencode(self, obj):
-        if isinstance(obj, dict):
-            s = [f"\"{k}\":\"{v}\"" for k,v in obj.items()]
-            formatted = ",".join(s)
-            return f"{{{formatted}}}"
-        return super(EmberaEncoder, self).iterencode(obj)
-
-class EmberaDecoder(json.JSONDecoder):
-    def __init__(self, *args, **kwargs):
-        json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
-
-    def object_hook(self, obj):
-        if isinstance(obj,dict):
-            format_eval = lambda k: k if k.isalpha() else eval(k)
-            return {format_eval(key):eval(value) for key, value in obj.items()}
-        return obj
-
 class EmberaDataBase:
     """ DataBase class to store embeddings, and samplesets. """
 
@@ -164,70 +54,6 @@ class EmberaDataBase:
         self.samplesets_path =  os.path.join(self.path,'samplesets')
         if not os.path.isdir(self.samplesets_path):
             os.mkdir(self.samplesets_path)
-
-
-    """ Inputs are stored as graphs and filed by name """
-    def _list_inputs(self):
-        inputs_map = map(os.path.splitext,os.listdir(self.inputs_path))
-        return [name for name,ext in inputs_map if ext=='.json']
-
-    def load_input(self, name):
-        if name in self.inputs:
-            input_path = os.path.join(inputs_path,input_name + '.json')
-            with open(input_path,'r') as fp:
-                return _deserialize_graph(_load(fp))
-        print(f"Input {name} not found")
-
-    def dump_input(self, input, force=False):
-        name = input.name
-        if (name in self.inputs) and not force:
-            print("Input already in DB. Use `force=True` to rewrite.")
-        else:
-            input_path = os.path.join(inputs_path,input.name + '.json')
-            with open(input_path,'w') as fp:
-                return _dump(_deserialize_graph(input), fp)
-            self.inputs = self._list_inputs()
-
-    def load_inputs(self):
-        return [load_input(name) for name in self.inputs]
-
-    def dump_inputs(self, inputs, force=False):
-        for input in inputs:
-            dump_input(input,force)
-        self.inputs = self._list_inputs()
-
-    """ Samplers are stored as graphs and filed by name """
-    def _list_samplers(self):
-        samplers_map = map(os.path.splitext,os.listdir(self.samplers_path))
-        return [name for name,ext in samplers_map if ext=='.json']
-
-    def load_sampler(self, name):
-        if name in self.samplers:
-            sampler_path = os.path.join(samplers_path,name + '.json')
-            with open(sampler_path,'r') as fp:
-                return _deserialize_graph(_load(fp))
-        print(f"Sampler {name} not found")
-
-    def dump_sampler(self, sampler, force=False):
-        name = sampler.name
-        if (name in self.samplers and not force):
-            print("Sampler already in DB. Use `force=True` to rewrite.")
-        else:
-            sampler_path = os.path.join(self.samplers_path,name + '.json')
-            with open(sampler_path,'w') as fp:
-                _dump(_serialize_graph(sampler), fp)
-            self.samplers = self._list_samplers()
-
-    def load_samplers(self, names=[]):
-        if names:
-            return [load_sampler(name) for name in names]
-        else:
-            return [load_sampler(name) for name in self.samplers]
-
-    def dump_samplers(self, samplers, force=False):
-        for sampler in samplers:
-            dump_sampler(sampler,force)
-        self.samplers = self._list_samplers()
 
     """ Samples are stored as Dimod SampleSets and filed under
         sampler/input/emmbedding """

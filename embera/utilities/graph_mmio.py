@@ -168,7 +168,7 @@ def write_networkx(Gnx, pos=None, mtx_name=None, mm_dir=MM_DIR, data=True, **par
 
 
 if __name__ == "__main__":
-    import random
+    from random import uniform
     import matplotlib.pyplot as plt
 
     J_RANGE = [-2.0,2.0]
@@ -180,7 +180,7 @@ if __name__ == "__main__":
     Gnx.name = name
     pos = {v:v for v in Gnx}
     for (u, v, data) in Gnx.edges(data=True):
-        data['weight'] = random.uniform(*J_RANGE)
+        data['weight'] = uniform(*J_RANGE)
 
     comments = "2D Grid 16x16"
     write_networkx(Gnx, pos=pos, mtx_name=name, mm_dir=mm_dir, comment=comments)

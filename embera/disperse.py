@@ -7,12 +7,12 @@ in the resultant embedding is one of the provided candidates.
 """
 
 import pulp
-import random
 import warnings
 
 import networkx as nx
 import matplotlib.pyplot as plt
 
+from random import Random, shuffle
 from heapq import heappop, heappush
 
 __all__ = ["find_embedding"]
@@ -268,7 +268,7 @@ def _rip_all(Sg, Tg):
 def _get_node(pending_set, pre_sel=[], opts={}):
     """ Next node preferably in pre-selected nodes
     """
-    random.shuffle(pre_sel)
+    shuffle(pre_sel)
     for node in pre_sel:
         if node in pending_set:
             pending_set.remove(node)
@@ -468,7 +468,7 @@ class RouterOptions(object):
     def __init__(self, **params):
 
         self.random_seed = params.pop('random_seed', None)
-        self.rng = random.Random(self.random_seed)
+        self.rng = Random(self.random_seed)
 
         self.tries =  params.pop('tries', 100)
 

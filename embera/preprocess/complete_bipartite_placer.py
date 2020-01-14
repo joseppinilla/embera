@@ -11,8 +11,8 @@ embedding due to faulty qubits, these assignments are deemed candidates.
 
 NOTE 2: This method is only applicable to Chimera graphs.
 """
-import random
 import networkx as nx
+from random import shuffle
 from dwave_networkx.generators.chimera import chimera_coordinates
 
 __all__ = ['find_candidates', 'CompleteBipartitePlacer']
@@ -337,12 +337,12 @@ class CompleteBipartitePlacer():
 
         if shuffle_p:
             keys_p = list(self.P.keys())
-            random.shuffle(keys_p)
+            shuffle(keys_p)
             self.P = {keys_p[i]: v for i, (k, v) in enumerate(self.P.items())}
 
         if shuffle_q:
             keys_q = list(self.Q.keys())
-            random.shuffle(keys_q)
+            shuffle(keys_q)
             self.Q = {keys_q[i]: v for i, (k, v) in enumerate(self.Q.items())}
 
     def rotate(self):

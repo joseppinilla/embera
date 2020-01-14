@@ -1,5 +1,6 @@
-import random
 import warnings
+
+from random import Random
 from embera.utilities.architectures.tiling import Tiling
 
 __all__ = ['find_candidates', 'SimulatedAnnealingPlacer']
@@ -15,7 +16,7 @@ class SimulatedAnnealingPlacer(Tiling):
 
         # Random Number Generator Configuration
         self.random_seed = params.pop('random_seed', None)
-        self.rng = random.Random(self.random_seed)
+        self.rng = Random(self.random_seed)
 
         # Choice of vicinity. See below.
         self.vicinity = params.pop('vicinity', 0)
