@@ -55,3 +55,7 @@ class TestDataBase(unittest.TestCase):
         self.db.dump_report(source_edgelist,target_edgelist,embedding,report)
         report_copy = self.db.load_report(source_edgelist,target_edgelist)
         self.assertEqual(report,report_copy)
+
+    def test_empty(self):
+        self.db.dump_embedding([],[],{})
+        self.db.dump_report([],[],{},{"valid":False})

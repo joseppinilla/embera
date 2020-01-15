@@ -3,11 +3,12 @@
 from setuptools import setup
 
 packages = ['embera',
+            'embera.architectures',
             'embera.benchmark',
             'embera.composites',
+            'embera.interfaces',
             'embera.preprocess',
             'embera.utilities',
-            'embera.utilities.architectures',
             ]
 
 install_requires = ['decorator>=4.1.0,<5.0.0',
