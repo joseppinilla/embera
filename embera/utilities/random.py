@@ -1,4 +1,4 @@
-from numpy import concatenate
+from numpy import array, concatenate
 from numpy.random import multinomial, normal, uniform, seed, sample, shuffle
 
 """ Probability functions and distributions useful in embedding and testing
@@ -24,6 +24,6 @@ def bimodal(N, loc1=-1.0,scale1=.25,size1=None,
 
 def categorical(N, vals):
     bins = multinomial(n=N, pvals=prob_vector(len(vals)))
-    samples = [vals[i] for i,b in enumerate(bins) for _ in range(b)]
+    samples = array([vals[i] for i,b in enumerate(bins) for _ in range(b)])
     shuffle(samples)
     return samples

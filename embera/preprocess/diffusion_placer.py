@@ -5,8 +5,8 @@ import matplotlib.pyplot as plt
 
 from random import Random
 
-from embera.utilities.architectures.tiling import Tiling
-from embera.utilities.architectures.drawing import draw_tiled_graph
+from embera.architectures.tiling import Tiling
+from embera.architectures.drawing import draw_tiled_graph
 
 __all__ = ['find_candidates']
 

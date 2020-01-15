@@ -2,8 +2,8 @@
 """
 import dwave_networkx as dnx
 import matplotlib.pyplot as plt
-from embera.utilities.architectures import drawing, generators
-from embera.utilities.architectures.tiling import Tiling
+from embera.architectures import drawing, generators
+from embera.architectures.tiling import Tiling
 
 p=3
 Tg = generators.p6_graph()

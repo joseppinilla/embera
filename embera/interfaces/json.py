@@ -1,11 +1,13 @@
 import json
+import embera
 
 class EmberaEncoder(json.JSONEncoder):
     def iterencode(self, obj):
-        if isinstance(obj, dict):
-            s = [f"\"{k}\":\"{v}\"" for k,v in obj.items()]
-            formatted = ",".join(s)
-            return f"{{{formatted}}}"
+        if isinstance(obj,embera.Embedding):
+            embedding = obj.items()
+            items_list = [f"\"{k}\":\"{v}\"" for k,v in embedding]
+            serialized = ",".join(items_list)
+            return f"{{{serialized}}}"
         return super(EmberaEncoder, self).iterencode(obj)
 
 class EmberaDecoder(json.JSONDecoder):

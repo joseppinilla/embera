@@ -21,10 +21,36 @@
 import networkx as nx
 import dwave_networkx as dnx
 
-__all__ = ['rainier_graph', 'vesuvius_graph', 'dw2x_graph', 'dw2000q_graph',
+__all__ = ['get_graph_from_solver',
+           'rainier_graph', 'vesuvius_graph', 'dw2x_graph', 'dw2000q_graph',
            'p6_graph', 'p16_graph',
            'h20k_graph']
 
+
+def get_graph_from_solver(solver, **kwargs):
+    """ D-Wave architecture graph from Dimod Structured Solver
+    """
+    topology = solver.properties['topology']
+    type = topology['type']
+    shape = topology['shape']
+
+    edgelist = solver.properties['couplers']
+    kwargs['edge_list'] = edgelist
+
+    if type=='chimera':
+        target_graph = dnx.generators.chimera_graph(*shape, **kwargs)
+        indices = nx.get_node_attributes(target_graph,'chimera_index')
+        target_graph.graph['pos'] = {v:(i,j) for v, (i,j,u,k) in indices.items()}
+        target_graph.name = solver.name
+    elif type=='pegasus':
+        target_graph = dnx.generators.pegasus_graph(*shape, **kwargs)
+        indices = nx.get_node_attributes(target_graph,'pegasus_index')
+        target_graph.graph['pos'] = {v:(x,y) for v, (t,y,x,u,k) in indices.items()}
+    else:
+        raise TypeError("Solver provided is not any of the supported types.")
+
+    target_graph.name = solver.name
+    return target_graph
 
 def rainier_graph(**kwargs):
     """ D-Wave One 'Rainier' Quantum Annealer graph

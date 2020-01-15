@@ -8,7 +8,7 @@ from random import uniform
 
 from embera.benchmark.topologies import pruned_graph_gen
 
-from embera.utilities.architectures import drawing, generators
+from embera.architectures import drawing, generators
 from embera.composites.layout_aware import LayoutAwareEmbeddingComposite
 
 from dimod.reference.composites.structure import StructureComposite

@@ -7,7 +7,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from embera.disperse import find_embedding
 from embera.benchmark.topologies import pruned_graph_gen
-from embera.utilities.architectures import drawing, generators
+from embera.architectures import drawing, generators
 from embera.preprocess.diffusion_placer import find_candidates
 
 # A 2x2 grid problem graph

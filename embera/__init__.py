@@ -1,3 +1,4 @@
+from .architectures import *
 from .benchmark import *
 from .composites import *
 from .interfaces import *

@@ -6,8 +6,8 @@ import networkx as nx
 import dwave_networkx as dnx
 import matplotlib.pyplot as plt
 from minorminer import find_embedding
-from embera.utilities.architectures import generators
-from embera.utilities.architectures import drawing
+from embera.architectures import generators
+from embera.architectures import drawing
 from embera.preprocess.diffusion_placer import find_candidates
 
 # A 16x16 grid problem graph

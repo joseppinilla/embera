@@ -13,7 +13,7 @@ import minorminer
 import networkx as nx
 import dwave_networkx as dnx
 
-from embera.utilities.architectures import generators
+from embera.architectures import generators
 from embera.composites.embedding import EmbeddingComposite
 
 from dimod.reference.samplers.exact_solver import ExactSolver

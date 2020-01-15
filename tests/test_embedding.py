@@ -2,7 +2,7 @@ import unittest
 import minorminer
 import dimod.testing as dtest
 
-from embera.utilities.architectures import generators
+from embera.architectures import generators
 from embera.composites.embedding import EmbeddingComposite
 
 from dimod.reference.samplers.random_sampler import RandomSampler

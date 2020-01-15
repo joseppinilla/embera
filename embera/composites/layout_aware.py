@@ -16,7 +16,7 @@ import minorminer
 from embera import disperse
 
 from embera.preprocess import diffusion_placer
-from embera.utilities.architectures.generators import dw2000q_graph
+from embera.architectures.generators import dw2000q_graph
 
 from dwave.embedding.transforms import embed_bqm, unembed_sampleset
 from dimod.binary_quadratic_model import BinaryQuadraticModel

@@ -1,7 +1,7 @@
 import warnings
 
 from random import Random
-from embera.utilities.architectures.tiling import Tiling
+from embera.architectures.tiling import Tiling
 
 __all__ = ['find_candidates', 'SimulatedAnnealingPlacer']
 

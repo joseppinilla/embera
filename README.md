@@ -36,7 +36,7 @@ When using along with `dimod`, either use the method-specific composites
 ...) with the corresponding method parameters:
 
 ``` python
-from embera.utilities.architectures import generators
+from embera.architectures import generators
 from dimod.reference.composites.structure import StructureComposite
 from embera.composites.minorminer import MinorMinerEmbeddingComposite
 from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampler
@@ -53,7 +53,7 @@ or the generic `EmbeddingComposite`:
 
 ``` python
 import minorminer
-from embera.utilities.architectures import generators
+from embera.architectures import generators
 from dimod.reference.samplers.random_sampler import RandomSampler
 from dimod.reference.composites.structure import StructureComposite
 from embera.composites.embedding import EmbeddingComposite
@@ -82,8 +82,8 @@ import networkx as nx
 import dwave_networkx as dnx
 import matplotlib.pyplot as plt
 from minorminer import find_embedding
-from embera.utilities.architectures import generators
-from embera.utilities.architectures import drawing
+from embera.architectures import generators
+from embera.architectures import drawing
 from embera.preprocess.diffusion_placer import find_candidates
 
 # A 16x16 grid problem graph
@@ -148,7 +148,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from embera.disperse import find_embedding
 from embera.benchmark.topologies import pruned_graph_gen
-from embera.utilities.architectures import drawing, generators
+from embera.architectures import drawing, generators
 from embera.preprocess.diffusion_placer import find_candidates
 
 # A 2x2 grid problem graph
@@ -187,8 +187,8 @@ Example of tiling a Pegasus architecture graph.
 ``` python
 import dwave_networkx as dnx
 import matplotlib.pyplot as plt
-from embera.utilities.architectures import drawing, generators
-from embera.utilities.architectures.tiling import Tiling
+from embera.architectures import drawing, generators
+from embera.architectures.tiling import Tiling
 
 # Pegasus graph
 Tg = generators.p6_graph()

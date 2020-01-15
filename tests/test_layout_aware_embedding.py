@@ -2,7 +2,7 @@ import unittest
 import dimod.testing as dtest
 
 
-from embera.utilities.architectures import generators
+from embera.architectures import generators
 from embera.composites.layout_aware import LayoutAwareEmbeddingComposite
 
 from dimod.reference.composites.structure import StructureComposite

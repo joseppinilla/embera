@@ -3,7 +3,7 @@
 
 import matplotlib.pyplot as plt
 from embera.benchmark.topologies import pruned_graph_gen
-from embera.utilities.architectures import drawing, generators
+from embera.architectures import drawing, generators
 from embera.preprocess.complete_bipartite_placer import CompleteBipartitePlacer, find_candidates
 
 # Problem dimensions

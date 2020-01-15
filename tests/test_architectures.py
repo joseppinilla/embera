@@ -2,7 +2,7 @@ import embera
 import unittest
 import minorminer
 
-from embera.utilities.architectures import generators
+from embera.architectures import generators
 from embera.benchmark.topologies import pruned_graph_gen
 
 GRAPHS = [embera.benchmark.complete_graph(16),
