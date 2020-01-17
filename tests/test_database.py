@@ -65,6 +65,67 @@ class TestDataBase(unittest.TestCase):
         target_edgelist = self.target_edgelist
         self.db.dump_sampleset(bqm,target_edgelist,sampleset,embedding=embedding)
         sampleset_copy = self.db.load_sampleset(bqm,target_edgelist,embedding=embedding)
+        self.assertEqual(sampleset,sampleset_copy)
+
+    def test_id_bqm(self):
+        bqm = self.bqm
+        bqm_id = self.db.id_bqm(bqm)
+        S = bqm.to_networkx_graph()
+        graph_id = self.db.id_bqm(S)
+        self.assertEqual(bqm_id,graph_id)
+
+        self.db.set_bqm_alias(bqm,'TEST')
+        name_id = self.db.id_bqm('TEST')
+        self.assertEqual(bqm_id,name_id)
+
+        self.assertRaises(ValueError,self.db.id_bqm,0)
+
+    def test_id_target(self):
+        target_edgelist = self.target_edgelist
+        edgelist_id = self.db.id_target(target_edgelist)
+        T = nx.Graph(target_edgelist)
+        graph_id = self.db.id_target(T)
+        self.assertEqual(edgelist_id,graph_id)
+
+        self.db.set_target_alias(target_edgelist,'TEST')
+        name_id = self.db.id_target('TEST')
+        self.assertEqual(edgelist_id,name_id)
+
+        self.assertRaises(ValueError,self.db.id_target,0)
+
+    def test_id_source(self):
+        source_edgelist = self.source_edgelist
+        edgelist_id = self.db.id_source(source_edgelist)
+        S = nx.Graph(source_edgelist)
+        graph_id = self.db.id_source(S)
+        self.assertEqual(edgelist_id,graph_id)
+
+        bqm_id = self.db.id_source(self.bqm)
+        self.assertEqual(edgelist_id,bqm_id)
+
+        self.db.set_source_alias(source_edgelist,'TEST')
+        name_id = self.db.id_source('TEST')
+        self.assertEqual(edgelist_id,name_id)
+
+        self.assertRaises(ValueError,self.db.id_source,0)
+
+    def test_id_embedding(self):
+
+        embedding = self.embedding
+        source = self.source_edgelist
+        target = self.target_edgelist
+        embedding_obj = Embedding(source,target,embedding)
+        embedding_id = self.db.id_embedding([],[],embedding_obj)
+        self.assertEqual(embedding_id,embedding_obj.id)
+
+        dict_id = self.db.id_embedding(source,target,embedding)
+        self.assertEqual(embedding_id,dict_id)
+
+        self.db.set_embedding_alias(embedding_obj,'TEST')
+        name_id = self.db.id_embedding([],[],'TEST')
+        self.assertEqual(dict_id,name_id)
+
+        self.assertRaises(ValueError,self.db.id_embedding,[],[],0)
 
     def test_empty(self):
         self.db.dump_embedding([],[],{})

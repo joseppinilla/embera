@@ -7,7 +7,7 @@ from json import dump as _dump
 from embera.interfaces.embedding import Embedding
 from embera.interfaces.json import EmberaEncoder, EmberaDecoder
 
-from dimod import BinaryQuadraticModel
+from dimod import concatenate, BinaryQuadraticModel
 from dimod.serialization.json import DimodEncoder, DimodDecoder
 
 from networkx import Graph
@@ -18,10 +18,9 @@ __all__ = ["EmberaDataBase"]
 
 
 class EmberaDataBase:
-    """ DataBase class to store embeddings, reports, and samplesets. """
-    bqm_aliases = {}
-    source_aliases = {}
-    target_aliases = {}
+    """ DataBase class to store bqms, embeddings, and samplesets. """
+    path = None
+    aliases = {}
 
     def __init__(self, path="./EmberaDB/"):
 
@@ -41,36 +40,51 @@ class EmberaDataBase:
         if not os.path.isdir(self.samplesets_path):
             os.mkdir(self.samplesets_path)
 
+        self.aliases_path = os.path.join(self.path,'aliases.json')
+        if os.path.exists(self.aliases_path):
+            with open(aliases_path,'r') as fp:
+                self.aliases = _load(fp)
 
-
-    def update_alias(self):
-        for id,name in self.bqm_aliases.items():
-            pass
-        for id,name in self.source_aliases.items():
-            pass
-        for id,name in self.target_aliases.items():
-            pass
-        # TODO: checks if directories have duplicates, merges them
+    def update_aliases(self):
+        with open(self.aliases_path,'w+') as fp:
+            _dump(self.aliases,fp)
 
     def set_bqm_alias(self, bqm, alias):
         id = self.id_bqm(bqm)
-        self.bqm_aliases[id] = alias
+        bqm_aliases = self.aliases.get('bqm',{})
+        bqm_aliases[alias] = id
+        self.aliases['bqm'] = bqm_aliases
+        self.update_aliases()
 
     def set_source_alias(self, source, alias):
         id = self.id_source(source)
-        self.source_aliases[id] = alias
+        bqm_aliases = self.aliases.get('source',{})
+        bqm_aliases[alias] = id
+        self.aliases['source'] = bqm_aliases
+        self.update_aliases()
 
     def set_target_alias(self, target, alias):
         id = self.id_target(target)
-        self.target_aliases[id] = alias
+        target_aliases = self.aliases.get('target',{})
+        target_aliases[alias] = id
+        self.aliases['target'] = target_aliases
+        self.update_aliases()
+
+    def set_embedding_alias(self, embedding, alias):
+        assert(isinstance(embedding,Embedding))
+        id = self.id_embedding([],[],embedding)
+        embedding_aliases = self.aliases.get('embedding',{})
+        embedding_aliases[alias] = id
+        self.aliases['embedding'] = embedding_aliases
+        self.update_aliases()
 
     def id_bqm(self, bqm):
         if isinstance(bqm,BinaryQuadraticModel):
             id = str(hash(json.dumps(bqm,cls=DimodEncoder)))
         elif isinstance(bqm,Graph):
-            id = str(hash(json.dumps(BinaryQuadraticModel(bqm),cls=DimodEncoder)))
+            id = str(hash(json.dumps(BinaryQuadraticModel.from_networkx_graph(bqm),cls=DimodEncoder)))
         elif isinstance(bqm,str):
-            id = bqm
+            id = self.aliases.get('bqm',{}).get(bqm,bqm)
         else:
             raise ValueError("BQM must be dimod.BinaryQuadraticModel, networkx.Graph, or str")
         return id
@@ -83,7 +97,7 @@ class EmberaDataBase:
         elif isinstance(source,list):
             id = str(hash(tuple(sorted((tuple(sorted(e)) for e in source)))))
         elif isinstance(source,str):
-            id = source
+            id = self.aliases.get('source',{}).get(source,source)
         else:
             raise ValueError("Source must be dimod.BinaryQuadraticModel, networkx.Graph, list of tuples or str")
         return id
@@ -94,7 +108,7 @@ class EmberaDataBase:
         elif isinstance(target,Graph):
             id = str(hash(tuple(target.edges())))
         elif isinstance(target,str):
-            id = target
+            id = self.aliases.get('target',{}).get(target,target)
         else:
             raise ValueError("Target must be list of tuples, networkx.Graph, or str")
         return id
@@ -102,10 +116,10 @@ class EmberaDataBase:
     def id_embedding(self, source, target, embedding):
         if isinstance(embedding,Embedding):
             id = embedding.id
-        elif source and target:
+        elif isinstance(embedding,dict) and source and target:
             id = Embedding(source,target,embedding).id
         elif isinstance(embedding,str):
-            id = embedding
+            id = self.aliases.get('embedding',{}).get(embedding,embedding)
         else:
             raise ValueError("Embedding must be embera.Embedding, dict, or str")
         return id
@@ -169,14 +183,14 @@ class EmberaDataBase:
         for root, dirs, files in os.walk(samplesets_path):
             if sampleset_filename in files:
                 sampleset_path = os.path.join(root,sampleset_filename)
-                with open(embedding_path,'r') as fp:
+                with open(sampleset_path,'r') as fp:
                     sampleset = _load(fp,cls=DimodDecoder)
                 samplesets.append(sampleset)
 
         if not samplesets:
             return {}
         else:
-            return dimod.sampleset.concatenate(samplesets)
+            return concatenate(samplesets)
 
     def dump_sampleset(self, bqm, target, sampleset, tag="", embedding={}):
         bqm_id = self.id_bqm(bqm)
@@ -184,7 +198,7 @@ class EmberaDataBase:
         samplesets_path = [self.samplesets_path,bqm_id,target_id,tag]
 
         embedding_id = self.id_embedding(bqm,target,embedding)
-        sampleset_filename = embedding_id + ".json"
+        sampleset_filename = embedding_id
 
         sampleset_path = self.get_path(samplesets_path, sampleset_filename)
 
