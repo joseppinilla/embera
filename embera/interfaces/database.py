@@ -66,9 +66,9 @@ class EmberaDataBase:
 
     def id_bqm(self, bqm):
         if isinstance(bqm,BinaryQuadraticModel):
-            id = hash(json.dumps(bqm,cls=DimodEncoder))
+            id = str(hash(json.dumps(bqm,cls=DimodEncoder)))
         elif isinstance(bqm,Graph):
-            id = hash(json.dumps(BinaryQuadraticModel(bqm),cls=DimodEncoder))
+            id = str(hash(json.dumps(BinaryQuadraticModel(bqm),cls=DimodEncoder)))
         elif isinstance(bqm,str):
             id = bqm
         else:
@@ -102,7 +102,7 @@ class EmberaDataBase:
     def id_embedding(self, source, target, embedding):
         if isinstance(embedding,Embedding):
             id = embedding.id
-        elif bqm and target:
+        elif source and target:
             id = Embedding(source,target,embedding).id
         elif isinstance(embedding,str):
             id = embedding
@@ -167,8 +167,8 @@ class EmberaDataBase:
         sampleset_filename = embedding_id + ".json"
         samplesets = []
         for root, dirs, files in os.walk(samplesets_path):
-            if embedding_filename in files:
-                sampleset_path = os.path.join(root,embedding_filename)
+            if sampleset_filename in files:
+                sampleset_path = os.path.join(root,sampleset_filename)
                 with open(embedding_path,'r') as fp:
                     sampleset = _load(fp,cls=DimodDecoder)
                 samplesets.append(sampleset)
@@ -268,7 +268,6 @@ class EmberaDataBase:
         embedding_filename = embedding_id + ".json"
 
         embedding_path = self.get_path(embeddings_path, embedding_filename)
-        print(embedding_path)
 
         with open(embedding_path,'w+') as fp:
             _dump(embedding_obj,fp,cls=EmberaEncoder)

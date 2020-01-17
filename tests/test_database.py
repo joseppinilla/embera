@@ -18,15 +18,18 @@ class TestDataBase(unittest.TestCase):
         # Temporary DataBase
         self.db = EmberaDataBase("./TMP_DB")
         # Toy Problem
-        self.bqm = dimod.BinaryQuadraticModel({'a':2,'b':2,'c':2},
-                                              {('a','b'):-1,('b','c'):-1,('c','a'):-1},
-                                              0.0,
-                                              dimod.Vartype.SPIN)
+        self.bqm = dimod.BinaryQuadraticModel(
+                   {'a':2,'b':2,'c':2},
+                   {('a','b'):-1,('b','c'):-1,('c','a'):-1},
+                   0.0,dimod.Vartype.SPIN)
         self.source_edgelist = [('a','b'),('b','c'),('c','a')]
         self.target_edgelist = [(1,2),(2,3),(3,4),(4,1)]
         # Toy Entries
-        self.embedding = minorminer.find_embedding(self.source_edgelist,self.target_edgelist)
-        self.sampleset = dimod.as_samples([{'a': 0, 'b': 1, 'c': 0},{'a': 0, 'b': 1, 'c': 1}])
+        self.embedding = minorminer.find_embedding(self.source_edgelist,
+                                                   self.target_edgelist)
+        self.sampleset = dimod.SampleSet.from_samples(
+                         [{'a': 0, 'b': 1, 'c': 0},{'a': 0, 'b': 1, 'c': 1}],
+                         'BINARY',0)
 
     def tearDown(self):
         shutil.rmtree("./TMP_DB")
@@ -54,27 +57,17 @@ class TestDataBase(unittest.TestCase):
         embedding_copy = self.db.load_embedding(source_edgelist,target_edgelist)
         self.assertEqual(embedding,embedding_copy)
 
-    def test_report(self):
-        report = {"this":"is","a":"test"}
-        embedding = self.embedding
-        source_edgelist = self.source_edgelist
-        target_edgelist = self.target_edgelist
-        self.db.dump_report(source_edgelist,target_edgelist,embedding,report)
-        report_copy = self.db.load_report(source_edgelist,target_edgelist)
-        self.assertEqual(report,report_copy)
-
     def test_sampleset(self):
         bqm = self.bqm
         sampleset = self.sampleset
         embedding = self.embedding
         source_edgelist = self.source_edgelist
         target_edgelist = self.target_edgelist
-        self.db.dump_sampleset(source_edgelist,target_edgelist,embedding,bqm,sampleset)
-        sampleset_copy = self.db.load_sampleset(source_edgelist,target_edgelist,embedding,bqm)
+        self.db.dump_sampleset(bqm,target_edgelist,sampleset,embedding=embedding)
+        sampleset_copy = self.db.load_sampleset(bqm,target_edgelist,embedding=embedding)
 
     def test_empty(self):
         self.db.dump_embedding([],[],{})
-        self.db.dump_report([],[],{},{"valid":False})
 
 # import json
 # import dimod
