@@ -16,6 +16,6 @@ class EmberaDecoder(json.JSONDecoder):
 
     def object_hook(self, obj):
         if isinstance(obj,dict):
-            format_eval = lambda k: k if k.isalpha() else eval(k)
+            format_eval = lambda k: k if k.isalnum() else eval(k)
             return {format_eval(key):eval(value) for key, value in obj.items()}
         return obj

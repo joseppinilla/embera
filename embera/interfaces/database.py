@@ -83,6 +83,7 @@ class EmberaDataBase:
             id = str(hash(json.dumps(bqm,cls=DimodEncoder)))
         elif isinstance(bqm,Graph):
             id = str(hash(json.dumps(BinaryQuadraticModel.from_networkx_graph(bqm),cls=DimodEncoder)))
+            if bqm.name: self.set_bqm_alias(id,bqm.name)
         elif isinstance(bqm,str):
             id = self.aliases.get('bqm',{}).get(bqm,bqm)
         else:
@@ -94,6 +95,7 @@ class EmberaDataBase:
             id = str(hash(tuple(sorted((tuple(sorted(e)) for e in source.quadratic)))))
         elif isinstance(source,Graph):
             id = str(hash(tuple(sorted((tuple(sorted(e)) for e in source.edges)))))
+            if source.name: self.set_source_alias(id,source.name)
         elif isinstance(source,list):
             id = str(hash(tuple(sorted((tuple(sorted(e)) for e in source)))))
         elif isinstance(source,str):
@@ -107,6 +109,7 @@ class EmberaDataBase:
             id = str(hash(tuple(sorted((tuple(sorted(e)) for e in target)))))
         elif isinstance(target,Graph):
             id = str(hash(tuple(target.edges())))
+            if target.name: self.set_target_alias(id,target.name)
         elif isinstance(target,str):
             id = self.aliases.get('target',{}).get(target,target)
         else:
