@@ -18,6 +18,7 @@ def validate_graphs(func):
 def parse_edges(func):
     def func_wrapper(self, source, target, *args, **kwargs):
         if hasattr(source, 'edges'): source_edgelist = source.edges()
+        elif hasattr(source, 'quadratic'): source_edgelist = source.quadratic.keys()
         else: source_edgelist = sorted((tuple(sorted(e)) for e in source))
 
         if hasattr(target, 'edges'): target_edgelist = target.edges()

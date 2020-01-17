@@ -1,6 +1,5 @@
 import embera
 import unittest
-import minorminer
 
 class TestBenchmarks(unittest.TestCase):
 

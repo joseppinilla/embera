@@ -1,10 +1,11 @@
+import dimod
 import shutil
 import unittest
 import minorminer
 
 import networkx as nx
 
-from embera import Embedding
+from embera.interfaces.embedding import Embedding
 from embera.interfaces.database import EmberaDataBase
 
 class TestDataBase(unittest.TestCase):
@@ -16,10 +17,16 @@ class TestDataBase(unittest.TestCase):
     def setUp(self):
         # Temporary DataBase
         self.db = EmberaDataBase("./TMP_DB")
-        #Toy Graphs
+        # Toy Problem
+        self.bqm = dimod.BinaryQuadraticModel({'a':2,'b':2,'c':2},
+                                              {('a','b'):-1,('b','c'):-1,('c','a'):-1},
+                                              0.0,
+                                              dimod.Vartype.SPIN)
         self.source_edgelist = [('a','b'),('b','c'),('c','a')]
         self.target_edgelist = [(1,2),(2,3),(3,4),(4,1)]
+        # Toy Entries
         self.embedding = minorminer.find_embedding(self.source_edgelist,self.target_edgelist)
+        self.sampleset = dimod.as_samples([{'a': 0, 'b': 1, 'c': 0},{'a': 0, 'b': 1, 'c': 1}])
 
     def tearDown(self):
         shutil.rmtree("./TMP_DB")
@@ -56,6 +63,25 @@ class TestDataBase(unittest.TestCase):
         report_copy = self.db.load_report(source_edgelist,target_edgelist)
         self.assertEqual(report,report_copy)
 
+    def test_sampleset(self):
+        bqm = self.bqm
+        sampleset = self.sampleset
+        embedding = self.embedding
+        source_edgelist = self.source_edgelist
+        target_edgelist = self.target_edgelist
+        self.db.dump_sampleset(source_edgelist,target_edgelist,embedding,bqm,sampleset)
+        sampleset_copy = self.db.load_sampleset(source_edgelist,target_edgelist,embedding,bqm)
+
     def test_empty(self):
         self.db.dump_embedding([],[],{})
         self.db.dump_report([],[],{},{"valid":False})
+
+# import json
+# import dimod
+# from dimod.serialization.json import DimodEncoder, DimodDecoder
+#
+# bqm = dimod.BinaryQuadraticModel({'a':2,'b':2,'c':2},{('a','b'):-1,('b','c'):-1,('c','a'):-1},0.0,dimod.Vartype.SPIN)
+# hash(json.dumps(bqm,cls=DimodEncoder))
+#
+# list(bqm.linear)
+# list(bqm.quadratic)

@@ -3,15 +3,15 @@ import embera
 
 __all__ = ["embed_and_report"]
 
-def embed_and_report(method, S, T):
+def embed_and_report(method, S, T, RNG_SEED=42):
     report = {}
     embedding = {}
 
     start = time.time()
-    embedding = method(S,T)
+    embedding = method(S,T,RNG_SEED)
     end = time.time()
 
-    if not embedding: return {"valid":False}, {}
+    if not embedding: return {}, {"valid":False}
     embedding_obj = embera.Embedding(S,T,embedding)
 
     report["embedding_method"] = method.__name__
