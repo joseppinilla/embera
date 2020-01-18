@@ -8,6 +8,23 @@ import networkx as nx
 from embera.interfaces.embedding import Embedding
 from embera.interfaces.database import EmberaDataBase
 
+class TestEmbedding(unittest.TestCase):
+    def setUp(self):
+        self.source_edgelist = [('a','b'),('b','c'),('c','a')]
+        self.target_edgelist = [(1,2),(2,3),(3,4),(4,1)]
+        self.embedding = minorminer.find_embedding(self.source_edgelist,self.target_edgelist)
+
+    def test_properties(self):
+        source = self.source_edgelist
+        target = self.target_edgelist
+        embedding = self.embedding
+        runtime = 1.0
+        embedding_obj = Embedding(source,target,embedding,runtime=runtime)
+        self.assertEqual(embedding_obj.properties['runtime'],runtime)
+        embedding_obj = Embedding(source,target,embedding,**{'test':True})
+        assert(embedding_obj.properties['test'])
+
+
 class TestDataBase(unittest.TestCase):
 
     db = None
@@ -36,9 +53,7 @@ class TestDataBase(unittest.TestCase):
 
     def test_embedding_graphs(self):
         S = nx.Graph(self.source_edgelist)
-        S.name = "TMP_K3"
         T = nx.Graph(self.target_edgelist)
-        T.name = "TMP_P4"
 
         embedding_obj = Embedding(S,T,self.embedding)
         interactions = embedding_obj.interactions_histogram(S,T)
@@ -48,14 +63,6 @@ class TestDataBase(unittest.TestCase):
         embedding_copy = self.db.load_embedding(S,T,tag='minorminer')
 
         self.assertEqual(embedding_obj, Embedding(S,T,embedding_copy))
-
-    def test_embedding_noname(self):
-        embedding = self.embedding
-        source_edgelist = self.source_edgelist
-        target_edgelist = self.target_edgelist
-        self.db.dump_embedding(source_edgelist,target_edgelist,embedding)
-        embedding_copy = self.db.load_embedding(source_edgelist,target_edgelist)
-        self.assertEqual(embedding,embedding_copy)
 
     def test_sampleset(self):
         bqm = self.bqm
@@ -129,13 +136,3 @@ class TestDataBase(unittest.TestCase):
 
     def test_empty(self):
         self.db.dump_embedding([],[],{})
-
-# import json
-# import dimod
-# from dimod.serialization.json import DimodEncoder, DimodDecoder
-#
-# bqm = dimod.BinaryQuadraticModel({'a':2,'b':2,'c':2},{('a','b'):-1,('b','c'):-1,('c','a'):-1},0.0,dimod.Vartype.SPIN)
-# hash(json.dumps(bqm,cls=DimodEncoder))
-#
-# list(bqm.linear)
-# list(bqm.quadratic)

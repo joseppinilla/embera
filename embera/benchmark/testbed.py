@@ -11,13 +11,9 @@ def embed_and_report(method, S, T, RNG_SEED=42):
     embedding = method(S,T,RNG_SEED)
     end = time.time()
 
-    if not embedding: return {}, {"valid":False}
-    embedding_obj = embera.Embedding(S,T,embedding)
+    report = {"valid":bool(embedding)} # This can be more elaborate, for incomplete embeddings
+    report['embedding_runtime'] = end-start
 
-    report["embedding_method"] = method.__name__
-    report["embedding_runtime"] = end - start
-    report["max_chain"] = embedding_obj.max_chain
-    report["total_qubits"] = embedding_obj.total_qubits
-    report["valid"] = True
+    embedding_obj = embera.Embedding(S,T,embedding,**report)
 
-    return embedding, report
+    return embedding

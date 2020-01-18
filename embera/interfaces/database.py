@@ -42,7 +42,7 @@ class EmberaDataBase:
 
         self.aliases_path = os.path.join(self.path,'aliases.json')
         if os.path.exists(self.aliases_path):
-            with open(aliases_path,'r') as fp:
+            with open(self.aliases_path,'r') as fp:
                 self.aliases = _load(fp)
 
     def update_aliases(self):
@@ -282,7 +282,7 @@ class EmberaDataBase:
         else: embedding_obj = Embedding(source,target,embedding)
 
         embedding_id = embedding_obj.id
-        embedding_filename = embedding_id + ".json"
+        embedding_filename = embedding_id
 
         embedding_path = self.get_path(embeddings_path, embedding_filename)
 

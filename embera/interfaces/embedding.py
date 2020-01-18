@@ -2,42 +2,31 @@
 
 __all__ = ["Embedding"]
 
-def validate_graphs(func):
-    def func_wrapper(self, source, target, *args, **kwargs):
-        source_id = hash(tuple(source))
-        assert(self.source_id==source_id), "Source ID does not match."
-
-        target_id = hash(tuple(target))
-        assert(self.target_id==target_id), "Target ID does not match."
-
-        res = func(self, source, target, *args, **kwargs)
-        return res
-
-    return func_wrapper
-
-def parse_edges(func):
-    def func_wrapper(self, source, target, *args, **kwargs):
-        if hasattr(source, 'edges'): source_edgelist = source.edges()
-        elif hasattr(source, 'quadratic'): source_edgelist = source.quadratic.keys()
-        else: source_edgelist = sorted((tuple(sorted(e)) for e in source))
-
-        if hasattr(target, 'edges'): target_edgelist = target.edges()
-        else: target_edgelist = sorted((tuple(sorted(e)) for e in target))
-
-        res = func(self, source_edgelist, target_edgelist, *args, **kwargs)
-        return res
-    return func_wrapper
-
 class Embedding(dict):
 
     source_id = None
     target_id = None
+    properties = {}
 
-    @parse_edges
-    def __init__(self, source, target, embedding,**properties):
-        self.update(embedding)
-        self.source_id = hash(tuple(source))
-        self.target_id = hash(tuple(target))
+    def __init__(self, source, target, embedding, **properties):
+        super(Embedding,self).__init__(embedding)
+
+        if isinstance(source,int):
+            self.source_id = source
+        else:
+            if hasattr(source, 'edges'): source = source.edges()
+            elif hasattr(source, 'quadratic'): source = source.quadratic.keys()
+            else: source = sorted((tuple(sorted(e)) for e in source))
+            self.source_id = hash(tuple(source))
+
+        if isinstance(target,int):
+            self.target_id = target
+        else:
+            if hasattr(target, 'edges'): target = target.edges()
+            else: target = sorted((tuple(sorted(e)) for e in target))
+            self.target_id = hash(tuple(target))
+
+        self.properties.update(properties)
 
     def chain_histogram(self):
         # Based on dwavesystems/minorminer quality_key by Boothby, K.
@@ -47,9 +36,19 @@ class Embedding(dict):
             hist[s] = 1 + hist.get(s, 0)
         return hist
 
-    @parse_edges
-    @validate_graphs
     def interactions_histogram(self, source, target):
+        if hasattr(source, 'edges'): source = source.edges()
+        elif hasattr(source, 'quadratic'): source = source.quadratic.keys()
+        else: source = sorted((tuple(sorted(e)) for e in source))
+
+        if hasattr(target, 'edges'): target = target.edges()
+        else: target = sorted((tuple(sorted(e)) for e in target))
+
+        source_id = hash(tuple(source))
+        assert(self.source_id==source_id), "Source ID does not match."
+
+        target_id = hash(tuple(target))
+        assert(self.target_id==target_id), "Target ID does not match."
         interactions = {}
         for u, v in source:
             source_edge = tuple(sorted((u,v)))
@@ -85,8 +84,9 @@ class Embedding(dict):
 
     @property
     def id(self):
-        # To create a unique ID we use the quality key as an ID string ...
-        quality_id = "".join([str(v) for v in self.quality_key])
+        # To create a unique ID we use the quality key as an ID string...
+        if not self: quality_id = "EMPTY" # ..., unless empty,
+        else: quality_id = "".join([str(v) for v in self.quality_key])
         # ...and the last 8 digits of this object's hash.
         hash_id = f"{self.__hash__():08}"[-8:]
         return f"{quality_id}_{hash_id}"
