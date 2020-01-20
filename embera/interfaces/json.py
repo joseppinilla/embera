@@ -30,8 +30,10 @@ class EmberaDecoder(json.JSONDecoder):
             if obj.get("type",None)=="Embedding":
                 source_id = obj["source_id"]
                 target_id = obj["target_id"]
-                properties = obj["properties"]
                 embedding = obj["embedding"]
-                embedding_obj = embera.Embedding(source_id,target_id,embedding)
+                properties = obj["properties"]
+                embedding_obj = embera.Embedding(source_id,target_id,
+                                                 embedding,
+                                                 properties=properties)
                 return embedding_obj
         return obj

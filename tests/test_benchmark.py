@@ -1,7 +1,17 @@
+import dimod
 import embera
 import unittest
 
-class TestBenchmarks(unittest.TestCase):
+class TestParameters(unittest.TestCase):
+
+    def test_bqm(self):
+        G = embera.benchmark.topologies.complete_graph(4)
+        h,J = embera.benchmark.parameters.csp(G)
+        bqm = dimod.BinaryQuadraticModel(h,J,0.0,dimod.Vartype.SPIN)
+        assert(isinstance(bqm,dimod.BinaryQuadraticModel))
+
+
+class TestTopologies(unittest.TestCase):
 
     def test_dwave(self):
         benchmarks = embera.benchmark.topologies.dwave_bench()

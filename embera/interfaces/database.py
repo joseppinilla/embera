@@ -58,9 +58,9 @@ class EmberaDataBase:
 
     def set_source_alias(self, source, alias):
         id = self.id_source(source)
-        bqm_aliases = self.aliases.get('source',{})
-        bqm_aliases[alias] = id
-        self.aliases['source'] = bqm_aliases
+        source_aliases = self.aliases.get('source',{})
+        source_aliases[alias] = id
+        self.aliases['source'] = source_aliases
         self.update_aliases()
 
     def set_target_alias(self, target, alias):
@@ -128,7 +128,7 @@ class EmberaDataBase:
         return id
 
     def get_path(self, dir_path, filename=None):
-        path = "./"
+        path = ""
         for dir in dir_path:
             path = os.path.join(path,dir)
             if not os.path.isdir(path):
@@ -138,24 +138,23 @@ class EmberaDataBase:
         return path
 
     """ ######################## BinaryQuadraticModels ##################### """
-    def load_bqm(self, bqm_id, tag=""):
+    def load_bqm(self, bqm, tag=""):
+        bqm_id = self.aliases.get('bqm',{}).get(bqm,bqm)
         bqm_filename = bqm_id + ".json"
         bqm_path = os.path.join(self.bqms_path,tag,bqm_filename)
 
         with open(bqm_path,'r') as fp:
             bqm = _load(fp,cls=DimodDecoder)
-
         return bqm
 
     def dump_bqm(self, bqm, tag=""):
         bqm_id = self.id_bqm(bqm)
-        bqm_filename = embedding_id + ".json"
+        bqms_path = [self.bqms_path,tag]
 
-        bqm_path = os.path.join(self.bqms_path,tag,bqm_filename)
+        bqm_path = self.get_path(bqms_path, bqm_id)
 
         with open(bqm_path,'w+') as fp:
             _dump(bqm,fp,cls=DimodEncoder)
-
 
     """ ############################# SampleSets ########################### """
     def load_sampleset(self, bqm, target, tag="", embedding={}):
@@ -209,7 +208,31 @@ class EmberaDataBase:
             _dump(sampleset,fp,cls=DimodEncoder)
 
     """ ############################ Embeddings ############################ """
-    def load_embedding(self, source, target, tag="", rank=0):
+    def load_embeddings(self, source, target, tag=""):
+        source_id = self.id_source(source)
+        target_id = self.id_target(target)
+
+        embeddings_path = os.path.join(self.embeddings_path,source_id,target_id,tag)
+
+        embedding_filenames = []
+        for root, dirs, files in os.walk(embeddings_path):
+            for file in files:
+                embedding_filenames.append((root,file))
+
+
+        if not embedding_filenames: return {}
+
+        embeddings = []
+        for embedding_filename in embedding_filenames:
+            embedding_path = os.path.join(*embedding_filename)
+
+            with open(embedding_path,'r') as fp:
+                embedding = _load(fp,cls=EmberaDecoder)
+            embeddings.append(embedding)
+
+        return embeddings
+
+    def load_embedding(self, source, target, tag="",index=0):
         """ Load an embedding object from JSON format, filed under:
             <EmberaDB>/<source_id>/<target_id>/<embedding_id>.json
             or, if tag is provided:
@@ -225,9 +248,9 @@ class EmberaDataBase:
             Optional Arguments:
                 tag: (str, default="")
                     If provided, embedding is read from directory ./<tag>/
-                rank: (int, default=0)
+                index: (int, default=0)
                     Embeddings are stored sorted by `quality_key`. Therefore,
-                    `rank==0` is the "best" embedding found for that bqm, onto
+                    `index==0` is the "best" embedding found for that bqm, onto
                     that target, with that `tag`.
 
             Returns:
@@ -242,7 +265,7 @@ class EmberaDataBase:
         embeddings = os.listdir(embeddings_path) #TODO: if no tag is given, also search within all tags for best embedding
         if not embeddings: return {}
 
-        embedding_filename = embeddings.pop(rank)
+        embedding_filename = embeddings.pop(index)
         embedding_path = os.path.join(embeddings_path, embedding_filename)
 
         with open(embedding_path,'r') as fp:
@@ -281,10 +304,7 @@ class EmberaDataBase:
         if isinstance(embedding,Embedding): embedding_obj = embedding
         else: embedding_obj = Embedding(source,target,embedding)
 
-        embedding_id = embedding_obj.id
-        embedding_filename = embedding_id
-
-        embedding_path = self.get_path(embeddings_path, embedding_filename)
+        embedding_path = self.get_path(embeddings_path, embedding_obj.id)
 
         with open(embedding_path,'w+') as fp:
             _dump(embedding_obj,fp,cls=EmberaEncoder)

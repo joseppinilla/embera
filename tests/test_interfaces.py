@@ -48,8 +48,19 @@ class TestDataBase(unittest.TestCase):
                          [{'a': 0, 'b': 1, 'c': 0},{'a': 0, 'b': 1, 'c': 1}],
                          'BINARY',0)
 
-    def tearDown(self):
-        shutil.rmtree("./TMP_DB")
+    # def tearDown(self):
+    #     shutil.rmtree("./TMP_DB")
+
+    def test_bqm(self):
+        bqm = self.bqm
+        self.db.dump_bqm(bqm)
+        self.db.set_bqm_alias(bqm,"Test")
+        bqm_copy = self.db.load_bqm("Test")
+        self.assertEqual(bqm, bqm_copy)
+        self.db.dump_bqm(bqm,tag="Tag")
+        self.db.set_bqm_alias(bqm,"Test2")
+        bqm_copy = self.db.load_bqm("Test2",tag="Tag")
+
 
     def test_embedding_graphs(self):
         S = nx.Graph(self.source_edgelist)
@@ -133,6 +144,17 @@ class TestDataBase(unittest.TestCase):
         self.assertEqual(dict_id,name_id)
 
         self.assertRaises(ValueError,self.db.id_embedding,[],[],0)
+
+    def test_load_embeddings(self):
+        embedding = self.embedding
+        source = self.source_edgelist
+        target = nx.path_graph(8)
+
+        self.db.dump_embedding(source,target,embedding,'tag1')
+        self.db.dump_embedding(source,target,embedding,'tag2')
+        embedding_copy = self.db.load_embeddings(source,target)
+        self.assertEqual(*embedding_copy)
+        self.assertDictEqual(embedding,dict(embedding_copy[0]))
 
     def test_empty(self):
         self.db.dump_embedding([],[],{})
