@@ -28,9 +28,9 @@ def embera_bench():
     """
     benchmark_set = []
     benchmark_set.extend(dwave_bench(N=1))
-    benchmark_set.extend(qca_bench())
-    benchmark_set.extend(geometry_bench())
+    benchmark_set.extend(qca_bench()[0:4])
     benchmark_set.extend(misc_bench())
+    benchmark_set.extend(geometry_bench())
 
     return benchmark_set
 
@@ -38,18 +38,23 @@ def geometry_bench():
     """ Set of benchmarks for geometric graphs:
             | name          | node      | edges     |
             | ------------- |:---------:| ---------:|
-            | grid_16x16    | 256       | 480       |
-            | rooks_8x8     | 64        | 448       |
-            | grid3d_10x10  | 200       | 460       |
+            | grid          | 256       | 480       |
+            | rooks         | 64        | 448       |
+            | triangular    | 216       | 590       |
+            | prism         | 288       | 576       |
+            | grid3d        | 200       | 460       |
             | hypercube     | 128       | 448       |
+            | barbell       | 410       | 1221      |
 
     """
     benchmark_set = []
-    benchmark_set.append(rooks_graph(8,8))
-    benchmark_set.append(prism_graph(24,12))
     benchmark_set.append(grid_2d_graph(16,16))
+    benchmark_set.append(rooks_graph(8,8))
+    benchmark_set.append(triangular_lattice_graph(15,25))
+    benchmark_set.append(prism_graph(24,12))
     benchmark_set.append(grid_3d_graph(10,10))
     benchmark_set.append(hypercube_graph(128))
+    benchmark_set.append(barbell_graph(30,350))
     return benchmark_set
 
 
@@ -259,12 +264,19 @@ def rooks_graph(n, m=None):
     F.graph['pos'] = {v:list(v) for v in F}
     return F
 
+def triangular_lattice_graph(m,n):
+    G = nx.triangular_lattice_graph(m,n,with_positions=True)
+    F = nx.Graph(name='triangular')
+    F.add_edges_from(G.edges)
+    F.graph['pos'] = nx.get_node_attributes(G,'pos')
+    return F
+
 def grid_3d_graph(n, m=None, t=2):
     if m is None:
         m = n
     G = nx.grid_graph(dim=[m,n,t])
     G.name = 'grid3d'
-    G.graph['pos'] = {(x,y,z):[x+z,y+z] for (x,y,z) in G}
+    G.graph['pos'] = {(z,y,x):[x+z,y+z] for (z,y,x) in G}
     return G
 
 def prism_graph(k,m):
@@ -274,6 +286,11 @@ def prism_graph(k,m):
     for j, i in G:
         nlist[i].append((j,i))
     G.graph['pos'] = nx.shell_layout(G,nlist=nlist)
+    return G
+
+def barbell_graph(k,m):
+    G = nx.barbell_graph(k,m)
+    G.name = 'barbell'
     return G
 
 def prune_graph(G, node_yield, edge_yield):
