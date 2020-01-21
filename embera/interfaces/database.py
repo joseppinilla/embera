@@ -92,12 +92,12 @@ class EmberaDataBase:
 
     def id_source(self, source):
         if isinstance(source,BinaryQuadraticModel):
-            id = str(hash(tuple(sorted((tuple(sorted(e)) for e in source.quadratic)))))
+            id = str(hash(tuple(set([tuple(set([u,v])) for u,v in source.quadratic]))))
         elif isinstance(source,Graph):
-            id = str(hash(tuple(sorted((tuple(sorted(e)) for e in source.edges)))))
+            id = str(hash(tuple(set([tuple(set([u,v])) for u,v in source.edges]))))
             if source.name: self.set_source_alias(id,source.name)
         elif isinstance(source,list):
-            id = str(hash(tuple(sorted((tuple(sorted(e)) for e in source)))))
+            id = str(hash(tuple(set([tuple(set([u,v])) for u,v in source]))))
         elif isinstance(source,str):
             id = self.aliases.get('source',{}).get(source,source)
         else:
@@ -106,9 +106,9 @@ class EmberaDataBase:
 
     def id_target(self, target):
         if isinstance(target,list):
-            id = str(hash(tuple(sorted((tuple(sorted(e)) for e in target)))))
+            id = str(hash(tuple(set([tuple(set([u,v])) for u,v in target]))))
         elif isinstance(target,Graph):
-            id = str(hash(tuple(target.edges())))
+            id = str(hash(tuple(set([tuple(set([u,v])) for u,v in target.edges]))))
             if target.name: self.set_target_alias(id,target.name)
         elif isinstance(target,str):
             id = self.aliases.get('target',{}).get(target,target)
@@ -219,8 +219,9 @@ class EmberaDataBase:
             for file in files:
                 embedding_filenames.append((root,file))
 
-
         if not embedding_filenames: return {}
+
+        embedding_filenames.sort(key=lambda entry: entry[1])
 
         embeddings = []
         for embedding_filename in embedding_filenames:
@@ -261,8 +262,8 @@ class EmberaDataBase:
         source_id = self.id_source(source)
         target_id = self.id_target(target)
 
-        embeddings_path = self.get_path([self.embeddings_path,source_id,target_id,tag])
-        embeddings = os.listdir(embeddings_path) #TODO: if no tag is given, also search within all tags for best embedding
+        embeddings_path = os.path.join(self.embeddings_path,source_id,target_id,tag)
+        embeddings = os.listdir(embeddings_path)
         if not embeddings: return {}
 
         embedding_filename = embeddings.pop(index)

@@ -16,14 +16,14 @@ class Embedding(dict):
         else:
             if hasattr(source, 'edges'): source = source.edges()
             elif hasattr(source, 'quadratic'): source = source.quadratic.keys()
-            else: source = sorted((tuple(sorted(e)) for e in source))
+            else: source = set([tuple(set([u,v])) for u,v in source])
             self.source_id = hash(tuple(source))
 
         if isinstance(target,int):
             self.target_id = target
         else:
             if hasattr(target, 'edges'): target = target.edges()
-            else: target = sorted((tuple(sorted(e)) for e in target))
+            else: target = set([tuple(set([u,v])) for u,v in target])
             self.target_id = hash(tuple(target))
 
         self.properties.update(properties)
@@ -39,23 +39,23 @@ class Embedding(dict):
     def interactions_histogram(self, source, target):
         if hasattr(source, 'edges'): source = source.edges()
         elif hasattr(source, 'quadratic'): source = source.quadratic.keys()
-        else: source = sorted((tuple(sorted(e)) for e in source))
+        else: source = tuple(set([tuple(set([u,v])) for u,v in source]))
 
         if hasattr(target, 'edges'): target = target.edges()
-        else: target = sorted((tuple(sorted(e)) for e in target))
+        else: target = tuple(set([tuple(set([u,v])) for u,v in target]))
 
         source_id = hash(tuple(source))
         assert(self.source_id==source_id), "Source ID does not match."
 
         target_id = hash(tuple(target))
         assert(self.target_id==target_id), "Target ID does not match."
+
         interactions = {}
         for u, v in source:
-            source_edge = tuple(sorted((u,v)))
             edge_interactions = []
             for s in self[u]:
                 for t in self[v]:
-                    target_edge = tuple(sorted((s,t)))
+                    target_edge = tuple(set([s,t]))
                     if target_edge in target:
                         edge_interactions.append(target_edge)
             interactions[(u,v)] = edge_interactions
@@ -92,7 +92,7 @@ class Embedding(dict):
         return f"{quality_id}_{hash_id}"
 
     def __embedding_key(self):
-        return tuple((k,tuple(self[k])) for k in sorted(self))
+        return tuple((k,tuple(set(self[k]))) for k in self)
 
     def __key(self):
         return (self.source_id, self.target_id, self.__embedding_key())

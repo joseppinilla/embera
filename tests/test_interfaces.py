@@ -10,7 +10,7 @@ from embera.interfaces.database import EmberaDataBase
 
 class TestEmbedding(unittest.TestCase):
     def setUp(self):
-        self.source_edgelist = [('a','b'),('b','c'),('c','a')]
+        self.source_edgelist = [('a','A1.S'),('A1.S',(0,1)),((0,1),'a')]
         self.target_edgelist = [(1,2),(2,3),(3,4),(4,1)]
         self.embedding = minorminer.find_embedding(self.source_edgelist,self.target_edgelist)
 
@@ -36,16 +36,16 @@ class TestDataBase(unittest.TestCase):
         self.db = EmberaDataBase("./TMP_DB")
         # Toy Problem
         self.bqm = dimod.BinaryQuadraticModel(
-                   {'a':2,'b':2,'c':2},
-                   {('a','b'):-1,('b','c'):-1,('c','a'):-1},
+                   {'a':2,'A1.S':2,(0,1):2},
+                   {('a','A1.S'):-1,('A1.S',(0,1)):-1,((0,1),'a'):-1},
                    0.0,dimod.Vartype.SPIN)
-        self.source_edgelist = [('a','b'),('b','c'),('c','a')]
+        self.source_edgelist = [('a','A1.S'),('A1.S',(0,1)),((0,1),'a')]
         self.target_edgelist = [(1,2),(2,3),(3,4),(4,1)]
         # Toy Entries
         self.embedding = minorminer.find_embedding(self.source_edgelist,
                                                    self.target_edgelist)
         self.sampleset = dimod.SampleSet.from_samples(
-                         [{'a': 0, 'b': 1, 'c': 0},{'a': 0, 'b': 1, 'c': 1}],
+                         [{'a': 0, 'A1.S': 1, (0,1): 0},{'a': 0, 'A1.S': 1, (0,1): 1}],
                          'BINARY',0)
 
     # def tearDown(self):
