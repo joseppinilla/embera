@@ -56,7 +56,7 @@ class Embedding(dict):
     @property
     def id(self):
         # To create a unique ID we use the quality key as an ID string...
-        if not self: quality_id = "EMPTY" # ..., unless empty,
+        if not self: quality_id = "NATIVE" # ..., unless empty,
         else: quality_id = "".join([str(v) for v in self.quality_key])
         # ...and the last 8 digits of this object's hash.
         hash_id = f"{self.__hash__():08}"[-8:]

@@ -90,30 +90,32 @@ class EmberaDataBase:
             raise ValueError("BQM must be dimod.BinaryQuadraticModel, networkx.Graph, or str")
         return id
 
+    def __graph_key(self, graph):
+        if isinstance(graph, BinaryQuadraticModel): edgelist = graph.quadratic
+        elif isinstance(graph, Graph): edgelist = graph.edges
+        else: edgelist = graph
+        return hash([hash(u)^hash(v) for u,v in edgelist].sort())
+
     def id_source(self, source):
-        if isinstance(source,BinaryQuadraticModel):
-            id = hash(tuple(source.to_networkx_graph().edges))
-        elif isinstance(source,Graph):
-            id = hash(tuple(source.edges))
-            if source.name: self.set_source_alias(id,source.name)
-        elif isinstance(source,list):
-            id = hash(tuple(Graph(source).edges))
-        elif isinstance(source,str):
+        if isinstance(source,str):
             id = self.aliases.get('source',{}).get(source,source)
+        elif isinstance(source,(BinaryQuadraticModel,Graph,list)):
+            id = str(self.__graph_key(source))
         else:
             raise ValueError("Source must be dimod.BinaryQuadraticModel, networkx.Graph, list of tuples or str")
+
+        if hasattr(source,'name'): self.set_source_alias(id,source.name)
         return id
 
     def id_target(self, target):
-        if isinstance(target,list):
-            id = hash(tuple(Graph(target).edges))
-        elif isinstance(target,Graph):
-            id = hash(tuple(target.edges))
-            if target.name: self.set_target_alias(id,target.name)
-        elif isinstance(target,str):
+        if isinstance(target,str):
             id = self.aliases.get('target',{}).get(target,target)
+        elif isinstance(target,(BinaryQuadraticModel,Graph,list)):
+            id = str(self.__graph_key(target))
         else:
-            raise ValueError("Target must be list of tuples, networkx.Graph, or str")
+            raise ValueError("Target must be networkx.Graph, list of tuples or str")
+
+        if hasattr(target,'name'): self.set_target_alias(id,target.name)
         return id
 
     def id_embedding(self, embedding):
@@ -139,7 +141,8 @@ class EmberaDataBase:
 
     """ ######################## BinaryQuadraticModels ##################### """
     def load_bqms(self, source, tag=""):
-        bqms_path = os.path.join(self.bqms_path,source,tag)
+        source_id = self.id_source(source)
+        bqms_path = os.path.join(self.bqms_path,source_id,tag)
 
         bqm_filenames = []
         for root, dirs, files in os.walk(bqms_path):
@@ -159,7 +162,7 @@ class EmberaDataBase:
         return bqms
 
     def load_bqm(self, source, tag="", index=0):
-        source_id = str(self.id_source(source))
+        source_id = self.id_source(source)
 
         bqms_path = os.path.join(self.bqms_path,source_id,tag)
         bqm_filenames = os.listdir(bqms_path)
@@ -174,8 +177,8 @@ class EmberaDataBase:
         return bqm
 
     def dump_bqm(self, source, bqm, tag=""):
-        bqm_id = str(self.id_bqm(bqm))
-        source_id = str(self.id_source(source))
+        bqm_id = self.id_bqm(bqm)
+        source_id = self.id_source(source)
         bqms_path = [self.bqms_path,source_id,tag]
 
         bqm_path = self.get_path(bqms_path, bqm_id)
@@ -202,8 +205,8 @@ class EmberaDataBase:
                 If provided, sampleset is read from directory ./<tag>/
 
         """
-        bqm_id = str(self.id_bqm(bqm))
-        target_id = str(self.id_target(target))
+        bqm_id = self.id_bqm(bqm)
+        target_id = self.id_target(target)
         samplesets_path = os.path.join(self.samplesets_path,bqm_id,target_id,tag)
 
         embedding_id = self.id_embedding(embedding)
@@ -222,22 +225,26 @@ class EmberaDataBase:
             return concatenate(samplesets)
 
     def dump_sampleset(self, bqm, target, sampleset, tag="", embedding={}):
-        bqm_id = str(self.id_bqm(bqm))
-        target_id = str(self.id_target(target))
+        bqm_id = self.id_bqm(bqm)
+        target_id = self.id_target(target)
         samplesets_path = [self.samplesets_path,bqm_id,target_id,tag]
 
         embedding_id = self.id_embedding(embedding)
         sampleset_filename = embedding_id
 
         sampleset_path = self.get_path(samplesets_path, sampleset_filename)
+        if os.path.exists(sampleset_path):
+            with open(sampleset_path,'r') as fp:
+                record = _load(fp,cls=DimodDecoder)
+            sampleset = concatenate(sampleset,record)
 
         with open(sampleset_path,'w+') as fp:
             _dump(sampleset,fp,cls=DimodEncoder)
 
     """ ############################ Embeddings ############################ """
     def load_embeddings(self, source, target, tag=""):
-        source_id = str(self.id_source(source))
-        target_id = str(self.id_target(target))
+        source_id = self.id_source(source)
+        target_id = self.id_target(target)
 
         embeddings_path = os.path.join(self.embeddings_path,source_id,target_id,tag)
 
@@ -286,8 +293,8 @@ class EmberaDataBase:
                     Embedding at given rank or empty dictionary if none found.
 
         """
-        source_id = str(self.id_source(source))
-        target_id = str(self.id_target(target))
+        source_id = self.id_source(source)
+        target_id = self.id_target(target)
 
         embeddings_path = os.path.join(self.embeddings_path,source_id,target_id,tag)
         embedding_filenames = os.listdir(embeddings_path)
@@ -325,8 +332,8 @@ class EmberaDataBase:
                     If provided, embedding is stored under a directory ./<tag>/
                     Useful to identify method used for embedding.
         """
-        source_id = str(self.id_source(source))
-        target_id = str(self.id_target(target))
+        source_id = self.id_source(source)
+        target_id = self.id_target(target)
         embeddings_path = [self.embeddings_path,source_id,target_id,tag]
 
         if isinstance(embedding,Embedding): embedding_obj = embedding

@@ -55,8 +55,8 @@ class TestDataBase(unittest.TestCase):
                          [{'a': 0, 'A1.S': 1, (0,1): 0},{'a': 0, 'A1.S': 1, (0,1): 1}],
                          'BINARY',0)
 
-    # def tearDown(self):
-    #     shutil.rmtree("./TMP_DB")
+    def tearDown(self):
+        shutil.rmtree("./TMP_DB")
 
     def test_bqm(self):
         bqm = self.bqm
@@ -153,11 +153,11 @@ class TestDataBase(unittest.TestCase):
         embedding = self.embedding
         source = self.source_edgelist
         target = nx.path_graph(8)
-
+        print(embedding)
         self.db.dump_embedding(source,target,embedding,'tag1')
+        print(embedding)
         self.db.dump_embedding(source,target,embedding,'tag2')
         embedding_copy = self.db.load_embeddings(source,target)
-        self.assertEqual(*embedding_copy)
         self.assertDictEqual(embedding,dict(embedding_copy[0]))
 
     def test_empty(self):
