@@ -1,6 +1,5 @@
-
-
 __all__ = ["Embedding"]
+
 
 class Embedding(dict):
 
@@ -8,24 +7,8 @@ class Embedding(dict):
     target_id = None
     properties = {}
 
-    def __init__(self, source, target, embedding, **properties):
+    def __init__(self, embedding, **properties):
         super(Embedding,self).__init__(embedding)
-
-        if isinstance(source,int):
-            self.source_id = source
-        else:
-            if hasattr(source, 'edges'): source = source.edges()
-            elif hasattr(source, 'quadratic'): source = source.quadratic.keys()
-            else: source = set([tuple(set([u,v])) for u,v in source])
-            self.source_id = hash(tuple(source))
-
-        if isinstance(target,int):
-            self.target_id = target
-        else:
-            if hasattr(target, 'edges'): target = target.edges()
-            else: target = set([tuple(set([u,v])) for u,v in target])
-            self.target_id = hash(tuple(target))
-
         self.properties.update(properties)
 
     def chain_histogram(self):
@@ -36,27 +19,15 @@ class Embedding(dict):
             hist[s] = 1 + hist.get(s, 0)
         return hist
 
-    def interactions_histogram(self, source, target):
-        if hasattr(source, 'edges'): source = source.edges()
-        elif hasattr(source, 'quadratic'): source = source.quadratic.keys()
-        else: source = tuple(set([tuple(set([u,v])) for u,v in source]))
-
-        if hasattr(target, 'edges'): target = target.edges()
-        else: target = tuple(set([tuple(set([u,v])) for u,v in target]))
-
-        source_id = hash(tuple(source))
-        assert(self.source_id==source_id), "Source ID does not match."
-
-        target_id = hash(tuple(target))
-        assert(self.target_id==target_id), "Target ID does not match."
-
+    def interactions_histogram(self, source_edgelist, target_edgelist):
+        target_keys = {hash(u)^hash(v) for u,v in target_edgelist}
         interactions = {}
-        for u, v in source:
+        for u, v in source_edgelist:
             edge_interactions = []
             for s in self[u]:
                 for t in self[v]:
-                    target_edge = tuple(set([s,t]))
-                    if target_edge in target:
+                    target_edge = hash(s)^hash(t)
+                    if target_edge in target_keys:
                         edge_interactions.append(target_edge)
             interactions[(u,v)] = edge_interactions
 
@@ -91,11 +62,14 @@ class Embedding(dict):
         hash_id = f"{self.__hash__():08}"[-8:]
         return f"{quality_id}_{hash_id}"
 
-    def __embedding_key(self):
-        return tuple((k,tuple(set(self[k]))) for k in self)
-
     def __key(self):
-        return (self.source_id, self.target_id, self.__embedding_key())
+        embedding_key = []
+        for v, chain in self.items():
+            chain_key = []
+            for q in chain:
+                chain_key.append(hash(q))
+            embedding_key.append(hash(tuple(sorted(chain_key))))
+        return hash(tuple(embedding_key))
 
     def __hash__(self):
         return hash(self.__key())

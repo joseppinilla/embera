@@ -16,9 +16,7 @@ class EmberaEncoder(json.JSONEncoder):
             serial_brackets = f"{{{serial}}}"
             embedding_dict = {"type": "Embedding",
                               "embedding": serial_brackets,
-                              "properties": obj.properties,
-                              "source_id": obj.source_id,
-                              "target_id": obj.target_id}
+                              "properties": obj.properties}
             return super(EmberaEncoder, self).iterencode(embedding_dict,_one_shot)
 
         return super(EmberaEncoder, self).iterencode(obj,_one_shot)
@@ -30,12 +28,8 @@ class EmberaDecoder(json.JSONDecoder):
     def object_hook(self, obj):
         if isinstance(obj,dict):
             if obj.get("type",None)=="Embedding":
-                source_id = obj["source_id"]
-                target_id = obj["target_id"]
                 embedding = eval(obj["embedding"])
                 properties = obj["properties"]
-                embedding_obj = embera.Embedding(source_id,target_id,
-                                                 embedding,
-                                                 **properties)
+                embedding_obj = embera.Embedding(embedding,**properties)
                 return embedding_obj
         return obj

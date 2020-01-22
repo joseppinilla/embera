@@ -19,10 +19,17 @@ class TestEmbedding(unittest.TestCase):
         target = self.target_edgelist
         embedding = self.embedding
         runtime = 1.0
-        embedding_obj = Embedding(source,target,embedding,runtime=runtime)
+        embedding_obj = Embedding(embedding,runtime=runtime)
         self.assertEqual(embedding_obj.properties['runtime'],runtime)
-        embedding_obj = Embedding(source,target,embedding,**{'test':True})
+        embedding_obj = Embedding(embedding,**{'test':True})
         assert(embedding_obj.properties['test'])
+
+    def test_interactions(self):
+        S = self.source_edgelist
+        T = self.target_edgelist
+        embedding_obj = Embedding(self.embedding)
+        interactions = embedding_obj.interactions_histogram(S,T)
+        self.assertEqual(interactions, {1:3})
 
 
 class TestDataBase(unittest.TestCase):
@@ -53,27 +60,24 @@ class TestDataBase(unittest.TestCase):
 
     def test_bqm(self):
         bqm = self.bqm
-        self.db.dump_bqm(bqm)
-        self.db.set_bqm_alias(bqm,"Test")
-        bqm_copy = self.db.load_bqm("Test")
+        source = self.source_edgelist
+        self.db.dump_bqm(source,bqm)
+        bqm_copy = self.db.load_bqm(source)
         self.assertEqual(bqm, bqm_copy)
-        self.db.dump_bqm(bqm,tag="Tag")
-        self.db.set_bqm_alias(bqm,"Test2")
-        bqm_copy = self.db.load_bqm("Test2",tag="Tag")
+        self.db.dump_bqm(source,bqm,tag="Tag")
+        bqm_copy = self.db.load_bqm(source,tag="Tag")
 
 
     def test_embedding_graphs(self):
         S = nx.Graph(self.source_edgelist)
         T = nx.Graph(self.target_edgelist)
 
-        embedding_obj = Embedding(S,T,self.embedding)
-        interactions = embedding_obj.interactions_histogram(S,T)
-        self.assertEqual(interactions, {1:3})
+        embedding_obj = Embedding(self.embedding)
 
         self.db.dump_embedding(S,T,embedding_obj,'minorminer')
         embedding_copy = self.db.load_embedding(S,T,tag='minorminer')
 
-        self.assertEqual(embedding_obj, Embedding(S,T,embedding_copy))
+        self.assertEqual(embedding_obj, Embedding(embedding_copy))
 
     def test_sampleset(self):
         bqm = self.bqm
@@ -132,18 +136,18 @@ class TestDataBase(unittest.TestCase):
         embedding = self.embedding
         source = self.source_edgelist
         target = self.target_edgelist
-        embedding_obj = Embedding(source,target,embedding)
-        embedding_id = self.db.id_embedding([],[],embedding_obj)
+        embedding_obj = Embedding(embedding)
+        embedding_id = self.db.id_embedding(embedding_obj)
         self.assertEqual(embedding_id,embedding_obj.id)
 
-        dict_id = self.db.id_embedding(source,target,embedding)
+        dict_id = self.db.id_embedding(embedding)
         self.assertEqual(embedding_id,dict_id)
 
         self.db.set_embedding_alias(embedding_obj,'TEST')
-        name_id = self.db.id_embedding([],[],'TEST')
+        name_id = self.db.id_embedding('TEST')
         self.assertEqual(dict_id,name_id)
 
-        self.assertRaises(ValueError,self.db.id_embedding,[],[],0)
+        self.assertRaises(ValueError,self.db.id_embedding,0)
 
     def test_load_embeddings(self):
         embedding = self.embedding

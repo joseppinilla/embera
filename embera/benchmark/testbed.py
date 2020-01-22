@@ -14,6 +14,6 @@ def embed_and_report(method, S, T, RNG_SEED=42):
     report = {"valid":bool(embedding)} # This can be more elaborate, for incomplete embeddings
     report['embedding_runtime'] = end-start
 
-    embedding_obj = embera.Embedding(S,T,embedding,**report)
+    embedding_obj = embera.Embedding(embedding,**report)
 
     return embedding
