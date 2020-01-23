@@ -17,4 +17,4 @@ def embed_and_report(method, S, T, RNG_SEED=42):
 
     embedding_obj = embera.Embedding(embedding,**report)
 
-    return embedding
+    return embedding_obj

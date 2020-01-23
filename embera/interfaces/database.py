@@ -229,14 +229,13 @@ class EmberaDataBase:
         target_id = self.id_target(target)
         samplesets_path = [self.samplesets_path,bqm_id,target_id,tag]
 
-        embedding_id = self.id_embedding(embedding)
-        sampleset_filename = embedding_id
+        sampleset_filename = self.id_embedding(embedding)
 
         sampleset_path = self.get_path(samplesets_path, sampleset_filename)
         if os.path.exists(sampleset_path):
             with open(sampleset_path,'r') as fp:
                 record = _load(fp,cls=DimodDecoder)
-            sampleset = concatenate(sampleset,record)
+            sampleset = concatenate((sampleset,record))
 
         with open(sampleset_path,'w+') as fp:
             _dump(sampleset,fp,cls=DimodEncoder)

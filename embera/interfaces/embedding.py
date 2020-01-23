@@ -3,13 +3,10 @@ __all__ = ["Embedding"]
 
 class Embedding(dict):
 
-    source_id = None
-    target_id = None
     properties = {}
-
     def __init__(self, embedding, **properties):
         super(Embedding,self).__init__(embedding)
-        self.properties.update(properties)
+        self.properties = properties
 
     def chain_histogram(self):
         # Based on dwavesystems/minorminer quality_key by Boothby, K.
