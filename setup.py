@@ -20,6 +20,7 @@ install_requires = ['decorator>=4.1.0,<5.0.0',
                     'networkx>=2.0,<3.0',
                     'numpy>=1.15.2,<1.16',
                     'pulp>=1.6.0,<2.0.0',
+                    'seaborn>=0.9.0,<1.0.0',
                     ]
 
 

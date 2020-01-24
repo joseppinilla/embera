@@ -91,10 +91,13 @@ class EmberaDataBase:
         return id
 
     def __graph_key(self, graph):
-        if isinstance(graph, BinaryQuadraticModel): edgelist = graph.quadratic
-        elif isinstance(graph, Graph): edgelist = graph.edges
-        else: edgelist = graph
-        return hash([hash(u)^hash(v) for u,v in edgelist].sort())
+        if isinstance(graph, BinaryQuadraticModel):
+            edgelist = graph.quadratic
+        elif isinstance(graph, Graph):
+            edgelist = graph.edges
+        else:
+            edgelist = graph
+        return hash(tuple(sorted([hash(u)^hash(v) for u,v in edgelist])))
 
     def id_source(self, source):
         if isinstance(source,str):

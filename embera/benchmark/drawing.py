@@ -72,5 +72,48 @@ def plot_embeddings(embeddings, T, savefig=True):
         path = savefig if isinstance(savefig,str) else "./embeddings.eps"
         plt.savefig(path)
 
-def plot_joint_sampleset(sampleset):
-    pass
+def plot_joint_sampleset(samplesets, savefig=True):
+
+    nplots = len(samplesets)
+    fig, axs = plt.subplots(1, nplots, squeeze=False)
+
+    for ax, sampleset in zip(axs.flat, samplesets):
+        x = []
+        y = []
+        E = []
+        c = []
+        for datum in sampleset.data():
+
+            value = ''.join(str((1+datum.sample[k])//2) for k in sorted(datum.sample))
+            size = len(value)
+            x.append(int(value[0:size//2],2)/(2**(size//2)))
+            y.append(int(value[size//2: ],2)/(2**(size//2)))
+            c.append(datum.num_occurrences)
+            E.append(datum.energy)
+
+
+        grid = sns.JointGrid(x,y,space=0,xlim=(0,1),ylim=(0,1))
+
+        grid = grid.plot_marginals(sns.distplot,kde=False,color='.5',bins=100)
+
+
+        minE = sampleset.first.energy
+        ratE = [250**((energy/minE)**5) for energy in E]
+        grid = grid.plot_joint(plt.scatter, s=ratE, c=E, cmap="jet", alpha=0.5)
+
+        xmin = grid.ax_marg_x.get_position().xmin
+        xmax = grid.ax_marg_x.get_position().width
+        cax = grid.fig.add_axes([xmin, 0, xmax, 0.02]) # [left, bottom, width, height]
+        plt.colorbar(orientation='horizontal', cax=cax)
+        cax.set_xlabel('Energy')
+
+
+        for ax in [grid.ax_joint, grid.ax_marg_x, grid.ax_marg_y]:
+            ax.axes.xaxis.set_ticklabels([])
+            ax.axes.yaxis.set_ticklabels([])
+        break # TEST
+
+
+    if savefig:
+        path = savefig if isinstance(savefig,str) else "./samplesets.eps"
+        plt.savefig(path)

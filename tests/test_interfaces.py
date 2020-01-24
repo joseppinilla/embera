@@ -153,9 +153,7 @@ class TestDataBase(unittest.TestCase):
         embedding = self.embedding
         source = self.source_edgelist
         target = nx.path_graph(8)
-        print(embedding)
         self.db.dump_embedding(source,target,embedding,'tag1')
-        print(embedding)
         self.db.dump_embedding(source,target,embedding,'tag2')
         embedding_copy = self.db.load_embeddings(source,target)
         self.assertDictEqual(embedding,dict(embedding_copy[0]))
