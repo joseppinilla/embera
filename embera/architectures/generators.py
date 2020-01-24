@@ -21,13 +21,13 @@
 import networkx as nx
 import dwave_networkx as dnx
 
-__all__ = ['get_graph_from_solver',
+__all__ = ['graph_from_solver',
            'rainier_graph', 'vesuvius_graph', 'dw2x_graph', 'dw2000q_graph',
            'p6_graph', 'p16_graph',
            'h20k_graph']
 
 
-def get_graph_from_solver(solver, **kwargs):
+def graph_from_solver(solver, **kwargs):
     """ D-Wave architecture graph from Dimod Structured Solver
     """
     topology = solver.properties['topology']
