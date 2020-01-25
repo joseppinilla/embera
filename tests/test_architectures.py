@@ -3,7 +3,6 @@ import unittest
 import minorminer
 
 from embera.architectures import generators
-from embera.benchmark.topologies import pruned_graph_gen
 
 GRAPHS = [embera.benchmark.complete_graph(16),
           embera.benchmark.complete_bipartite_graph(8),
@@ -65,7 +64,3 @@ class TestArchitectures(unittest.TestCase):
     def test_h20k(self):
         self.target = 'h20k_graph'
         self.parse_and_test()
-
-    def test_pruned_graph(self):
-        target_graph = embera.benchmark.topologies.pruned_graph_gen(generators.dw2000q_graph)()
-        self.all_graphs(target_graph)

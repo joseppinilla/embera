@@ -72,18 +72,17 @@ def plot_embeddings(embeddings, T, savefig=True):
         path = savefig if isinstance(savefig,str) else "./embeddings.eps"
         plt.savefig(path)
 
-def plot_joint_sampleset(samplesets, savefig=True):
-
-    nplots = len(samplesets)
-    fig, axs = plt.subplots(1, nplots, squeeze=False)
-
-    for ax, sampleset in zip(axs.flat, samplesets):
+def plot_joint_samplesets(samplesets, savefig=True):
+    """
+    Based on:
+    https://jakevdp.github.io/PythonDataScienceHandbook/04.08-multiple-subplots.html
+    """
+    for i,sampleset in enumerate(samplesets):
         x = []
         y = []
         E = []
         c = []
         for datum in sampleset.data():
-
             value = ''.join(str((1+datum.sample[k])//2) for k in sorted(datum.sample))
             size = len(value)
             x.append(int(value[0:size//2],2)/(2**(size//2)))
@@ -91,29 +90,41 @@ def plot_joint_sampleset(samplesets, savefig=True):
             c.append(datum.num_occurrences)
             E.append(datum.energy)
 
-
-        grid = sns.JointGrid(x,y,space=0,xlim=(0,1),ylim=(0,1))
-
-        grid = grid.plot_marginals(sns.distplot,kde=False,color='.5',bins=100)
-
-
         minE = sampleset.first.energy
         ratE = [250**((energy/minE)**5) for energy in E]
-        grid = grid.plot_joint(plt.scatter, s=ratE, c=E, cmap="jet", alpha=0.5)
 
-        xmin = grid.ax_marg_x.get_position().xmin
-        xmax = grid.ax_marg_x.get_position().width
-        cax = grid.fig.add_axes([xmin, 0, xmax, 0.02]) # [left, bottom, width, height]
-        plt.colorbar(orientation='horizontal', cax=cax)
+        fig = plt.figure(i, figsize=(6, 6))
+        grid = plt.GridSpec(5, 5, hspace=0.0, wspace=0.0)
+
+        # Set up the axes with gridspec
+        main_ax = fig.add_subplot(grid[1:5,0:4])
+        y_hist = fig.add_subplot(grid[1:5,4], sharey=main_ax)
+        x_hist = fig.add_subplot(grid[0,0:4], sharex=main_ax)
+
+        y_hist.spines['right'].set_visible(False)
+        y_hist.spines['top'].set_visible(False)
+        y_hist.xaxis.set_ticks_position('bottom')
+        y_hist.set_yticks([],[])
+
+        x_hist.spines['left'].set_visible(False)
+        x_hist.spines['top'].set_visible(False)
+        x_hist.yaxis.set_ticks_position('right')
+        x_hist.set_xticks([],[])
+
+        # scatter points on the main axes
+        sct = main_ax.scatter(x, y, s=ratE, c=E, cmap="jet", alpha=0.5)
+
+        # histogram on the attached axes
+        x_hist.hist(x, 100, histtype='stepfilled',
+                    orientation='vertical', color='gray')
+
+        y_hist.hist(y, 100, histtype='stepfilled',
+                    orientation='horizontal', color='gray')
+
+        xmin = main_ax.get_position().xmin
+        xmax = main_ax.get_position().width
+        cax = fig.add_axes([xmin, 0, xmax, 0.02]) # [left, bottom, width, height]
+        # cax = fig.add_axes([0.09, 0.06, 0.84, 0.02])
+        plt.colorbar(sct,orientation='horizontal',cax=cax)
         cax.set_xlabel('Energy')
-
-
-        for ax in [grid.ax_joint, grid.ax_marg_x, grid.ax_marg_y]:
-            ax.axes.xaxis.set_ticklabels([])
-            ax.axes.yaxis.set_ticklabels([])
-        break # TEST
-
-
-    if savefig:
-        path = savefig if isinstance(savefig,str) else "./samplesets.eps"
-        plt.savefig(path)
+        break

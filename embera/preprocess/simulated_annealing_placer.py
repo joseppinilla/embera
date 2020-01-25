@@ -1,6 +1,5 @@
 import warnings
 
-from random import Random
 from embera.architectures.tiling import Tiling
 
 __all__ = ['find_candidates', 'SimulatedAnnealingPlacer']
@@ -13,10 +12,6 @@ class SimulatedAnnealingPlacer(Tiling):
 
         self.tries = params.pop('tries', 1)
         self.verbose = params.pop('verbose', 0)
-
-        # Random Number Generator Configuration
-        self.random_seed = params.pop('random_seed', None)
-        self.rng = Random(self.random_seed)
 
         # Choice of vicinity. See below.
         self.vicinity = params.pop('vicinity', 0)
@@ -58,10 +53,10 @@ class SimulatedAnnealingPlacer(Tiling):
         #TODO: Simulated Annealing placement
         warnings.warn('Work in progress.')
         init_loc = {}
-        for s_node in S:
-            i = self.rng.randint(0, self.n)
-            j = self.rng.randint(0, self.m)
-            self.mapping[node] = (i, j)
+        # for s_node in S:
+            # i = randint(0, self.n)
+            # j = randint(0, self.m)
+            # self.mapping[node] = (i, j)
 
         candidates = self._assign_candidates()
         return candidates

@@ -19,7 +19,7 @@ class Embedding(dict):
     def interactions_histogram(self, source_edgelist, target_edgelist):
         target_keys = {hash(u)^hash(v) for u,v in target_edgelist}
         interactions = {}
-        for u, v in source_edgelist:
+        for u,v in source_edgelist:
             edge_interactions = []
             for s in self[u]:
                 for t in self[v]:
@@ -53,7 +53,7 @@ class Embedding(dict):
     @property
     def id(self):
         # To create a unique ID we use the quality key as an ID string...
-        if not self: quality_id = "NATIVE" # ..., unless empty,
+        if not self: return "NATIVE" # ..., unless empty,
         else: quality_id = "".join([str(v) for v in self.quality_key])
         # ...and the last 8 digits of this object's hash.
         hash_id = f"{self.__hash__():08}"[-8:]
@@ -61,7 +61,7 @@ class Embedding(dict):
 
     def __key(self):
         embedding_key = []
-        for v, chain in self.items():
+        for v,chain in self.items():
             chain_key = []
             for q in chain:
                 chain_key.append(hash(q))

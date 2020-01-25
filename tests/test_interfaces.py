@@ -85,8 +85,8 @@ class TestDataBase(unittest.TestCase):
         embedding = self.embedding
         source_edgelist = self.source_edgelist
         target_edgelist = self.target_edgelist
-        self.db.dump_sampleset(bqm,target_edgelist,sampleset,embedding=embedding)
-        sampleset_copy = self.db.load_sampleset(bqm,target_edgelist,embedding=embedding)
+        self.db.dump_sampleset(bqm,target_edgelist,embedding,sampleset)
+        sampleset_copy = self.db.load_sampleset(bqm,target_edgelist,embedding)
         self.assertEqual(sampleset,sampleset_copy)
 
     def test_id_bqm(self):

@@ -15,7 +15,7 @@ import requests
 
 import networkx as nx
 
-from random import sample
+from embera.utilities.random import choice
 
 def embera_bench():
     """ Set of benchmarks used to evaluate embera:
@@ -58,7 +58,7 @@ def geometry_bench():
     return benchmark_set
 
 
-def dwave_bench(N=10):
+def dwave_bench(N=10,seed=42):
     """ Set of benchmarks to replicate results in [1].
 
     Parameters:
@@ -122,13 +122,13 @@ def dwave_bench(N=10):
         benchmark_set.append(G)
 
     for _ in range(N):
-        G = nx.generators.k_random_intersection_graph(2*35, 35, 3)
+        G = nx.generators.k_random_intersection_graph(2*35,35,3,seed=seed)
         G.name = 'nae3sat'
         benchmark_set.append(G)
 
     for n,p in [(70,25),(60,50),(50,75)]:
         for _ in range(N):
-            G = nx.erdos_renyi_graph(n,p/100)
+            G = nx.erdos_renyi_graph(n,p/100,seed=seed)
             G.name = f'gnp{p}'
             benchmark_set.append(G)
 
@@ -292,46 +292,3 @@ def barbell_graph(k,m):
     G = nx.barbell_graph(k,m)
     G.name = 'barbell'
     return G
-
-def prune_graph(G, node_yield, edge_yield):
-    # Remove nodes
-    node_set = set(G.nodes)
-    num_node_faults = len(node_set) - round(len(node_set) * node_yield)
-    randnodes = sample(node_set, int(num_node_faults))
-    G.remove_nodes_from(randnodes)
-    # Remove edges
-    edge_set = set(G.edges)
-    num_edge_faults = len(edge_set) - round(len(edge_set) * edge_yield)
-    randedges = sample(edge_set, int(num_edge_faults))
-    G.remove_edges_from(randedges)
-    # Rename graph
-    G.name = G.name + ' node_yield %s edge_yield %s' % (node_yield, edge_yield)
-    return G
-
-def pruned_graph_gen(graph_method, node_yield=0.995, edge_yield=0.9995):
-    """ Create a graph generator method of the given topology with
-        size*yield elements of the original graph.
-
-    Example:
-        # DWave graph with 95% yield
-        >>> Tg = pruned_graph_gen(generators.dw2x_graph, node_yield=0.95)()
-        # Prune 5% of the edges of a bipartite grap at random
-        >>> G = pruned_graph_gen(nx.complete_bipartite_graph, edge_yield=0.95)(8,8)
-
-    Args:
-        arch_method: (method)
-            One of the graph generator function
-
-        node_yield: (optional, float, default=0.995)
-            Ratio of nodes over original size.
-            i.e. The original graph has node_yield=1.0
-
-        edge_yield: (optional, float, default=0.9995)
-            Ratio of edges over original size.
-            i.e. The original graph has edge_yield=1.0
-    """
-
-
-    arch_gen = lambda *args, **kwargs: prune_graph(graph_method(*args,**kwargs), node_yield, edge_yield)
-    arch_gen.__name__ = graph_method.__name__ + 'node_yield %s edge_yield %s' % (node_yield, edge_yield)
-    return arch_gen
