@@ -198,9 +198,10 @@ class EmberaDataBase:
             json.dump(bqm_ser,fp)
 
     """ ############################# SampleSets ########################### """
-    def load_samplesets(self, bqm, target, tag=""):
+    def load_samplesets(self, bqm, target, tag="", embedding=""):
         bqm_id = self.id_bqm(bqm)
         target_id = self.id_target(target)
+        embedding_id = self.id_embedding(embedding)
 
         samplesets_path = os.path.join(self.samplesets_path,bqm_id,target_id,tag)
 
@@ -210,13 +211,12 @@ class EmberaDataBase:
                 sampleset_filenames.append((root,file))
 
         samplesets = []
-        if not sampleset_filenames: return samplesets
-
-        for sampleset_filename in sampleset_filenames:
-            sampleset_path = os.path.join(*sampleset_filename)
-            with open(sampleset_path,'r') as fp:
-                sampleset = _load(fp,cls=DimodDecoder)
-            samplesets.append(sampleset)
+        sampleset_filename = embedding_id
+        for root,filename in sampleset_filenames:
+            if sampleset_filename in filename:
+                sampleset_path = os.path.join(root,filename)
+                with open(sampleset_path,'r') as fp:
+                    samplesets.append(_load(fp,cls=DimodDecoder))
 
         return samplesets
 
@@ -241,30 +241,16 @@ class EmberaDataBase:
             embedding: (embera.Embedding, dict, or str, default=None)
                 Dictionary is converted to Embedding, Embedding ID is used.
                 String is taken literally as path.
-                If None, concatenate all samplesets under directory.
+                If "", concatenate all under <EmberaDB>/<bqm_id>/<target_id>/<tag>
                 If {}, return `native` sampleset. i.e. <Embedding({}).id>.json
 
         """
-        bqm_id = self.id_bqm(bqm)
-        target_id = self.id_target(target)
-        embedding_id = self.id_embedding(embedding)
+        samplesets = self.load_samplesets(bqm,target,tag,embedding)
 
-        samplesets_path = os.path.join(self.samplesets_path,bqm_id,target_id,tag)
-
-        sampleset_filenames = []
-        for root, dirs, files in os.walk(samplesets_path):
-            for file in files:
-                sampleset_filenames.append((root,file))
-
-        samplesets = []
-        sampleset_filename = embedding_id+'.json'
-        for root,filename in sampleset_filenames:
-            if filename==sampleset_filename:
-                sampleset_path = os.path.join(root,filename)
-                with open(sampleset_path,'r') as fp:
-                    samplesets.append(_load(fp,cls=DimodDecoder))
-        if not samplesets: raise ValueError("No samplesets found.")
-        return dimod.concatenate(samplesets)
+        if not samplesets:
+            raise ValueError("No samplesets found.")
+        else:
+            return dimod.concatenate(samplesets)
 
     def dump_sampleset(self, bqm, target, embedding, sampleset, tag=""):
         bqm_id = self.id_bqm(bqm)
