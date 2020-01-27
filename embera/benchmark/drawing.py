@@ -1,5 +1,4 @@
 import embera
-import seaborn as sns
 import networkx as nx
 import matplotlib.pyplot as plt
 

@@ -1,5 +1,7 @@
 import os
 import json
+import dimod
+import numpy
 
 from json import load as _load
 from json import dump as _dump
@@ -7,7 +9,6 @@ from json import dump as _dump
 from embera.interfaces.embedding import Embedding
 from embera.interfaces.json import EmberaEncoder, EmberaDecoder
 
-from dimod import concatenate, BinaryQuadraticModel, SampleSet
 from dimod.serialization.json import DimodEncoder, DimodDecoder
 
 from networkx import Graph
@@ -79,7 +80,7 @@ class EmberaDataBase:
         self.update_aliases()
 
     def id_bqm(self, bqm):
-        if isinstance(bqm,BinaryQuadraticModel):
+        if isinstance(bqm,dimod.BinaryQuadraticModel):
             lin_key = [hash(v)^hash(bias) for v,bias in bqm.linear.items()]
             quad_key = [hash(u)^hash(v)^hash(bias) for (u,v), bias in bqm.quadratic.items()]
             id = str(hash(tuple(sorted(lin_key)))^hash(tuple(sorted(quad_key))))
@@ -95,7 +96,7 @@ class EmberaDataBase:
         return id
 
     def __graph_key(self, graph):
-        if isinstance(graph, BinaryQuadraticModel):
+        if isinstance(graph, dimod.BinaryQuadraticModel):
             edgelist = graph.quadratic
         elif isinstance(graph, Graph):
             edgelist = graph.edges
@@ -106,7 +107,7 @@ class EmberaDataBase:
     def id_source(self, source):
         if isinstance(source,str):
             id = self.aliases.get('source',{}).get(source,source)
-        elif isinstance(source,(BinaryQuadraticModel,Graph,list)):
+        elif isinstance(source,(dimod.BinaryQuadraticModel,Graph,list)):
             id = str(self.__graph_key(source))
         else:
             raise ValueError("Source must be dimod.BinaryQuadraticModel, networkx.Graph, list of tuples or str")
@@ -117,7 +118,7 @@ class EmberaDataBase:
     def id_target(self, target):
         if isinstance(target,str):
             id = self.aliases.get('target',{}).get(target,target)
-        elif isinstance(target,(BinaryQuadraticModel,Graph,list)):
+        elif isinstance(target,(dimod.BinaryQuadraticModel,Graph,list)):
             id = str(self.__graph_key(target))
         else:
             raise ValueError("Target must be networkx.Graph, list of tuples or str")
@@ -134,15 +135,6 @@ class EmberaDataBase:
             id = self.aliases.get('embedding',{}).get(embedding,embedding)
         else:
             raise ValueError("Embedding must be embera.Embedding, dict, or str")
-        return id
-
-    def id_sampleset(self, sampleset):
-        if isinstance(sampleset,SampleSet):
-            id = str(hash(tuple(sampleset.first.sample.values())))
-        elif isinstance(sampleset,str):
-            id = self.aliases.get('sampleset',{}).get(sampleset,sampleset)
-        else:
-            raise ValueError("Sampleset must be dimod.SampleSet, or str")
         return id
 
     def get_path(self, dir_path, filename=None):
@@ -172,7 +164,8 @@ class EmberaDataBase:
             bqm_path = os.path.join(*bqm_filename)
 
             with open(bqm_path,'r') as fp:
-                bqm = _load(fp,cls=DimodDecoder)
+                bqm_ser = json.load(fp)
+                bqm = dimod.BinaryQuadraticModel.from_serializable(bqm_ser)
             bqms.append(bqm)
 
         return bqms
@@ -188,7 +181,8 @@ class EmberaDataBase:
         bqm_path = os.path.join(bqms_path, bqm_filename)
 
         with open(bqm_path,'r') as fp:
-            bqm = _load(fp,cls=DimodDecoder)
+            bqm_ser = json.load(fp)
+            bqm = dimod.BinaryQuadraticModel.from_serializable(bqm_ser)
 
         return bqm
 
@@ -200,15 +194,15 @@ class EmberaDataBase:
         bqm_path = self.get_path(bqms_path, bqm_id)
 
         with open(bqm_path,'w+') as fp:
-            _dump(bqm,fp,cls=DimodEncoder)
+            bqm_ser = bqm.to_serializable(bias_dtype=numpy.float64)
+            json.dump(bqm_ser,fp)
 
     """ ############################# SampleSets ########################### """
-    def load_samplesets(self, bqm, target="", embedding="", tag=""):
+    def load_samplesets(self, bqm, target, tag=""):
         bqm_id = self.id_bqm(bqm)
         target_id = self.id_target(target)
-        embedding_id = self.id_embedding(embedding)
 
-        samplesets_path = os.path.join(self.samplesets_path,bqm_id,target_id,embedding_id,tag)
+        samplesets_path = os.path.join(self.samplesets_path,bqm_id,target_id,tag)
 
         sampleset_filenames = []
         for root, dirs, files in os.walk(samplesets_path):
@@ -220,18 +214,22 @@ class EmberaDataBase:
 
         for sampleset_filename in sampleset_filenames:
             sampleset_path = os.path.join(*sampleset_filename)
-
             with open(sampleset_path,'r') as fp:
                 sampleset = _load(fp,cls=DimodDecoder)
             samplesets.append(sampleset)
 
         return samplesets
 
-    def load_sampleset(self, bqm, target="", embedding="", tag=""):
+    def load_sampleset(self, bqm, target, tag="", embedding=""):
         """ Load a sampleset object from JSON format, filed under:
             <EmberaDB>/<bqm_id>/<target_id>/<tag>/<embedding_id>.json
             If tag and/or embedding are not provided, returns the concatenation
             of all samples found under the given criteria.
+
+        Arguments:
+
+            target: (str)
+                If "*", and embedding="" concatenates samples from all targets.
 
         Optional Arguments:
             If none of the optional arguments are given, all samplesets under
@@ -247,26 +245,40 @@ class EmberaDataBase:
                 If {}, return `native` sampleset. i.e. <Embedding({}).id>.json
 
         """
-        samplesets = self.load_samplesets(bqm,target,embedding,tag)
-        if not samplesets:
-            raise ValueError("No samplesets found.")
-        else:
-            return concatenate(samplesets)
+        bqm_id = self.id_bqm(bqm)
+        target_id = self.id_target(target)
+        embedding_id = self.id_embedding(embedding)
+
+        samplesets_path = os.path.join(self.samplesets_path,bqm_id,target_id,tag)
+
+        sampleset_filenames = []
+        for root, dirs, files in os.walk(samplesets_path):
+            for file in files:
+                sampleset_filenames.append((root,file))
+
+        samplesets = []
+        sampleset_filename = embedding_id+'.json'
+        for root,filename in sampleset_filenames:
+            if filename==sampleset_filename:
+                sampleset_path = os.path.join(root,filename)
+                with open(sampleset_path,'r') as fp:
+                    samplesets.append(_load(fp,cls=DimodDecoder))
+        if not samplesets: raise ValueError("No samplesets found.")
+        return dimod.concatenate(samplesets)
 
     def dump_sampleset(self, bqm, target, embedding, sampleset, tag=""):
         bqm_id = self.id_bqm(bqm)
         target_id = self.id_target(target)
         embedding_id = self.id_embedding(embedding)
-        sampleset_id = self.id_sampleset(sampleset)
 
-        samplesets_path = [self.samplesets_path,bqm_id,target_id,embedding_id,tag]
+        samplesets_path = [self.samplesets_path,bqm_id,target_id,tag]
 
-        sampleset_path = self.get_path(samplesets_path, sampleset_id)
+        sampleset_path = self.get_path(samplesets_path, embedding_id)
 
         if os.path.exists(sampleset_path):
             with open(sampleset_path,'r') as fp:
                 record = _load(fp,cls=DimodDecoder)
-            sampleset = concatenate((sampleset,record))
+            sampleset = dimod.concatenate((sampleset,record))
 
         with open(sampleset_path,'w+') as fp:
             _dump(sampleset,fp,cls=DimodEncoder)

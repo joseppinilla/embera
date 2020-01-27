@@ -60,12 +60,20 @@ class TestDataBase(unittest.TestCase):
 
     def test_bqm(self):
         bqm = self.bqm
+        bqm_id = self.db.id_bqm(bqm)
         source = self.source_edgelist
+
         self.db.dump_bqm(source,bqm)
         bqm_copy = self.db.load_bqm(source)
         self.assertEqual(bqm, bqm_copy)
+        copy_id = self.db.id_bqm(bqm_copy)
+        self.assertEqual(bqm_id,copy_id)
+
         self.db.dump_bqm(source,bqm,tag="Tag")
-        bqm_copy = self.db.load_bqm(source,tag="Tag")
+        bqm_copy2 = self.db.load_bqm(source,tag="Tag")
+        self.assertEqual(bqm,bqm_copy2)
+        copy_id2 = self.db.id_bqm(bqm_copy2)
+        self.assertEqual(bqm_id,copy_id2)
 
 
     def test_embedding_graphs(self):
@@ -86,7 +94,7 @@ class TestDataBase(unittest.TestCase):
         source_edgelist = self.source_edgelist
         target_edgelist = self.target_edgelist
         self.db.dump_sampleset(bqm,target_edgelist,embedding,sampleset)
-        sampleset_copy = self.db.load_sampleset(bqm,target_edgelist,embedding)
+        sampleset_copy = self.db.load_sampleset(bqm,target_edgelist,embedding=embedding)
         self.assertEqual(sampleset,sampleset_copy)
 
     def test_id_bqm(self):
