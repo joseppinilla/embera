@@ -126,4 +126,3 @@ def plot_joint_samplesets(samplesets, savefig=True):
         # cax = fig.add_axes([0.09, 0.06, 0.84, 0.02])
         plt.colorbar(sct,orientation='horizontal',cax=cax)
         cax.set_xlabel('Energy')
-        break
