@@ -11,6 +11,8 @@ from embera.interfaces.json import EmberaEncoder, EmberaDecoder
 
 from dimod.serialization.json import DimodEncoder, DimodDecoder
 
+from dwave.embedding import unembed_sampleset
+
 from networkx import Graph
 from networkx.readwrite.json_graph import node_link_data as _serialize_graph
 from networkx.readwrite.json_graph import node_link_graph as _deserialize_graph
@@ -198,10 +200,10 @@ class EmberaDataBase:
             json.dump(bqm_ser,fp)
 
     """ ############################# SampleSets ########################### """
-    def load_samplesets(self, bqm, target, tags=[], embedding=""):
+    def load_samplesets(self, bqm, target, tags=[], embedding="",unembed_args={}):
         bqm_id = self.id_bqm(bqm)
         target_id = self.id_target(target)
-        embedding_id = self.id_embedding(embedding)
+        embedding_id = self.id_embedding(embedding) if embedding!="" else ""
 
         samplesets_path = os.path.join(self.samplesets_path,bqm_id,target_id,*tags)
 
@@ -216,11 +218,21 @@ class EmberaDataBase:
             if sampleset_filename in filename:
                 sampleset_path = os.path.join(root,filename)
                 with open(sampleset_path,'r') as fp:
-                    samplesets.append(_load(fp,cls=DimodDecoder))
+                    sampleset = _load(fp,cls=DimodDecoder)
+
+                if not embedding:
+                    if not isinstance(bqm,dimod.BinaryQuadraticModel):
+                        raise ValueError("Need BQM object to unembed.")
+                    embedding_id,_ = os.path.splitext(filename)
+                    source_id = self.id_source(bqm)
+                    embeddings = self.load_embeddings(source_id,target_id)
+                    emb = next(e for e in embeddings if self.id_embedding(e)==embedding_id)
+                    sampleset = unembed_sampleset(sampleset,emb,bqm,**unembed_args)
+                samplesets.append(sampleset)
 
         return samplesets
 
-    def load_sampleset(self, bqm, target, tags=[], embedding=""):
+    def load_sampleset(self, bqm, target, tags=[], embedding="", unembed_args={}):
         """ Load a sampleset object from JSON format, filed under:
             <EmberaDB>/<bqm_id>/<target_id>/<tag>/<embedding_id>.json
             If tag and/or embedding are not provided, returns the concatenation
@@ -245,7 +257,8 @@ class EmberaDataBase:
                 If {}, return `native` sampleset. i.e. <Embedding({}).id>.json
 
         """
-        samplesets = self.load_samplesets(bqm,target,tags,embedding)
+        samplesets = self.load_samplesets(bqm,target,tags,embedding,unembed_args)
+
 
         if not samplesets:
             raise ValueError("No samplesets found.")
@@ -295,7 +308,7 @@ class EmberaDataBase:
 
         return embeddings
 
-    def load_embedding(self, source, target, tags=[],index=0):
+    def load_embedding(self, source, target, tags=[], index=0):
         """ Load an embedding object from JSON format, filed under:
             <EmberaDB>/<source_id>/<target_id>/<embedding_id>.json
             or, if tag is provided:
