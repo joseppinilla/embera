@@ -148,9 +148,9 @@ class EmberaDataBase:
         return path
 
     """ ######################## BinaryQuadraticModels ##################### """
-    def load_bqms(self, source, tag=""):
+    def load_bqms(self, source, tags=[]):
         source_id = self.id_source(source)
-        bqms_path = os.path.join(self.bqms_path,source_id,tag)
+        bqms_path = os.path.join(self.bqms_path,source_id,*tags)
 
         bqm_filenames = []
         for root, dirs, files in os.walk(bqms_path):
@@ -170,10 +170,10 @@ class EmberaDataBase:
 
         return bqms
 
-    def load_bqm(self, source, tag="", index=0):
+    def load_bqm(self, source, tags=[], index=0):
         source_id = self.id_source(source)
 
-        bqms_path = os.path.join(self.bqms_path,source_id,tag)
+        bqms_path = os.path.join(self.bqms_path,source_id,*tags)
         bqm_filenames = os.listdir(bqms_path)
         if not bqm_filenames: raise ValueError("No BQMs found.")
 
@@ -186,10 +186,10 @@ class EmberaDataBase:
 
         return bqm
 
-    def dump_bqm(self, source, bqm, tag=""):
+    def dump_bqm(self, source, bqm, tags=[]):
         bqm_id = self.id_bqm(bqm)
         source_id = self.id_source(source)
-        bqms_path = [self.bqms_path,source_id,tag]
+        bqms_path = [self.bqms_path,source_id]+tags
 
         bqm_path = self.get_path(bqms_path, bqm_id)
 
@@ -198,12 +198,12 @@ class EmberaDataBase:
             json.dump(bqm_ser,fp)
 
     """ ############################# SampleSets ########################### """
-    def load_samplesets(self, bqm, target, tag="", embedding=""):
+    def load_samplesets(self, bqm, target, tags=[], embedding=""):
         bqm_id = self.id_bqm(bqm)
         target_id = self.id_target(target)
         embedding_id = self.id_embedding(embedding)
 
-        samplesets_path = os.path.join(self.samplesets_path,bqm_id,target_id,tag)
+        samplesets_path = os.path.join(self.samplesets_path,bqm_id,target_id,*tags)
 
         sampleset_filenames = []
         for root, dirs, files in os.walk(samplesets_path):
@@ -220,7 +220,7 @@ class EmberaDataBase:
 
         return samplesets
 
-    def load_sampleset(self, bqm, target, tag="", embedding=""):
+    def load_sampleset(self, bqm, target, tags=[], embedding=""):
         """ Load a sampleset object from JSON format, filed under:
             <EmberaDB>/<bqm_id>/<target_id>/<tag>/<embedding_id>.json
             If tag and/or embedding are not provided, returns the concatenation
@@ -245,19 +245,19 @@ class EmberaDataBase:
                 If {}, return `native` sampleset. i.e. <Embedding({}).id>.json
 
         """
-        samplesets = self.load_samplesets(bqm,target,tag,embedding)
+        samplesets = self.load_samplesets(bqm,target,tags,embedding)
 
         if not samplesets:
             raise ValueError("No samplesets found.")
         else:
             return dimod.concatenate(samplesets)
 
-    def dump_sampleset(self, bqm, target, embedding, sampleset, tag=""):
+    def dump_sampleset(self, bqm, target, embedding, sampleset, tags=[]):
         bqm_id = self.id_bqm(bqm)
         target_id = self.id_target(target)
         embedding_id = self.id_embedding(embedding)
 
-        samplesets_path = [self.samplesets_path,bqm_id,target_id,tag]
+        samplesets_path = [self.samplesets_path,bqm_id,target_id]+tags
 
         sampleset_path = self.get_path(samplesets_path, embedding_id)
 
@@ -270,11 +270,11 @@ class EmberaDataBase:
             _dump(sampleset,fp,cls=DimodEncoder)
 
     """ ############################ Embeddings ############################ """
-    def load_embeddings(self, source, target, tag=""):
+    def load_embeddings(self, source, target, tags=[]):
         source_id = self.id_source(source)
         target_id = self.id_target(target)
 
-        embeddings_path = os.path.join(self.embeddings_path,source_id,target_id,tag)
+        embeddings_path = os.path.join(self.embeddings_path,source_id,target_id,*tags)
 
         embedding_filenames = []
         for root, dirs, files in os.walk(embeddings_path):
@@ -295,7 +295,7 @@ class EmberaDataBase:
 
         return embeddings
 
-    def load_embedding(self, source, target, tag="",index=0):
+    def load_embedding(self, source, target, tags=[],index=0):
         """ Load an embedding object from JSON format, filed under:
             <EmberaDB>/<source_id>/<target_id>/<embedding_id>.json
             or, if tag is provided:
@@ -324,7 +324,7 @@ class EmberaDataBase:
         source_id = self.id_source(source)
         target_id = self.id_target(target)
 
-        embeddings_path = os.path.join(self.embeddings_path,source_id,target_id,tag)
+        embeddings_path = os.path.join(self.embeddings_path,source_id,target_id,*tags)
         embedding_filenames = os.listdir(embeddings_path)
         if not embedding_filenames: raise ValueError("No embeddings found.")
 
@@ -337,7 +337,7 @@ class EmberaDataBase:
         return embedding
 
 
-    def dump_embedding(self, source, target, embedding, tag=""):
+    def dump_embedding(self, source, target, embedding, tags=[]):
         """ Store an embedding object in JSON format, filed under:
             <EmberaDB>/<source_id>/<target_id>/<embedding_id>.json
             or, if tag is provided:
@@ -362,7 +362,7 @@ class EmberaDataBase:
         """
         source_id = self.id_source(source)
         target_id = self.id_target(target)
-        embeddings_path = [self.embeddings_path,source_id,target_id,tag]
+        embeddings_path = [self.embeddings_path,source_id,target_id] + tags
 
         if isinstance(embedding,Embedding): embedding_obj = embedding
         else: embedding_obj = Embedding(embedding)

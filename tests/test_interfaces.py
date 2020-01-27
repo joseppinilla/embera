@@ -69,8 +69,8 @@ class TestDataBase(unittest.TestCase):
         copy_id = self.db.id_bqm(bqm_copy)
         self.assertEqual(bqm_id,copy_id)
 
-        self.db.dump_bqm(source,bqm,tag="Tag")
-        bqm_copy2 = self.db.load_bqm(source,tag="Tag")
+        self.db.dump_bqm(source,bqm,tags=["Tag"])
+        bqm_copy2 = self.db.load_bqm(source,tags=["Tag"])
         self.assertEqual(bqm,bqm_copy2)
         copy_id2 = self.db.id_bqm(bqm_copy2)
         self.assertEqual(bqm_id,copy_id2)
@@ -82,8 +82,8 @@ class TestDataBase(unittest.TestCase):
 
         embedding_obj = Embedding(self.embedding)
 
-        self.db.dump_embedding(S,T,embedding_obj,'minorminer')
-        embedding_copy = self.db.load_embedding(S,T,tag='minorminer')
+        self.db.dump_embedding(S,T,embedding_obj,tags=['minorminer'])
+        embedding_copy = self.db.load_embedding(S,T,tags=['minorminer'])
 
         self.assertEqual(embedding_obj, Embedding(embedding_copy))
 
@@ -161,8 +161,8 @@ class TestDataBase(unittest.TestCase):
         embedding = self.embedding
         source = self.source_edgelist
         target = nx.path_graph(8)
-        self.db.dump_embedding(source,target,embedding,'tag1')
-        self.db.dump_embedding(source,target,embedding,'tag2')
+        self.db.dump_embedding(source,target,embedding,tags=['tag1'])
+        self.db.dump_embedding(source,target,embedding,tags=['tag2'])
         embedding_copy = self.db.load_embeddings(source,target)
         self.assertDictEqual(embedding,dict(embedding_copy[0]))
 
