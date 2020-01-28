@@ -72,10 +72,11 @@ def plot_embeddings(embeddings, T, savefig=True):
         plt.savefig(path)
 
 def plot_joint_samplesets(samplesets, savefig=True):
-    """
-    Based on:
-    https://jakevdp.github.io/PythonDataScienceHandbook/04.08-multiple-subplots.html
-    """
+    nplots = len(samplesets)
+    fig = plt.figure(figsize=(nplots*3, 3))
+    grid = plt.GridSpec(5, 5*nplots, hspace=0.0, wspace=0.0)
+
+    ims = []
     for i,sampleset in enumerate(samplesets):
         x = []
         y = []
@@ -92,37 +93,35 @@ def plot_joint_samplesets(samplesets, savefig=True):
         minE = sampleset.first.energy
         ratE = [250**((energy/minE)**5) for energy in E]
 
-        fig = plt.figure(i, figsize=(6, 6))
-        grid = plt.GridSpec(5, 5, hspace=0.0, wspace=0.0)
-
         # Set up the axes with gridspec
-        main_ax = fig.add_subplot(grid[1:5,0:4])
-        y_hist = fig.add_subplot(grid[1:5,4], sharey=main_ax)
-        x_hist = fig.add_subplot(grid[0,0:4], sharex=main_ax)
+        main_ax = fig.add_subplot(grid[1:5,i*5:4+(i*5)])
+        y_hist = fig.add_subplot(grid[1:5,4+(i*5)], sharey=main_ax, frameon=False)
+        x_hist = fig.add_subplot(grid[0,i*5:4+(i*5)], sharex=main_ax, frameon=False)
 
-        y_hist.spines['right'].set_visible(False)
-        y_hist.spines['top'].set_visible(False)
-        y_hist.xaxis.set_ticks_position('bottom')
+        y_hist.set_xticks([],[])
         y_hist.set_yticks([],[])
 
-        x_hist.spines['left'].set_visible(False)
-        x_hist.spines['top'].set_visible(False)
-        x_hist.yaxis.set_ticks_position('right')
         x_hist.set_xticks([],[])
+        x_hist.set_yticks([],[])
 
-        # scatter points on the main axes
+        # Scatter points on the main axes
         sct = main_ax.scatter(x, y, s=ratE, c=E, cmap="jet", alpha=0.5)
 
-        # histogram on the attached axes
+        # Histograms on the attached axes
         x_hist.hist(x, 100, histtype='stepfilled',
                     orientation='vertical', color='gray')
 
         y_hist.hist(y, 100, histtype='stepfilled',
                     orientation='horizontal', color='gray')
 
-        xmin = main_ax.get_position().xmin
-        xmax = main_ax.get_position().width
-        cax = fig.add_axes([xmin, 0, xmax, 0.02]) # [left, bottom, width, height]
-        # cax = fig.add_axes([0.09, 0.06, 0.84, 0.02])
-        plt.colorbar(sct,orientation='horizontal',cax=cax)
-        cax.set_xlabel('Energy')
+        ims.append(sct)
+
+    # Color Bar
+    vmin,vmax = zip(*[im.get_clim() for im in ims])
+
+    for i,im in enumerate(ims):
+        im.set_clim(vmin=min(vmin),vmax=max(vmax))
+
+    cax = fig.add_axes([1/nplots,-0.01,0.5,0.02]) # [left,bottom,width,height]
+    plt.colorbar(sct,orientation='horizontal',cax=cax)
+    _ = cax.set_xlabel('Energy')
