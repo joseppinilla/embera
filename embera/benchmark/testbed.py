@@ -1,7 +1,16 @@
 import time
+import dimod
 import embera
 
 __all__ = ["embed_and_report"]
+
+class SAnnealSampler(dimod.StructureComposite):
+    def __init__(self,solver):
+        nodes = solver.nodes
+        edges = solver.edges
+        sa_sampler = dimod.SimulatedAnnealingSampler
+        super(SAnnealSampler, self).__init__(sa_sampler,nodes,edges)
+
 
 def embed_and_report(method, S, T, RNG_SEED=42):
     report = {}

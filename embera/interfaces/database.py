@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import dimod
 import numpy
 
@@ -47,6 +48,9 @@ class EmberaDataBase:
         if os.path.exists(self.aliases_path):
             with open(self.aliases_path,'r') as fp:
                 self.aliases = _load(fp)
+
+    def timestamp(self):
+        return f"{time.time():.0f}"
 
     def update_aliases(self):
         with open(self.aliases_path,'w+') as fp:
@@ -188,9 +192,9 @@ class EmberaDataBase:
 
         return bqm
 
-    def dump_bqm(self, source, bqm, tags=[]):
+    def dump_bqm(self, bqm, tags=[]):
+        source_id = self.id_source(bqm)
         bqm_id = self.id_bqm(bqm)
-        source_id = self.id_source(source)
         bqms_path = [self.bqms_path,source_id]+tags
 
         bqm_path = self.get_path(bqms_path, bqm_id)

@@ -21,11 +21,31 @@
 import networkx as nx
 import dwave_networkx as dnx
 
-__all__ = ['graph_from_solver',
+__all__ = ['from_dwave', 'graph_from_solver',
            'rainier_graph', 'vesuvius_graph', 'dw2x_graph', 'dw2000q_graph',
            'p6_graph', 'p16_graph',
            'h20k_graph']
 
+def from_dwave(simulate=True):
+    import dwave.cloud
+
+    with dwave.cloud.Client.from_config() as client:
+        solvers = client.get_solvers()
+
+    if not simulate:
+        return solvers
+    else:
+        import dimod
+        sa_solvers = []
+        for solver in solvers:
+            nodes = solver.nodes
+            edges = solver.edges
+            sa_sampler = dimod.SimulatedAnnealingSampler()
+            sa_sampler.properties.update(solver.properties)
+            sa_sampler.properties['chip_id'] = "SIM_"+solver.name
+            sa_sampler.properties['category'] = 'software'
+            sa_solvers.append(dimod.StructureComposite(sa_sampler,nodes,edges))
+        return sa_solvers
 
 def graph_from_solver(solver, **kwargs):
     """ D-Wave architecture graph from Dimod Structured Solver
@@ -41,7 +61,6 @@ def graph_from_solver(solver, **kwargs):
         target_graph = dnx.generators.chimera_graph(*shape, **kwargs)
         indices = nx.get_node_attributes(target_graph,'chimera_index')
         target_graph.graph['pos'] = {v:(i,j) for v, (i,j,u,k) in indices.items()}
-        target_graph.name = solver.name
     elif type=='pegasus':
         target_graph = dnx.generators.pegasus_graph(*shape, **kwargs)
         indices = nx.get_node_attributes(target_graph,'pegasus_index')
@@ -49,7 +68,7 @@ def graph_from_solver(solver, **kwargs):
     else:
         raise TypeError("Solver provided is not any of the supported types.")
 
-    target_graph.name = solver.name
+    target_graph.name = solver.properties['chip_id']
     return target_graph
 
 def rainier_graph(**kwargs):

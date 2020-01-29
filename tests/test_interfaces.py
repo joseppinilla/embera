@@ -63,13 +63,13 @@ class TestDataBase(unittest.TestCase):
         bqm_id = self.db.id_bqm(bqm)
         source = self.source_edgelist
 
-        self.db.dump_bqm(source,bqm)
+        self.db.dump_bqm(bqm)
         bqm_copy = self.db.load_bqm(source)
         self.assertEqual(bqm, bqm_copy)
         copy_id = self.db.id_bqm(bqm_copy)
         self.assertEqual(bqm_id,copy_id)
 
-        self.db.dump_bqm(source,bqm,tags=["Tag"])
+        self.db.dump_bqm(bqm,tags=["Tag"])
         bqm_copy2 = self.db.load_bqm(source,tags=["Tag"])
         self.assertEqual(bqm,bqm_copy2)
         copy_id2 = self.db.id_bqm(bqm_copy2)

@@ -15,6 +15,12 @@ def plot(plot_method, args, plot_kw={}, subplot_kw={}, savefig=True):
         path = savefig if isinstance(savefig,str) else f"./{plot_method.__name}.eps"
         plt.savefig(path)
 
+def plot_yields(solvers, savefig=True):
+    kwargs = {'plot_kw':{'node_size':1},
+              'subplot_kw':{'aspect':'equal'},
+              'savefig':'yield.eps'}
+    plot(embera.draw_architecture_yield,solvers,**kwargs)
+
 def plot_parameters(bqms, savefig=True):
     nplots = len(bqms)
 
@@ -39,7 +45,7 @@ def plot_topologies(topologies, nrows=1, ncols=None, savefig=True):
     if ncols is None:
         ncols = len(topologies)//nrows + bool(len(topologies)%nrows)
 
-    fig, axs = plt.subplots(nrows, ncols, subplot_kw={'aspect':'equal'},squeeze=False)
+    fig, axs = plt.subplots(nrows,ncols,subplot_kw={'aspect':'equal'},squeeze=False)
     fig.set_size_inches(ncols , nrows)
 
     for i, (ax,G) in enumerate(zip(axs.flat,topologies)):
@@ -56,7 +62,6 @@ def plot_topologies(topologies, nrows=1, ncols=None, savefig=True):
         plt.savefig(path)
 
 def plot_embeddings(embeddings, T, savefig=True):
-
     nplots = len(embeddings)
     fig, axs = plt.subplots(1, nplots, subplot_kw={'aspect':'equal'}, squeeze=False)
     fig.set_size_inches(2*nplots, 2)
@@ -125,3 +130,30 @@ def plot_joint_samplesets(samplesets, savefig=True):
     cax = fig.add_axes([1/nplots,-0.01,0.5,0.02]) # [left,bottom,width,height]
     plt.colorbar(sct,orientation='horizontal',cax=cax)
     _ = cax.set_xlabel('Energy')
+
+def plot_chain_metrics(embeddings, S, T, classes=[], savefig=True):
+    nplots = len(embeddings)
+    fig, axs = plt.subplots(1, 5)
+
+    for embedding in embeddings:
+        method = embedding.properties["embedding_method"]
+        plt_args = {'label':method,'c':palette(classes.index(method))}
+
+        chain_hist = embedding.chain_histogram()
+        axs[0].scatter(chain_hist.keys(),chain_hist.values(),**plt_args)
+
+        inter_hist = embedding.interactions_histogram(S.edges(),T.edges())
+        axs[1].scatter(inter_hist.keys(),inter_hist.values(),**plt_args)
+
+        runtime = embedding.properties["embedding_runtime"]
+        axs[2].scatter(len(embedding),runtime,**plt_args)
+
+        max_chain = embedding.max_chain
+        axs[3].scatter(len(embedding),max_chain,**plt_args)
+
+        total_qubits = embedding.total_qubits
+        axs[4].scatter(len(embedding),total_qubits,**plt_args)
+
+    if savefig:
+        path = savefig if isinstance(savefig,str) else "./chain_metrics.eps"
+        plt.savefig(path)
