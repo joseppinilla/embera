@@ -28,12 +28,13 @@ __all__ = ['from_dwave', 'graph_from_solver',
 
 def from_dwave(simulate=True):
     import dwave.cloud
+    import dwave.system
 
     with dwave.cloud.Client.from_config() as client:
         solvers = client.get_solvers()
 
     if not simulate:
-        return solvers
+        return [dwave.system.DWaveSampler(s) for s in solvers]
     else:
         import dimod
         sa_solvers = []
