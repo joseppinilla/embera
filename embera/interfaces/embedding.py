@@ -8,36 +8,76 @@ class Embedding(dict):
         super(Embedding,self).__init__(embedding)
         self.properties = properties
 
+    """ ############################ Histograms ############################ """
     def chain_histogram(self):
         # Based on dwavesystems/minorminer quality_key by Boothby, K.
-        sizes = [len(c) for c in self.values()]
         hist = {}
-        for s in sizes:
+        for s in map(len,self.values()):
             hist[s] = 1 + hist.get(s, 0)
         return hist
 
     def interactions_histogram(self, source_edgelist, target_edgelist):
-        target_keys = {hash(u)^hash(v) for u,v in target_edgelist}
+        interactions = self.interactions(source_edgelist,target_edgelist)
+
+        hist = {}
+        for size in map(len,interactions.values()):
+            hist[size] = 1 + hist.get(size, 0)
+
+        return hist
+
+    def connectivity_histogram(self, source_edgelist, target_edgelist):
+        connections = self.connections(source_edgelist,target_edgelist)
+
+        source_degree = {}
+        for u,v in source_edgelist:
+            if (u==v): continue
+            source_degree[u] = 1 + source_degree.get(u,0)
+            source_degree[v] = 1 + source_degree.get(v,0)
+
+        hist = {}
+        for t,edges in connections.items():
+            u,v = edges[0]
+            edgeset = set(edges)
+            connectivity = len(edgeset)/source_degree[u]
+            hist[connectivity] = 1 + hist.get(connectivity,0)
+
+        return hist
+
+    """ ############################## Metrics ############################# """
+    def interactions(self,source_edgelist,target_edgelist):
+        target_adj = {}
+        for s,t in target_edgelist:
+            if (s==t): continue
+            target_adj[s] = [t] + target_adj.get(s,[])
+            target_adj[t] = [s] + target_adj.get(t,[])
+
         interactions = {}
         for u,v in source_edgelist:
+            if (u==v): continue
             edge_interactions = []
             for s in self[u]:
                 for t in self[v]:
-                    target_edge = hash(s)^hash(t)
-                    if target_edge in target_keys:
-                        edge_interactions.append(target_edge)
+                    if t in target_adj[s]:
+                        edge_interactions.append((s,t))
             interactions[(u,v)] = edge_interactions
 
-        sizes = [len(i) for i in interactions.values()]
-        hist = {}
-        for s in sizes:
-            hist[s] = 1 + hist.get(s, 0)
-        return hist
+        return interactions
+
+    def connections(self,source_edgelist,target_edgelist):
+        interactions = self.interactions(source_edgelist,target_edgelist)
+
+        connections = {}
+        for (u,v),edge_interactions in interactions.items():
+            for s,t in edge_interactions:
+                connections[s] = [(u,v)] + connections.get(s,[])
+                connections[t] = [(v,u)] + connections.get(t,[])
+
+        return connections
 
     @property
     def max_chain(self):
-        hist = self.quality_key
-        return hist.pop()
+        hist = self.chain_histogram()
+        return max(hist)
 
     @property
     def total_qubits(self):
@@ -50,6 +90,7 @@ class Embedding(dict):
         hist = self.chain_histogram()
         return [value for item in sorted(hist.items(), reverse=True) for value in item]
 
+    """ ############################# Interface ############################ """
     @property
     def id(self):
         # To create a unique ID we use the quality key as an ID string...

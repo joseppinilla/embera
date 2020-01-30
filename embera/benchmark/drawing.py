@@ -1,6 +1,7 @@
 import embera
 import networkx as nx
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 palette = plt.get_cmap('Pastel2')
 
@@ -41,7 +42,7 @@ def plot_parameters(bqms, savefig=True):
         path = savefig if isinstance(savefig,str) else "./parameters.eps"
         plt.savefig(path)
 
-def plot_topologies(topologies, nrows=1, ncols=None, savefig=True):
+def plot_topologies(topologies, nrows=1, ncols=None, spring_seed=None, savefig=True):
     if ncols is None:
         ncols = len(topologies)//nrows + bool(len(topologies)%nrows)
 
@@ -50,7 +51,7 @@ def plot_topologies(topologies, nrows=1, ncols=None, savefig=True):
 
     for i, (ax,G) in enumerate(zip(axs.flat,topologies)):
         if i>=len(topologies): fig.delaxes(ax); continue
-        pos = G.graph.setdefault('pos', nx.spring_layout(G))
+        pos = G.graph.setdefault('pos', nx.spring_layout(G,seed=spring_seed))
         draw_params = {"node_size":10, "width":0.2,
                        "edge_color":'grey', "node_color":palette(i//ncols)}
         nx.draw(G, pos=pos, ax=ax, **draw_params)
@@ -132,27 +133,23 @@ def plot_joint_samplesets(samplesets, savefig=True):
     _ = cax.set_xlabel('Energy')
 
 def plot_chain_metrics(embeddings, S, T, classes=[], savefig=True):
-    nplots = len(embeddings)
-    fig, axs = plt.subplots(1, 5)
+    fig, axs = plt.subplots(1, 3, subplot_kw={'projection':'3d'})
+    fig.set_size_inches(15, 3)
+    chain_ax, inter_ax, conns_ax = axs.flat
 
     for embedding in embeddings:
         method = embedding.properties["embedding_method"]
-        plt_args = {'label':method,'c':palette(classes.index(method))}
+        index = classes.index(method)
+        plt_args = {'color':palette(index),'zs':index,'zdir':'y'}
 
         chain_hist = embedding.chain_histogram()
-        axs[0].scatter(chain_hist.keys(),chain_hist.values(),**plt_args)
+        chain_ax.bar(chain_hist.keys(),chain_hist.values(),**plt_args)
 
         inter_hist = embedding.interactions_histogram(S.edges(),T.edges())
-        axs[1].scatter(inter_hist.keys(),inter_hist.values(),**plt_args)
+        inter_ax.bar(inter_hist.keys(),inter_hist.values(),**plt_args)
 
-        runtime = embedding.properties["embedding_runtime"]
-        axs[2].scatter(len(embedding),runtime,**plt_args)
-
-        max_chain = embedding.max_chain
-        axs[3].scatter(len(embedding),max_chain,**plt_args)
-
-        total_qubits = embedding.total_qubits
-        axs[4].scatter(len(embedding),total_qubits,**plt_args)
+        conns_hist = embedding.connectivity_histogram(S.edges(),T.edges())
+        conns_ax.bar(conns_hist.keys(),conns_hist.values(),**plt_args)
 
     if savefig:
         path = savefig if isinstance(savefig,str) else "./chain_metrics.eps"
