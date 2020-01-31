@@ -6,8 +6,6 @@ import matplotlib.pyplot as plt
 
 from random import uniform
 
-from embera.benchmark.topologies import pruned_graph_gen
-
 from embera.architectures import drawing, generators
 from embera.composites.layout_aware import LayoutAwareEmbeddingComposite
 
@@ -16,7 +14,7 @@ from dimod.reference.samplers.simulated_annealing import SimulatedAnnealingSampl
 
 # The corresponding graph of the D-Wave annealer with 0.95 qubit yield
 J_RANGE = [-2.0,2.0]
-Tg = pruned_graph_gen(generators.rainier_graph, node_yield=0.95)()
+Tg = generators.rainier_graph()
 
 # A 4x4 grid problem graph
 p = 4

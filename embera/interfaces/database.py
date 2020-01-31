@@ -203,40 +203,39 @@ class EmberaDataBase:
             bqm_ser = bqm.to_serializable(bias_dtype=numpy.float64)
             json.dump(bqm_ser,fp)
 
+    def dump_ising(self, h, J, tags=[]):
+        bqm = dimod.BinaryQuadraticModel(h,J,0.0,'SPIN',tags=tags)
+        self.dump_bqm(bqm,tags)
+
     """ ############################# SampleSets ########################### """
-    def load_samplesets(self, bqm, target, tags=[], embedding="",unembed_args={}):
+    def load_samplesets(self, bqm, target, embedding="", tags=[""], unembed_args={}):
         bqm_id = self.id_bqm(bqm)
         target_id = self.id_target(target)
-        embedding_id = self.id_embedding(embedding) if embedding!="" else ""
+        embedding_id = self.id_embedding(embedding)
 
-        samplesets_path = os.path.join(self.samplesets_path,bqm_id,target_id,*tags)
+        samplesets_path = os.path.join(self.embeddings_path,bqm_id,target_id)
 
         sampleset_filenames = []
-        for root, dirs, files in os.walk(samplesets_path):
-            for file in files:
-                sampleset_filenames.append((root,file))
+        sampleset_filename = embedding_id if embedding else ""
+        for root, dirs, files in os.walk(self.samplesets_path):
+            if all(tag in root for tag in tags):
+                for file in files:
+                    if sampleset_filename in file:
+                        sampleset_filenames.append((root,file))
 
         samplesets = []
-        sampleset_filename = embedding_id
         for root,filename in sampleset_filenames:
-            if sampleset_filename in filename:
-                sampleset_path = os.path.join(root,filename)
-                with open(sampleset_path,'r') as fp:
-                    sampleset = _load(fp,cls=DimodDecoder)
+            sampleset_path = os.path.join(root,filename)
+            with open(sampleset_path,'r') as fp:
+                sampleset = _load(fp,cls=DimodDecoder)
+            samplesets.append(sampleset)
 
-                if not embedding:
-                    if not isinstance(bqm,dimod.BinaryQuadraticModel):
-                        raise ValueError("Need BQM object to unembed.")
-                    embedding_id,_ = os.path.splitext(filename)
-                    source_id = self.id_source(bqm)
-                    embeddings = self.load_embeddings(source_id,target_id)
-                    emb = next(e for e in embeddings if self.id_embedding(e)==embedding_id)
-                    sampleset = unembed_sampleset(sampleset,emb,bqm,**unembed_args)
-                samplesets.append(sampleset)
+        if embedding:
+            return [unembed_sampleset(s,embedding,bqm,**unembed_args) for s in samplesets]
+        else:
+            return samplesets
 
-        return samplesets
-
-    def load_sampleset(self, bqm, target, tags=[], embedding="", unembed_args={}):
+    def load_sampleset(self, bqm, target, embedding="", tags=[""], unembed_args={}):
         """ Load a sampleset object from JSON format, filed under:
             <EmberaDB>/<bqm_id>/<target_id>/<tag>/<embedding_id>.json
             If tag and/or embedding are not provided, returns the concatenation
@@ -261,7 +260,7 @@ class EmberaDataBase:
                 If {}, return `native` sampleset. i.e. <Embedding({}).id>.json
 
         """
-        samplesets = self.load_samplesets(bqm,target,tags,embedding,unembed_args)
+        samplesets = self.load_samplesets(bqm,target,embedding,tags,unembed_args)
 
 
         if not samplesets:
@@ -269,7 +268,7 @@ class EmberaDataBase:
         else:
             return dimod.concatenate(samplesets)
 
-    def dump_sampleset(self, bqm, target, embedding, sampleset, tags=[]):
+    def dump_sampleset(self, bqm, target, embedding, sampleset, tags=[""]):
         bqm_id = self.id_bqm(bqm)
         target_id = self.id_target(target)
         embedding_id = self.id_embedding(embedding)
@@ -287,16 +286,17 @@ class EmberaDataBase:
             _dump(sampleset,fp,cls=DimodEncoder)
 
     """ ############################ Embeddings ############################ """
-    def load_embeddings(self, source, target, tags=[]):
+    def load_embeddings(self, source, target, tags=[""]):
         source_id = self.id_source(source)
         target_id = self.id_target(target)
 
-        embeddings_path = os.path.join(self.embeddings_path,source_id,target_id,*tags)
+        embeddings_path = os.path.join(self.embeddings_path,source_id,target_id)
 
         embedding_filenames = []
         for root, dirs, files in os.walk(embeddings_path):
-            for file in files:
-                embedding_filenames.append((root,file))
+            if all(tag in root for tag in tags):
+                for file in files:
+                    embedding_filenames.append((root,file))
 
         embeddings = []
         if not embedding_filenames: return embeddings

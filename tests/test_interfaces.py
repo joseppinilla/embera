@@ -52,11 +52,11 @@ class TestDataBase(unittest.TestCase):
         self.embedding = minorminer.find_embedding(self.source_edgelist,
                                                    self.target_edgelist)
         self.sampleset = dimod.SampleSet.from_samples(
-                         [{'a': 0, 'A1.S': 1, (0,1): 0},{'a': 0, 'A1.S': 1, (0,1): 1}],
-                         'BINARY',0)
+                         [{1:-1, 2:1, 3:-1, 4:-1},{1:-1, 2:1, 3:1, 4:1}],
+                         'SPIN',0)
 
-    def tearDown(self):
-        shutil.rmtree("./TMP_DB")
+    # def tearDown(self):
+    #     shutil.rmtree("./TMP_DB")
 
     def test_bqm(self):
         bqm = self.bqm
@@ -89,12 +89,13 @@ class TestDataBase(unittest.TestCase):
 
     def test_sampleset(self):
         bqm = self.bqm
+        print(bqm)
+        print(self.db.id_bqm(bqm))
         sampleset = self.sampleset
         embedding = self.embedding
-        source_edgelist = self.source_edgelist
         target_edgelist = self.target_edgelist
         self.db.dump_sampleset(bqm,target_edgelist,embedding,sampleset)
-        sampleset_copy = self.db.load_sampleset(bqm,target_edgelist,embedding=embedding)
+        sampleset_copy = self.db.load_sampleset(bqm,target_edgelist)
         self.assertEqual(sampleset,sampleset_copy)
 
     def test_id_bqm(self):

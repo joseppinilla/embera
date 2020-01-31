@@ -2,7 +2,6 @@ import embera
 import networkx as nx
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-
 palette = plt.get_cmap('Pastel2')
 
 def plot(plot_method, args, plot_kw={}, subplot_kw={}, savefig=True):
@@ -29,8 +28,8 @@ def plot_parameters(bqms, savefig=True):
     fig.set_size_inches(2*nplots, 2)
 
     for ax,bqm in zip(axs.flat,bqms):
-        type = bqm.info.get("type","")
-        ax.set_title(type)
+        tags = bqm.info.get("tags","")
+        ax.set_title(" ".join(tags))
         h,J = bqm.linear.values(), bqm.quadratic.values()
         _ = ax.hist(J, range=(-2,2),bins=100,color=palette(0),label='J')
         _ = ax.hist(h, range=(-1,1),bins=100,color=palette(1),label='h')
@@ -112,6 +111,7 @@ def plot_joint_samplesets(samplesets, savefig=True):
 
         # Scatter points on the main axes
         sct = main_ax.scatter(x, y, s=ratE, c=E, cmap="jet", alpha=0.5)
+        main_ax.set_title(" ".join(sampleset.info.values()))
 
         # Histograms on the attached axes
         x_hist.hist(x, 100, histtype='stepfilled',
@@ -133,23 +133,39 @@ def plot_joint_samplesets(samplesets, savefig=True):
     _ = cax.set_xlabel('Energy')
 
 def plot_chain_metrics(embeddings, S, T, classes=[], savefig=True):
-    fig, axs = plt.subplots(1, 3, subplot_kw={'projection':'3d'})
+    fig, axs = plt.subplots(1,3,num=S.name,subplot_kw={'projection':'3d'})
     fig.set_size_inches(15, 3)
     chain_ax, inter_ax, conns_ax = axs.flat
 
+    cnt_class = {}
     for embedding in embeddings:
         method = embedding.properties["embedding_method"]
         index = classes.index(method)
-        plt_args = {'color':palette(index),'zs':index,'zdir':'y'}
+        cnt_class[method] = 1+cnt_class.get(method,0)
+
+        zs = index*50 + cnt_class[method]
+        plt_args = {'color':palette(index),'edgecolor':'k','width':1,
+                    'zorder':zs,'zs':zs,'zdir':'y','align':'edge'}
 
         chain_hist = embedding.chain_histogram()
         chain_ax.bar(chain_hist.keys(),chain_hist.values(),**plt_args)
 
+
         inter_hist = embedding.interactions_histogram(S.edges(),T.edges())
         inter_ax.bar(inter_hist.keys(),inter_hist.values(),**plt_args)
 
+
         conns_hist = embedding.connectivity_histogram(S.edges(),T.edges())
         conns_ax.bar(conns_hist.keys(),conns_hist.values(),**plt_args)
+
+    for ax in [chain_ax,inter_ax,conns_ax]:
+        ax.set_yticks([i*50 for i in range(len(classes))])
+        ax.set_yticklabels(classes)
+        ax.tick_params('y',labelrotation=-45)
+
+    chain_ax.set_title('Chain Length')
+    inter_ax.set_title('Chain Interactions')
+    conns_ax.set_title('Qubit Connectivity')
 
     if savefig:
         path = savefig if isinstance(savefig,str) else "./chain_metrics.eps"

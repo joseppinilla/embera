@@ -42,7 +42,7 @@ def draw_architecture_yield(target_graph, **kwargs):
         coordinates = target_graph.graph['labels'] == 'coordinate'
     except:
         raise ValueError("Target graph needs to have columns, rows, and tile \
-        attributes to dientify faulty qubits.")
+        attributes to identify faulty qubits.")
 
     if family == 'chimera':
         perfect_graph = dnx.chimera_graph(m,n,t, coordinates=coordinates)

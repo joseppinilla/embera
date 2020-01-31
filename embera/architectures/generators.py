@@ -21,32 +21,11 @@
 import networkx as nx
 import dwave_networkx as dnx
 
-__all__ = ['from_dwave', 'graph_from_solver',
+__all__ = ['graph_from_solver',
+           'dwave_online',
            'rainier_graph', 'vesuvius_graph', 'dw2x_graph', 'dw2000q_graph',
            'p6_graph', 'p16_graph',
            'h20k_graph']
-
-def from_dwave(simulate=True):
-    import dwave.cloud
-    import dwave.system
-
-    with dwave.cloud.Client.from_config() as client:
-        solvers = client.get_solvers()
-
-    if not simulate:
-        return [dwave.system.DWaveSampler(s) for s in solvers]
-    else:
-        import dimod
-        sa_solvers = []
-        for solver in solvers:
-            nodes = solver.nodes
-            edges = solver.edges
-            sa_sampler = dimod.SimulatedAnnealingSampler()
-            sa_sampler.properties.update(solver.properties)
-            sa_sampler.properties['chip_id'] = "SIM_"+solver.name
-            sa_sampler.properties['category'] = 'software'
-            sa_solvers.append(dimod.StructureComposite(sa_sampler,nodes,edges))
-        return sa_solvers
 
 def graph_from_solver(solver, **kwargs):
     """ D-Wave architecture graph from Dimod Structured Solver
@@ -71,6 +50,15 @@ def graph_from_solver(solver, **kwargs):
 
     target_graph.name = solver.properties['chip_id']
     return target_graph
+
+def dwave_online(**kwargs):
+    """ Architecture graphs from D-Wave devices `online`"""
+    import dwave.cloud
+    with dwave.cloud.Client.from_config(**kwargs) as client:
+        solvers = client.get_solvers()
+
+    return [graph_from_solver(s) for s in solvers]
+
 
 def rainier_graph(**kwargs):
     """ D-Wave One 'Rainier' Quantum Annealer graph
