@@ -55,8 +55,8 @@ class TestDataBase(unittest.TestCase):
                          [{1:-1, 2:1, 3:-1, 4:-1},{1:-1, 2:1, 3:1, 4:1}],
                          'SPIN',0)
 
-    # def tearDown(self):
-    #     shutil.rmtree("./TMP_DB")
+    def tearDown(self):
+        shutil.rmtree("./TMP_DB")
 
     def test_bqm(self):
         bqm = self.bqm
@@ -76,7 +76,7 @@ class TestDataBase(unittest.TestCase):
         self.assertEqual(bqm_id,copy_id2)
 
 
-    def test_embedding_graphs(self):
+    def test_embedding(self):
         S = nx.Graph(self.source_edgelist)
         T = nx.Graph(self.target_edgelist)
 
@@ -89,8 +89,6 @@ class TestDataBase(unittest.TestCase):
 
     def test_sampleset(self):
         bqm = self.bqm
-        print(bqm)
-        print(self.db.id_bqm(bqm))
         sampleset = self.sampleset
         embedding = self.embedding
         target_edgelist = self.target_edgelist

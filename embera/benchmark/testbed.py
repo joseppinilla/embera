@@ -40,8 +40,7 @@ def sample_and_report(bqm, sampler, **kwargs):
 
     sampleset = sampler.sample(bqm,**kwargs)
 
-    report['bqm_info'] = bqm.info
-    report['embedding_method'] = embedding.properties['embedding_method']
+    report.update(bqm.info)
     report['solver'] = sampler.properties
     report['parameters'] = sampler.parameters
 

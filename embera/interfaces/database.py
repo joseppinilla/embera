@@ -87,13 +87,13 @@ class EmberaDataBase:
 
     def id_bqm(self, bqm):
         if isinstance(bqm,dimod.BinaryQuadraticModel):
-            lin_key = [hash(v)^hash(bias) for v,bias in bqm.linear.items()]
-            quad_key = [hash(u)^hash(v)^hash(bias) for (u,v), bias in bqm.quadratic.items()]
-            id = str(hash(tuple(sorted(lin_key)))^hash(tuple(sorted(quad_key))))
+            lin_key = sum(bqm.linear.values())
+            quad_key = sum(bqm.quadratic.values())
+            id = f"{lin_key:f}_{quad_key:f}".replace('.','').replace('-','')
         elif isinstance(bqm,Graph):
-            lin_key = [hash(v)^hash(data['bias']) for v,data in bqm.nodes(data=True)]
-            quad_key = [hash(u)^hash(v)^hash(data['bias']) for u,v,data in bqm.edges(data=True)]
-            id = str(hash(tuple(sorted(lin_key)))^hash(tuple(sorted(quad_key))))
+            lin_key = sum([data['bias'] for v,data in bqm.nodes(data=True)])
+            quad_key = sum([data['bias'] for u,v,data in bqm.edges(data=True)])
+            id = f"{lin_key:f}_{quad_key:f}".replace('.','').replace('-','')
             if bqm.name: self.set_bqm_alias(id,bqm.name)
         elif isinstance(bqm,str):
             id = self.aliases.get('bqm',{}).get(bqm,bqm)
@@ -102,19 +102,29 @@ class EmberaDataBase:
         return id
 
     def __graph_key(self, graph):
-        if isinstance(graph, dimod.BinaryQuadraticModel):
-            edgelist = graph.quadratic
-        elif isinstance(graph, Graph):
-            edgelist = graph.edges
+        if isinstance(graph, Graph):
+            degree = graph.degree()
         else:
-            edgelist = graph
-        return hash(tuple(sorted([hash(u)^hash(v) for u,v in edgelist])))
+            if isinstance(graph, dimod.BinaryQuadraticModel):
+                edgelist = graph.quadratic
+            else:
+                edgelist = graph
+            degree_dict = {}
+            for u,v in edgelist:
+                degree_dict[u] = 1 + degree_dict.get(u,0)
+                degree_dict[v] = 1 + degree_dict.get(v,0)
+            degree = degree_dict.items()
+        degree_hist = {}
+        for v,d in degree:
+            degree_hist[d] = 1+degree_hist.get(d,0)
+
+        return (c for bin in sorted(degree_hist.items(), reverse=True) for c in bin)
 
     def id_source(self, source):
         if isinstance(source,str):
             id = self.aliases.get('source',{}).get(source,source)
         elif isinstance(source,(dimod.BinaryQuadraticModel,Graph,list)):
-            id = str(self.__graph_key(source))
+            id = "".join([str(v) for v in self.__graph_key(source)])
         else:
             raise ValueError("Source must be dimod.BinaryQuadraticModel, networkx.Graph, list of tuples or str")
 
@@ -125,7 +135,7 @@ class EmberaDataBase:
         if isinstance(target,str):
             id = self.aliases.get('target',{}).get(target,target)
         elif isinstance(target,(dimod.BinaryQuadraticModel,Graph,list)):
-            id = str(self.__graph_key(target))
+            id = "".join([str(v) for v in self.__graph_key(target)])
         else:
             raise ValueError("Target must be networkx.Graph, list of tuples or str")
 
