@@ -226,7 +226,7 @@ class EmberaDataBase:
         samplesets_path = os.path.join(self.embeddings_path,bqm_id,target_id,embedding_id)
 
         sampleset_filenames = []
-        for root, dirs, files in os.walk(self.samplesets_path):
+        for root, dirs, files in os.walk(samplesets_path):
             if all(tag in root for tag in tags):
                 for file in files:
                     sampleset_filenames.append((root,file))
@@ -252,7 +252,7 @@ class EmberaDataBase:
         Arguments:
 
             target: (str)
-                
+
 
         Optional Arguments:
             If none of the optional arguments are given, all samplesets under
