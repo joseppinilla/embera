@@ -223,7 +223,7 @@ class EmberaDataBase:
         target_id = self.id_target(target)
         embedding_id = self.id_embedding(embedding)
 
-        samplesets_path = os.path.join(self.embeddings_path,bqm_id,target_id,embedding_id)
+        samplesets_path = os.path.join(self.samplesets_path,bqm_id,target_id,embedding_id)
 
         sampleset_filenames = []
         for root, dirs, files in os.walk(samplesets_path):
