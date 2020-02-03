@@ -223,15 +223,13 @@ class EmberaDataBase:
         target_id = self.id_target(target)
         embedding_id = self.id_embedding(embedding)
 
-        samplesets_path = os.path.join(self.embeddings_path,bqm_id,target_id)
+        samplesets_path = os.path.join(self.embeddings_path,bqm_id,target_id,embedding_id)
 
         sampleset_filenames = []
-        sampleset_filename = embedding_id if embedding else ""
         for root, dirs, files in os.walk(self.samplesets_path):
             if all(tag in root for tag in tags):
                 for file in files:
-                    if sampleset_filename in file:
-                        sampleset_filenames.append((root,file))
+                    sampleset_filenames.append((root,file))
 
         samplesets = []
         for root,filename in sampleset_filenames:
@@ -254,7 +252,7 @@ class EmberaDataBase:
         Arguments:
 
             target: (str)
-                If "*", and embedding="" concatenates samples from all targets.
+                
 
         Optional Arguments:
             If none of the optional arguments are given, all samplesets under
@@ -283,9 +281,10 @@ class EmberaDataBase:
         target_id = self.id_target(target)
         embedding_id = self.id_embedding(embedding)
 
-        samplesets_path = [self.samplesets_path,bqm_id,target_id]+tags
+        samplesets_path = [self.samplesets_path,bqm_id,target_id,embedding_id]+tags
 
-        sampleset_path = self.get_path(samplesets_path, embedding_id)
+        sampleset_filename = self.timestamp()
+        sampleset_path = self.get_path(samplesets_path, sampleset_filename)
 
         if os.path.exists(sampleset_path):
             with open(sampleset_path,'r') as fp:

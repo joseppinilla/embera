@@ -91,10 +91,14 @@ class Embedding(dict):
     """ ############################# Interface ############################ """
     @property
     def id(self):
+        """ The Embedding IDentifier is made up of two parts:
+                Quality ID: String of the Chain Histogram
+                Chains ID: String of the 8 last digits of the chain key.
+        """
         chains_id = f"{self.__hash__():08}"[:8]
         quality_id = "".join([str(v) for v in self.quality_key])
         return quality_id+"_"+chains_id
-
+        
     def __key(self):
         embedding_key = []
         for v,chain in self.items():

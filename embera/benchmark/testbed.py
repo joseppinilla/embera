@@ -40,9 +40,7 @@ def sample_and_report(bqm, sampler, **kwargs):
 
     sampleset = sampler.sample(bqm,**kwargs)
 
-    report.update(bqm.info)
-    report['solver'] = sampler.properties
-    report['parameters'] = sampler.parameters
+    # TODO: What to report?
 
     sampleset.info.update(report)
 
