@@ -283,13 +283,8 @@ class EmberaDataBase:
 
         samplesets_path = [self.samplesets_path,bqm_id,target_id,embedding_id]+tags
 
-        sampleset_filename = self.timestamp()
+        sampleset_filename = f"{self.timestamp()}_{len(sampleset)}"
         sampleset_path = self.get_path(samplesets_path, sampleset_filename)
-
-        if os.path.exists(sampleset_path):
-            with open(sampleset_path,'r') as fp:
-                record = _load(fp,cls=DimodDecoder)
-            sampleset = dimod.concatenate((sampleset,record))
 
         with open(sampleset_path,'w+') as fp:
             _dump(sampleset,fp,cls=DimodEncoder)

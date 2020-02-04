@@ -3,11 +3,27 @@ import dimod
 import embera
 import dwave.cloud
 
-class SAnnealSampler(dimod.SimulatedAnnealingSampler,dimod.Structured):
+class StructuredSASampler(dimod.SimulatedAnnealingSampler,dimod.Structured):
     nodelist = None
     edgelist = None
     def __init__(self, failover=None,**config):
-        super(SAnnealSampler, self).__init__()
+        super(StructuredSASampler, self).__init__()
+        self.client = dwave.cloud.Client.from_config(**config)
+        solver = self.client.get_solver()
+
+        self.properties.update(solver.properties)
+        self.properties['category'] = 'software'
+        self.properties['chip_id'] = "SIM_"+solver.name
+
+        G = embera.architectures.graph_from_solver(solver)
+        self.nodelist = list(G.nodes())
+        self.edgelist = list(G.edges())
+
+class StructuredRandomSampler(dimod.RandomSampler,dimod.Structured):
+    nodelist = None
+    edgelist = None
+    def __init__(self, failover=None,**config):
+        super(StructuredRandomSampler, self).__init__()
         self.client = dwave.cloud.Client.from_config(**config)
         solver = self.client.get_solver()
 
@@ -40,8 +56,6 @@ def sample_and_report(bqm, sampler, **kwargs):
 
     sampleset = sampler.sample(bqm,**kwargs)
 
-    # TODO: What to report?
-
-    sampleset.info.update(report)
+    sampleset.info.update({'parameters':kwargs})
 
     return sampleset

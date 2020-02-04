@@ -83,25 +83,27 @@ def plot_joint_samplesets(samplesets, savefig=True):
 
     ims = []
     for i,sampleset in enumerate(samplesets):
+        minE = sampleset.first.energy
+        size = len(sampleset.first.sample)
+        xmax = (2**(size//2))
+        ymax = (2**(size-size//2))
+
         x = []
         y = []
         E = []
         c = []
         for datum in sampleset.data():
             value = ''.join(str((1+datum.sample[k])//2) for k in sorted(datum.sample))
-            size = len(value)
-            x.append(int(value[0:size//2],2)/(2**(size//2)))
-            y.append(int(value[size//2: ],2)/(2**(size//2)))
+            x.append(int(value[0:size//2],2)/xmax)
+            y.append(int(value[size//2: ],2)/ymax)
             c.append(datum.num_occurrences)
             E.append(datum.energy)
 
-        minE = sampleset.first.energy
-        ratE = [250**((energy/minE)**5) for energy in E]
-
         # Set up the axes with gridspec
-        main_ax = fig.add_subplot(grid[1:5,i*5:4+(i*5)])
-        y_hist = fig.add_subplot(grid[1:5,4+(i*5)], sharey=main_ax, frameon=False)
-        x_hist = fig.add_subplot(grid[0,i*5:4+(i*5)], sharex=main_ax, frameon=False)
+        xlim=ylim=(0.0,1.0)
+        main_ax = fig.add_subplot(grid[1:5,i*5:4+(i*5)],xlim=xlim,ylim=ylim)
+        y_hist = fig.add_subplot(grid[1:5,4+(i*5)],sharey=main_ax,frameon=False)
+        x_hist = fig.add_subplot(grid[0,i*5:4+(i*5)],sharex=main_ax,frameon=False)
 
         y_hist.set_xticks([],[])
         y_hist.set_yticks([],[])
@@ -110,7 +112,8 @@ def plot_joint_samplesets(samplesets, savefig=True):
         x_hist.set_yticks([],[])
 
         # Scatter points on the main axes
-        sct = main_ax.scatter(x, y, s=ratE, c=E, cmap="jet", alpha=0.5)
+        ratE = [250**((energy/minE)**5) for energy in E]
+        sct = main_ax.scatter(x,y,s=ratE,c=E,cmap="jet",alpha=0.5)
         main_ax.set_title(" ".join(sampleset.info.values()))
 
         # Histograms on the attached axes
@@ -131,6 +134,10 @@ def plot_joint_samplesets(samplesets, savefig=True):
     cax = fig.add_axes([1/nplots,-0.01,0.5,0.02]) # [left,bottom,width,height]
     plt.colorbar(sct,orientation='horizontal',cax=cax)
     _ = cax.set_xlabel('Energy')
+
+    if savefig:
+        path = savefig if isinstance(savefig,str) else "./samplesets_joint.eps"
+        plt.savefig(path)
 
 def plot_chain_metrics(embeddings, S, T, classes=[], savefig=True):
     fig, axs = plt.subplots(1,3,num=S.name,subplot_kw={'projection':'3d'})
