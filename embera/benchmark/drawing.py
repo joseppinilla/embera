@@ -82,22 +82,22 @@ def plot_joint_samplesets(samplesets, savefig=True):
     grid = plt.GridSpec(5, 5*nplots, hspace=0.0, wspace=0.0)
 
     ims = []
+    minE = {}; maxE = {};
     for i,sampleset in enumerate(samplesets):
         minE = sampleset.first.energy
         size = len(sampleset.first.sample)
         xmax = (2**(size//2))
         ymax = (2**(size-size//2))
 
-        x = []
-        y = []
-        E = []
-        c = []
-        for datum in sampleset.data():
+        # Reverse iteration allows plotting lower (important) samples on top.
+        x = []; y = []; E = []; c = []
+        for datum in sampleset.data(sorted_by='energy',reverse=True):
             value = ''.join(str((1+datum.sample[k])//2) for k in sorted(datum.sample))
             x.append(int(value[0:size//2],2)/xmax)
             y.append(int(value[size//2: ],2)/ymax)
             c.append(datum.num_occurrences)
             E.append(datum.energy)
+        maxE = E[0]
 
         # Set up the axes with gridspec
         xlim=ylim=(0.0,1.0)
@@ -105,14 +105,16 @@ def plot_joint_samplesets(samplesets, savefig=True):
         y_hist = fig.add_subplot(grid[1:5,4+(i*5)],sharey=main_ax,frameon=False)
         x_hist = fig.add_subplot(grid[0,i*5:4+(i*5)],sharex=main_ax,frameon=False)
 
+        # No ticks of histograms
         y_hist.set_xticks([],[])
         y_hist.set_yticks([],[])
-
         x_hist.set_xticks([],[])
         x_hist.set_yticks([],[])
 
         # Scatter points on the main axes
-        ratE = [250**((energy/minE)**5) for energy in E]
+        rangeE = maxE-minE
+        ratE = [250*(((energy-minE)/rangeE)**2) for energy in E]
+        # ratE = 50
         sct = main_ax.scatter(x,y,s=ratE,c=E,cmap="jet",alpha=0.5)
         main_ax.set_title(" ".join(sampleset.info.values()))
 
