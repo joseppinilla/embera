@@ -16,8 +16,6 @@ import requests
 import networkx as nx
 
 from itertools import combinations
-from embera.utilities.random import choice
-
 
 def embera_bench():
     """ Set of benchmarks used to evaluate embera:
@@ -179,6 +177,7 @@ def misc_bench():
                 | LANL1 [2]     | 269       | 490       |
                 | Maze(6x6) [3] | 326       | 564       |
                 | MNIST [4]     | 74        | 1664      |
+                | DBG [5]       | 120       | 481       |
 
     [3] Scott Pakin. "A Quantum Macro Assembler". In Proceedings of the 20th
     Annual IEEE High Performance Extreme Computing Conference (HPEC 2016),
@@ -187,6 +186,8 @@ def misc_bench():
     [4] Adachi, S. H., & Henderson, M. P. (2015). Application of Quantum
     Annealing to Training of Deep Neural Networks. ArXiv Preprint
     ArXiv:1510.00635, 18. https://doi.org/10.1038/nature10012
+    [5] Bass, G. et al.: Optimizing the Optimizer: Decomposition Techniques
+    for Quantum Annealing. (2020).https://arxiv.org/abs/2001.06079
 
     """
     benchmark_set = []
@@ -205,6 +206,9 @@ def misc_bench():
             f = contents.extractfile(member)
             G = nx.read_gpickle(f)
             benchmark_set.append(G)
+
+    # Deep Boltzmann Graph from function
+    benchmark_set.append(dbg_graph(6,20,2,0.1))
 
     return benchmark_set
 
@@ -295,11 +299,18 @@ def barbell_graph(k,m):
     G.name = 'barbell'
     return G
 
-def dbg_graph(number_of_layers,nodes_per_layer,max_connectivity_range_layer,connectivity_probability):
+@nx.utils.np_random_state(4)
+def dbg_graph(layers, nodes, max_conn, probability, seed=42):
     """
-        [5] Bass, G. et al.: Optimizing the Optimizer: Decomposition Techniques
-        for Quantum Annealing. (2020).https://arxiv.org/abs/2001.06079
+        l,n,c,p,seed=42number_of_layers,nodes_per_layer,max_connectivity_range_layer,connectivity_probability,seed
+
     """
+    # Names used in [5]
+    number_of_layers=layers
+    nodes_per_layer=nodes
+    max_connectivity_range_layer=max_conn
+    connectivity_probability=probability
+    # Start from empty graph, add nodes, add nodes with probability p
     G = nx.Graph()
     G.name = 'dbg'
     for l in range(number_of_layers):
@@ -308,7 +319,7 @@ def dbg_graph(number_of_layers,nodes_per_layer,max_connectivity_range_layer,conn
         l1,v1 = u
         l2,v2 = v
         p = [1.0-connectivity_probability,connectivity_probability]
-        if choice([0,1],p=p) and l2-l1<=max_connectivity_range_layer:
+        if seed.choice([0,1],p=p) and l2-l1<=max_connectivity_range_layer:
             G.add_edge(u,v)
-    G.graph['pos'] = {(l,v):(l,v) for l,v in G.nodes}
+    G.graph['pos'] = {(l,v):(l/number_of_layers,v/nodes_per_layer) for l,v in G.nodes}
     return G
