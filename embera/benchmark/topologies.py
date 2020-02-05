@@ -15,7 +15,9 @@ import requests
 
 import networkx as nx
 
+from itertools import combinations
 from embera.utilities.random import choice
+
 
 def embera_bench():
     """ Set of benchmarks used to evaluate embera:
@@ -291,4 +293,22 @@ def prism_graph(k,m):
 def barbell_graph(k,m):
     G = nx.barbell_graph(k,m)
     G.name = 'barbell'
+    return G
+
+def dbg_graph(number_of_layers,nodes_per_layer,max_connectivity_range_layer,connectivity_probability):
+    """
+        [5] Bass, G. et al.: Optimizing the Optimizer: Decomposition Techniques
+        for Quantum Annealing. (2020).https://arxiv.org/abs/2001.06079
+    """
+    G = nx.Graph()
+    G.name = 'dbg'
+    for l in range(number_of_layers):
+        G.add_nodes_from([(l,v) for v in range(nodes_per_layer)])
+    for (u,v) in combinations(G.nodes,2):
+        l1,v1 = u
+        l2,v2 = v
+        p = [1.0-connectivity_probability,connectivity_probability]
+        if choice([0,1],p=p) and l2-l1<=max_connectivity_range_layer:
+            G.add_edge(u,v)
+    G.graph['pos'] = {(l,v):(l,v) for l,v in G.nodes}
     return G

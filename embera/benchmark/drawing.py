@@ -1,6 +1,8 @@
 import embera
 import networkx as nx
 import matplotlib.pyplot as plt
+import matplotlib.colors
+
 from mpl_toolkits.mplot3d import Axes3D
 palette = plt.get_cmap('Pastel2')
 
@@ -12,13 +14,13 @@ def plot(plot_method, args, plot_kw={}, subplot_kw={}, savefig=True):
         plot_method(arg, ax=ax, **plot_kw)
 
     if savefig:
-        path = savefig if isinstance(savefig,str) else f"./{plot_method.__name}.eps"
+        path = savefig if isinstance(savefig,str) else f"./{plot_method.__name}.pdf"
         plt.savefig(path)
 
 def plot_yields(solvers, savefig=True):
     kwargs = {'plot_kw':{'node_size':1},
               'subplot_kw':{'aspect':'equal'},
-              'savefig':'yield.eps'}
+              'savefig':'yield.pdf'}
     plot(embera.draw_architecture_yield,solvers,**kwargs)
 
 def plot_parameters(bqms, savefig=True):
@@ -38,7 +40,7 @@ def plot_parameters(bqms, savefig=True):
     plt.subplots_adjust(left=0.05, right=0.995, bottom=0.1, top=0.9, wspace=0.2, hspace=0)
 
     if savefig:
-        path = savefig if isinstance(savefig,str) else "./parameters.eps"
+        path = savefig if isinstance(savefig,str) else "./parameters.pdf"
         plt.savefig(path)
 
 def plot_topologies(topologies, nrows=1, ncols=None, spring_seed=None, savefig=True):
@@ -50,15 +52,16 @@ def plot_topologies(topologies, nrows=1, ncols=None, spring_seed=None, savefig=T
 
     for i, (ax,G) in enumerate(zip(axs.flat,topologies)):
         if i>=len(topologies): fig.delaxes(ax); continue
-        pos = G.graph.setdefault('pos', nx.spring_layout(G,seed=spring_seed))
+        pos = G.graph.setdefault('pos', nx.spring_layout(G,seed=spring_seed,weight=None))
         draw_params = {"node_size":10, "width":0.2,
-                       "edge_color":'grey', "node_color":palette(i//ncols)}
+                       "edge_color":'grey',
+                       "node_color":matplotlib.colors.to_hex(palette(i//ncols))}
         nx.draw(G, pos=pos, ax=ax, **draw_params)
 
     plt.subplots_adjust(left=0, right=1, bottom=0, top=1, wspace=0, hspace=0)
 
     if savefig:
-        path = savefig if isinstance(savefig,str) else "./topologies.eps"
+        path = savefig if isinstance(savefig,str) else "./topologies.pdf"
         plt.savefig(path)
 
 def plot_embeddings(embeddings, T, savefig=True):
@@ -73,16 +76,15 @@ def plot_embeddings(embeddings, T, savefig=True):
     plt.subplots_adjust(left=0, right=1, bottom=0, top=.85, wspace=0, hspace=0)
 
     if savefig:
-        path = savefig if isinstance(savefig,str) else "./embeddings.eps"
+        path = savefig if isinstance(savefig,str) else "./embeddings.pdf"
         plt.savefig(path)
 
-def plot_joint_samplesets(samplesets, savefig=True):
+def plot_joint_samplesets(samplesets, info_key=None, savefig=True):
     nplots = len(samplesets)
     fig = plt.figure(figsize=(nplots*3, 3))
     grid = plt.GridSpec(5, 5*nplots, hspace=0.0, wspace=0.0)
 
-    ims = []
-    minE = {}; maxE = {};
+    x = {}; y = {}; E = {}; c = {}
     for i,sampleset in enumerate(samplesets):
         minE = sampleset.first.energy
         size = len(sampleset.first.sample)
@@ -90,17 +92,22 @@ def plot_joint_samplesets(samplesets, savefig=True):
         ymax = (2**(size-size//2))
 
         # Reverse iteration allows plotting lower (important) samples on top.
-        x = []; y = []; E = []; c = []
+        x[i] = []; y[i] = []; E[i] = []; c[i] = []
         for datum in sampleset.data(sorted_by='energy',reverse=True):
             value = ''.join(str((1+datum.sample[k])//2) for k in sorted(datum.sample))
-            x.append(int(value[0:size//2],2)/xmax)
-            y.append(int(value[size//2: ],2)/ymax)
-            c.append(datum.num_occurrences)
-            E.append(datum.energy)
-        maxE = E[0]
+            x[i].append(int(value[0:size//2],2)/xmax)
+            y[i].append(int(value[size//2: ],2)/ymax)
+            c[i].append(datum.num_occurrences)
+            E[i].append(datum.energy)
 
+    minE = min(energy[-1] for energy in E.values())
+    maxE = max(energy[ 0] for energy in E.values())
+    rangeE = maxE-minE
+
+    ims = []
+    xlim=ylim=(0.0,1.0)
+    for i,sampleset in enumerate(samplesets):
         # Set up the axes with gridspec
-        xlim=ylim=(0.0,1.0)
         main_ax = fig.add_subplot(grid[1:5,i*5:4+(i*5)],xlim=xlim,ylim=ylim)
         y_hist = fig.add_subplot(grid[1:5,4+(i*5)],sharey=main_ax,frameon=False)
         x_hist = fig.add_subplot(grid[0,i*5:4+(i*5)],sharex=main_ax,frameon=False)
@@ -112,20 +119,19 @@ def plot_joint_samplesets(samplesets, savefig=True):
         x_hist.set_yticks([],[])
 
         # Scatter points on the main axes
-        rangeE = maxE-minE
-        ratE = [250*(((energy-minE)/rangeE)**2) for energy in E]
-        # ratE = 50
-        sct = main_ax.scatter(x,y,s=ratE,c=E,cmap="jet",alpha=0.5)
-        main_ax.set_title(" ".join(sampleset.info.values()))
+        ratE = [250*(((energy-minE)/rangeE)**2) for energy in E[i]]
+        sct = main_ax.scatter(x[i],y[i],s=ratE,c=E[i],cmap="jet",alpha=0.5)
+
 
         # Histograms on the attached axes
-        x_hist.hist(x, 100, histtype='stepfilled',
+        x_hist.hist(x[i], 100, histtype='stepfilled',
                     orientation='vertical', color='gray')
 
-        y_hist.hist(y, 100, histtype='stepfilled',
+        y_hist.hist(y[i], 100, histtype='stepfilled',
                     orientation='horizontal', color='gray')
 
         ims.append(sct)
+        main_ax.set_xlabel(sampleset.info[info_key])
 
     # Color Bar
     vmin,vmax = zip(*[im.get_clim() for im in ims])
@@ -138,7 +144,7 @@ def plot_joint_samplesets(samplesets, savefig=True):
     _ = cax.set_xlabel('Energy')
 
     if savefig:
-        path = savefig if isinstance(savefig,str) else "./samplesets_joint.eps"
+        path = savefig if isinstance(savefig,str) else "./samplesets_joint.pdf"
         plt.savefig(path)
 
 def plot_chain_metrics(embeddings, S, T, classes=[], savefig=True):
@@ -177,5 +183,5 @@ def plot_chain_metrics(embeddings, S, T, classes=[], savefig=True):
     conns_ax.set_title('Qubit Connectivity')
 
     if savefig:
-        path = savefig if isinstance(savefig,str) else "./chain_metrics.eps"
+        path = savefig if isinstance(savefig,str) else "./chain_metrics.pdf"
         plt.savefig(path)

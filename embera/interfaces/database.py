@@ -219,11 +219,13 @@ class EmberaDataBase:
 
     """ ############################# SampleSets ########################### """
     def load_samplesets(self, bqm, target, embedding="", tags=[""], unembed_args={}):
+        source_id = self.id_source(bqm)
         bqm_id = self.id_bqm(bqm)
         target_id = self.id_target(target)
         embedding_id = self.id_embedding(embedding)
 
-        samplesets_path = os.path.join(self.samplesets_path,bqm_id,target_id,embedding_id)
+        dir_path = [self.samplesets_path,source_id,bqm_id,target_id,embedding_id]
+        samplesets_path = os.path.join(*dir_path)
 
         sampleset_filenames = []
         for root, dirs, files in os.walk(samplesets_path):
@@ -274,14 +276,17 @@ class EmberaDataBase:
         if not samplesets:
             raise ValueError("No samplesets found.")
         else:
-            return dimod.concatenate(samplesets)
+            sampleset = dimod.concatenate(samplesets)
+            for s in samplesets: sampleset.info.update(s.info)
+            return sampleset
 
     def dump_sampleset(self, bqm, target, embedding, sampleset, tags=[""]):
+        source_id = self.id_source(bqm)
         bqm_id = self.id_bqm(bqm)
         target_id = self.id_target(target)
         embedding_id = self.id_embedding(embedding)
 
-        samplesets_path = [self.samplesets_path,bqm_id,target_id,embedding_id]+tags
+        samplesets_path = [self.samplesets_path,source_id,bqm_id,target_id,embedding_id]+tags
 
         sampleset_filename = f"{self.timestamp()}_{len(sampleset)}"
         sampleset_path = self.get_path(samplesets_path, sampleset_filename)

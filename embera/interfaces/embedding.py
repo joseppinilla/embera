@@ -44,6 +44,7 @@ class Embedding(dict):
 
     """ ############################## Metrics ############################# """
     def interactions(self,source_edgelist,target_edgelist):
+        if not self: return {}
         target_adj = {}
         for s,t in target_edgelist:
             if (s==t): continue
@@ -63,6 +64,7 @@ class Embedding(dict):
         return interactions
 
     def connections(self,source_edgelist,target_edgelist):
+        if not self: return {}
         interactions = self.interactions(source_edgelist,target_edgelist)
 
         connections = {}
@@ -97,8 +99,11 @@ class Embedding(dict):
         """
         chains_id = f"{self.__hash__():08}"[:8]
         quality_id = "".join([str(v) for v in self.quality_key])
-        return quality_id+"_"+chains_id
-        
+        if not self:
+            return "XXXXXXXX_XXXXXXXX"
+        else:
+            return quality_id+"_"+chains_id
+
     def __key(self):
         embedding_key = []
         for v,chain in self.items():
