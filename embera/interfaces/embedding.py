@@ -97,12 +97,12 @@ class Embedding(dict):
                 Quality ID: String of the Chain Histogram
                 Chains ID: String of the 8 last digits of the chain key.
         """
-        chains_id = f"{self.__hash__():08}"[:8]
-        quality_id = "".join([str(v) for v in self.quality_key])
+        chains_id = f"{self.__hash__():08}"
+        quality_id = "".join(map(str,self.quality_key))
         if not self:
             return "XXXXXXXX_XXXXXXXX"
         else:
-            return quality_id+"_"+chains_id
+            return quality_id[:8] + "_" + chains_id[:8]
 
     def __key(self):
         embedding_key = []

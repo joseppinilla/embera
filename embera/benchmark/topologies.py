@@ -187,7 +187,7 @@ def misc_bench():
     Annealing to Training of Deep Neural Networks. ArXiv Preprint
     ArXiv:1510.00635, 18. https://doi.org/10.1038/nature10012
     [5] Bass, G. et al.: Optimizing the Optimizer: Decomposition Techniques
-    for Quantum Annealing. (2020).https://arxiv.org/abs/2001.06079
+    for Quantum Annealing. (2020). https://arxiv.org/abs/2001.06079
 
     """
     benchmark_set = []
@@ -233,6 +233,7 @@ def complete_bipartite_graph(n, m=None):
         m = n
     G = nx.complete_bipartite_graph(m,n)
     G.name = 'bipartite'
+    G.graph['pos'] = nx.bipartite_layout(G, nx.bipartite.sets(G)[0])
     return G
 
 def complete_multipartite_graph(n,m=None,o=10): #TODO: More than 3 layers?
@@ -301,16 +302,12 @@ def barbell_graph(k,m):
 
 @nx.utils.np_random_state(4)
 def dbg_graph(layers, nodes, max_conn, probability, seed=42):
-    """
-        l,n,c,p,seed=42number_of_layers,nodes_per_layer,max_connectivity_range_layer,connectivity_probability,seed
-
-    """
     # Names used in [5]
     number_of_layers=layers
     nodes_per_layer=nodes
     max_connectivity_range_layer=max_conn
     connectivity_probability=probability
-    # Start from empty graph, add nodes, add nodes with probability p
+    # Start from empty graph, add nodes, add edges with probability p
     G = nx.Graph()
     G.name = 'dbg'
     for l in range(number_of_layers):
