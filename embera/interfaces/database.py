@@ -201,10 +201,25 @@ class EmberaDataBase:
             json.dump(bqm_ser,fp)
         return bqm_id
 
-    def dump_ising(self, h, J, tags=[]):
+    def dump_ising(self, h, J, tags=[], return_bqm=False):
+        """ Convert Ising parameters into BQM and dump to JSON file
+
+            Arguments:
+                h: (dict)
+                    Dictionary of nodes with Ising parameters.
+                J: (dict)
+                    Dictionary of edges with Ising parameters.
+
+            Optional Arguments:
+                return_bqm: (bool, default=False)
+                    If True, return a tuple of (BQM, ID(BQM)).
+        """
         bqm = dimod.BinaryQuadraticModel(h,J,0.0,'SPIN',tags=tags)
-        self.dump_bqm(bqm,tags)
-        return bqm, bqm_id
+        bqm_id = self.dump_bqm(bqm,tags)
+        if return_bqm:
+            return bqm, bqm_id
+        else:
+            return bqm_id
 
     """ ############################# SampleSets ########################### """
     def load_samplesets(self, bqm, target, embedding, tags=[], unembed_args={}):
@@ -287,6 +302,7 @@ class EmberaDataBase:
 
         with open(sampleset_path,'w+') as fp:
             _dump(sampleset,fp,cls=DimodEncoder)
+        return sampleset_filename
 
     """ ############################ Embeddings ############################ """
     def load_embeddings(self, source, target, tags=[]):
@@ -380,3 +396,4 @@ class EmberaDataBase:
 
         with open(embedding_path,'w+') as fp:
             _dump(embedding_obj,fp,cls=EmberaEncoder)
+        return embedding_obj.id
