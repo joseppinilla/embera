@@ -16,7 +16,7 @@ class Embedding(dict):
         return hist
 
     def interactions_histogram(self, source_edgelist, target_edgelist):
-        interactions = self.interactions(source_edgelist,target_edgelist)
+        interactions = self.edge_interactions(source_edgelist,target_edgelist)
 
         hist = {}
         for size in map(len,interactions.values()):
@@ -43,7 +43,18 @@ class Embedding(dict):
         return hist
 
     """ ############################## Metrics ############################# """
-    def interactions(self,source_edgelist,target_edgelist):
+    def node_interactions(self,source_edgelist,target_edgelist):
+        edge_inters = self.edge_interactions(source_edgelist,target_edgelist)
+
+        node_inters = {}
+        for (u,v),edge_inters in edge_inters.items():
+            for (s,t) in edge_inters:
+                node_inters[u] = [(s,t)] + node_inters.get(u,[])
+                node_inters[v] = [(t,s)] + node_inters.get(v,[])
+
+        return node_inters
+
+    def edge_interactions(self,source_edgelist,target_edgelist):
         if not self: return {}
         target_adj = {}
         for s,t in target_edgelist:
@@ -51,21 +62,19 @@ class Embedding(dict):
             target_adj[s] = [t] + target_adj.get(s,[])
             target_adj[t] = [s] + target_adj.get(t,[])
 
-        interactions = {}
+        edge_inters = {}
         for u,v in source_edgelist:
             if (u==v): continue
-            edge_interactions = []
             for s in self[u]:
                 for t in self[v]:
                     if t in target_adj[s]:
-                        edge_interactions.append((s,t))
-            interactions[(u,v)] = edge_interactions
+                        edge_inters[(u,v)] = [(s,t)] + edge_inters.get((u,v),[])
 
-        return interactions
+        return edge_inters
 
     def connections(self,source_edgelist,target_edgelist):
         if not self: return {}
-        interactions = self.interactions(source_edgelist,target_edgelist)
+        interactions = self.edge_interactions(source_edgelist,target_edgelist)
 
         connections = {}
         for (u,v),edge_interactions in interactions.items():

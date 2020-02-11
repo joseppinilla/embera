@@ -17,6 +17,9 @@ import networkx as nx
 
 from itertools import combinations
 
+def get_graph(name):
+    return next(G for G in embera_bench() if G.name==name)
+
 def embera_bench():
     """ Set of benchmarks used to evaluate embera:
             | name          | node      | edges     |

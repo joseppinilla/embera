@@ -51,13 +51,16 @@ def graph_from_solver(solver, **kwargs):
     target_graph.name = solver.properties['chip_id']
     return target_graph
 
-def dwave_online(**kwargs):
+def dwave_online(squeeze=True, **kwargs):
     """ Architecture graphs from D-Wave devices `online`"""
     import dwave.cloud
     with dwave.cloud.Client.from_config(**kwargs) as client:
         solvers = client.get_solvers()
-
-    return [graph_from_solver(s) for s in solvers]
+    graphs = [graph_from_solver(s) for s in solvers]
+    if squeeze:
+        return graphs[0] if len(graphs)==1 else graphs
+    else:
+        return graphs
 
 
 def rainier_graph(**kwargs):

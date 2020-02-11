@@ -115,6 +115,7 @@ class EmberaDataBase:
                 edgelist = graph
             degree_dict = {}
             for u,v in edgelist:
+                if (u==v): continue
                 degree_dict[u] = 1 + degree_dict.get(u,0)
                 degree_dict[v] = 1 + degree_dict.get(v,0)
             degree = degree_dict.items()
@@ -222,7 +223,7 @@ class EmberaDataBase:
             return bqm_id
 
     """ ############################# SampleSets ########################### """
-    def load_samplesets(self, bqm, target, embedding, tags=[], unembed_args={}):
+    def load_samplesets(self, bqm, target, embedding, tags=[], unembed_args=None):
         source_id = self.id_source(bqm)
         bqm_id = self.id_bqm(bqm)
         target_id = self.id_target(target)
@@ -243,12 +244,15 @@ class EmberaDataBase:
 
         if embedding is "":
             return samplesets
-        elif not isinstance(embedding,(embera.Embedding,dict)):
+        elif not isinstance(embedding,(Embedding,dict)):
             raise ValueError("Embedding alias or id cannot be used to unembed")
 
-        return [unembed_sampleset(s,embedding,bqm,**unembed_args) for s in samplesets]
+        if unembed_args is None:
+            return samplesets
+        else:
+            return [unembed_sampleset(s,embedding,bqm,**unembed_args) for s in samplesets]
 
-    def load_sampleset(self, bqm, target, embedding, tags=[], unembed_args={}, index=None):
+    def load_sampleset(self, bqm, target, embedding, tags=[], unembed_args=None, index=None):
         """ Load a sampleset object from JSON format, filed under:
             <EmberaDB>/<bqm_id>/<target_id>/<embedding_id>/<tags>/<timestamp>.json
             If more than one sampleset is found, returns the concatenation

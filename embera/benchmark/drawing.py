@@ -79,10 +79,18 @@ def plot_embeddings(embeddings, T, savefig=True):
         path = savefig if isinstance(savefig,str) else "./embeddings.pdf"
         plt.savefig(path)
 
-def plot_joint_samplesets(samplesets, info_key=None, savefig=True):
+def plot_joint_samplesets(samplesets, info_key=None, gray=True, savefig=True):
     nplots = len(samplesets)
     fig = plt.figure(figsize=(nplots*3, 3))
     grid = plt.GridSpec(5, 5*nplots, hspace=0.0, wspace=0.0)
+
+    def gray2bin(n):
+        n = int(n, 2)
+        mask = n
+        while mask != 0:
+            mask >>= 1
+            n ^= mask
+        return bin(n)[2:]
 
     x = {}; y = {}; E = {}; c = {}
     for i,sampleset in enumerate(samplesets):
@@ -95,8 +103,10 @@ def plot_joint_samplesets(samplesets, info_key=None, savefig=True):
         x[i] = []; y[i] = []; E[i] = []; c[i] = []
         for datum in sampleset.data(sorted_by='energy',reverse=True):
             value = ''.join(str((1+datum.sample[k])//2) for k in sorted(datum.sample))
-            x[i].append(int(value[0:size//2],2)/xmax)
-            y[i].append(int(value[size//2: ],2)/ymax)
+            x_point = gray2bin(value[0:size//2]) if gray else value[0:size//2]
+            y_point = gray2bin(value[size//2:]) if gray else  value[size//2:]
+            x[i].append(int(x_point,2)/xmax)
+            y[i].append(int(y_point,2)/ymax)
             c[i].append(datum.num_occurrences)
             E[i].append(datum.energy)
 
