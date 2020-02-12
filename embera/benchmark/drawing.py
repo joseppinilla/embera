@@ -101,7 +101,6 @@ def plot_joint_samplesets(samplesets, info_key=None, gray=True, savefig=True):
         x[i] = []; y[i] = []; E[i] = []; c[i] = []
         if not sampleset: continue
 
-        minE = sampleset.first.energy
         size = len(sampleset.first.sample)
         xmax = (2**(size//2))
         ymax = (2**(size-size//2))
@@ -118,7 +117,6 @@ def plot_joint_samplesets(samplesets, info_key=None, gray=True, savefig=True):
             if datum.energy < minE: minE = datum.energy
             if datum.energy > maxE: maxE = datum.energy
 
-
     ims = []
     xlim=ylim=(0.0,1.0)
     rangeE = maxE - minE
@@ -127,7 +125,6 @@ def plot_joint_samplesets(samplesets, info_key=None, gray=True, savefig=True):
         main_ax = fig.add_subplot(grid[1:5,i*5:4+(i*5)],xlim=xlim,ylim=ylim)
         y_hist = fig.add_subplot(grid[1:5,4+(i*5)],sharey=main_ax,frameon=False)
         x_hist = fig.add_subplot(grid[0,i*5:4+(i*5)],sharex=main_ax,frameon=False)
-
 
         # No ticks of histograms
         y_hist.set_xticks([],[])
@@ -138,9 +135,11 @@ def plot_joint_samplesets(samplesets, info_key=None, gray=True, savefig=True):
         if not sampleset: main_ax.set_xlabel('N/A'); continue
 
         # Scatter points on the main axes
-        ratE = [250*(((energy-minE)/rangeE)**2) for energy in E[i]]
+        ratE = [5+250*(((energy-minE)/rangeE)**2) for energy in E[i]]
         sct = main_ax.scatter(x[i],y[i],s=ratE,c=E[i],cmap="jet",alpha=0.5)
 
+        minXY = [(x[i][ie],y[i][ie]) for ie,e in enumerate(E[i]) if e==minE]
+        if minXY: main_ax.plot(*zip(*minXY),ms=25,mew=1,c='k',marker='x')
 
         # Histograms on the attached axes
         x_hist.hist(x[i], 100, histtype='stepfilled',
