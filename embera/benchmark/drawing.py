@@ -64,12 +64,13 @@ def plot_topologies(topologies, nrows=1, ncols=None, spring_seed=None, savefig=T
         path = savefig if isinstance(savefig,str) else "./topologies.pdf"
         plt.savefig(path)
 
-def plot_embeddings(embeddings, T, savefig=True):
+def plot_embeddings(embeddings, T, classes=[], savefig=True):
     nplots = len(embeddings)
     fig, axs = plt.subplots(1, nplots, subplot_kw={'aspect':'equal'}, squeeze=False)
     fig.set_size_inches(2*nplots, 2)
     for ax,embedding in zip(axs.flat,embeddings):
         embera.draw_architecture_embedding(T,embedding,node_size=0.2,ax=ax)
+        if not embedding: ax.set_title(f"N/A\nruntime: N/A\nN/A qubits"); continue
         method = embedding.properties["embedding_method"]
         runtime = embedding.properties["embedding_runtime"]
         ax.set_title(f"{method}\nruntime: {runtime:.2f}s\n{embedding.total_qubits} qubits")
@@ -92,15 +93,20 @@ def plot_joint_samplesets(samplesets, info_key=None, gray=True, savefig=True):
             n ^= mask
         return bin(n)[2:]
 
+    minE = float('Inf')
+    maxE = -float('Inf')
     x = {}; y = {}; E = {}; c = {}
     for i,sampleset in enumerate(samplesets):
+
+        x[i] = []; y[i] = []; E[i] = []; c[i] = []
+        if not sampleset: continue
+
         minE = sampleset.first.energy
         size = len(sampleset.first.sample)
         xmax = (2**(size//2))
         ymax = (2**(size-size//2))
 
         # Reverse iteration allows plotting lower (important) samples on top.
-        x[i] = []; y[i] = []; E[i] = []; c[i] = []
         for datum in sampleset.data(sorted_by='energy',reverse=True):
             value = ''.join(str((1+datum.sample[k])//2) for k in sorted(datum.sample))
             x_point = gray2bin(value[0:size//2]) if gray else value[0:size//2]
@@ -109,24 +115,27 @@ def plot_joint_samplesets(samplesets, info_key=None, gray=True, savefig=True):
             y[i].append(int(y_point,2)/ymax)
             c[i].append(datum.num_occurrences)
             E[i].append(datum.energy)
+            if datum.energy < minE: minE = datum.energy
+            if datum.energy > maxE: maxE = datum.energy
 
-    minE = min(energy[-1] for energy in E.values())
-    maxE = max(energy[ 0] for energy in E.values())
-    rangeE = maxE-minE
 
     ims = []
     xlim=ylim=(0.0,1.0)
+    rangeE = maxE - minE
     for i,sampleset in enumerate(samplesets):
         # Set up the axes with gridspec
         main_ax = fig.add_subplot(grid[1:5,i*5:4+(i*5)],xlim=xlim,ylim=ylim)
         y_hist = fig.add_subplot(grid[1:5,4+(i*5)],sharey=main_ax,frameon=False)
         x_hist = fig.add_subplot(grid[0,i*5:4+(i*5)],sharex=main_ax,frameon=False)
 
+
         # No ticks of histograms
         y_hist.set_xticks([],[])
         y_hist.set_yticks([],[])
         x_hist.set_xticks([],[])
         x_hist.set_yticks([],[])
+
+        if not sampleset: main_ax.set_xlabel('N/A'); continue
 
         # Scatter points on the main axes
         ratE = [250*(((energy-minE)/rangeE)**2) for energy in E[i]]
@@ -149,7 +158,7 @@ def plot_joint_samplesets(samplesets, info_key=None, gray=True, savefig=True):
     for i,im in enumerate(ims):
         im.set_clim(vmin=min(vmin),vmax=max(vmax))
 
-    cax = fig.add_axes([1/nplots,-0.01,0.5,0.02]) # [left,bottom,width,height]
+    cax = fig.add_axes([0.25,-0.01,0.5,0.02]) # [left,bottom,width,height]
     plt.colorbar(sct,orientation='horizontal',cax=cax)
     _ = cax.set_xlabel('Energy')
 

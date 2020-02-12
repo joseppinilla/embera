@@ -188,6 +188,10 @@ class EmberaDataBase:
 
     def load_bqm(self, source, tags=[], index=0):
         bqms = self.load_bqms(source,tags)
+
+        if not bqms:
+            raise ValueError("No BQMs found")
+
         return bqms.pop(index)
 
     def dump_bqm(self, bqm, tags=[]):
@@ -281,7 +285,7 @@ class EmberaDataBase:
         samplesets = self.load_samplesets(bqm,target,embedding,tags,unembed_args)
 
         if not samplesets:
-            raise ValueError("No samplesets found.")
+            return dimod.SampleSet.from_samples([],bqm.vartype,None)
 
         if index is not None:
             return samplesets.pop(index)
@@ -363,7 +367,11 @@ class EmberaDataBase:
 
         """
         embeddings = self.load_embeddings(source,target,tags)
-        return  embeddings.pop(index)
+
+        if not embeddings:
+            return Embedding({})
+        else:
+            return embeddings.pop(index)
 
 
     def dump_embedding(self, source, target, embedding, tags=[]):
