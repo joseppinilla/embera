@@ -47,12 +47,27 @@ class Embedding(dict):
         edge_inters = self.edge_interactions(source_edgelist,target_edgelist)
 
         node_inters = {}
-        for (u,v),edge_inters in edge_inters.items():
-            for (s,t) in edge_inters:
+        for (u,v),ie in edge_inters.items():
+            for (s,t) in ie:
                 node_inters[u] = [(s,t)] + node_inters.get(u,[])
                 node_inters[v] = [(t,s)] + node_inters.get(v,[])
 
         return node_inters
+
+    def node_connectivity(self, source_edgelist,target_edgelist):
+        node_inters = self.node_interactions(source_edgelist,target_edgelist)
+
+        source_adj = {}
+        for u,v in source_edgelist:
+            if (u==v): continue
+            source_adj[u] = [v] + source_adj.get(u,[])
+            source_adj[v] = [u] + source_adj.get(v,[])
+
+        node_conn = {}
+        for v,ie in node_inters.items():
+            node_conn[v] = len(ie)/len(source_adj[v])
+
+        return node_conn
 
     def edge_interactions(self,source_edgelist,target_edgelist):
         if not self: return {}
