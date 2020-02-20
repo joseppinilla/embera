@@ -43,7 +43,7 @@ class Embedding(dict):
         return hist
 
     """ ############################## Metrics ############################# """
-    def node_interactions(self,source_edgelist,target_edgelist):
+    def node_interactions(self, source_edgelist, target_edgelist):
         edge_inters = self.edge_interactions(source_edgelist,target_edgelist)
 
         node_inters = {}
@@ -54,7 +54,7 @@ class Embedding(dict):
 
         return node_inters
 
-    def node_connectivity(self, source_edgelist,target_edgelist):
+    def node_connectivity(self, source_edgelist, target_edgelist):
         node_inters = self.node_interactions(source_edgelist,target_edgelist)
 
         source_adj = {}
@@ -69,7 +69,7 @@ class Embedding(dict):
 
         return node_conn
 
-    def edge_interactions(self,source_edgelist,target_edgelist):
+    def edge_interactions(self, source_edgelist, target_edgelist):
         if not self: return {}
         target_adj = {}
         for s,t in target_edgelist:
@@ -113,6 +113,30 @@ class Embedding(dict):
     def quality_key(self):
         hist = self.chain_histogram()
         return (c for bin in sorted(hist.items(), reverse=True) for c in bin)
+    """ ############################# SampleSet ############################ """
+    def chain_breaks(self, sampleset):
+
+        import numpy as np
+        source_nodes = list(self)
+        target_nodes = list(sampleset.variables)
+
+        target_relabel = {q: idx for idx, q in enumerate(target_nodes)}
+        chains = [[target_relabel[q] for q in self[v]] for v in source_nodes]
+
+        samples = sampleset.record.sample
+        values = list(sampleset.vartype.value)
+
+        ratio = np.ones(len(self), dtype=float, order='F')
+
+        for cidx, chain in enumerate(chains):
+            chain = np.asarray(chain)
+            if len(chain) <= 1: continue
+
+            np_params = {'assume_unique':True,'invert':True}
+            rat = np.isin(samples[:,chain].mean(axis=1), values, **np_params)
+            ratio[cidx] = rat.mean()
+
+        return dict(zip(source_nodes,ratio))
 
     """ ############################# Interface ############################ """
     @property
