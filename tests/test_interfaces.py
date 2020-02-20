@@ -25,7 +25,7 @@ class TestEmbedding(unittest.TestCase):
         embedding_obj = Embedding(embedding,runtime=runtime)
         self.assertEqual(embedding_obj.properties['runtime'],runtime)
         embedding_obj = Embedding(embedding,**{'test':True})
-        assert(embedding_obj.properties['test'])
+        self.assertIn('test',embedding_obj.properties)
 
     def test_interactions(self):
         S = self.source_edgelist
