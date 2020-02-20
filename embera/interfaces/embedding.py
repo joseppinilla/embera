@@ -112,7 +112,12 @@ class Embedding(dict):
     @property
     def quality_key(self):
         hist = self.chain_histogram()
-        return (c for bin in sorted(hist.items(), reverse=True) for c in bin)
+        qkey = []
+        for bin in sorted(hist.items(), reverse=True):
+            for c in bin:
+                qkey.append(c)
+        return qkey
+
     """ ############################# SampleSet ############################ """
     def chain_breaks(self, sampleset):
 

@@ -13,6 +13,9 @@ class TestEmbedding(unittest.TestCase):
         self.source_edgelist = [('a','A1.S'),('A1.S',(0,1)),((0,1),'a')]
         self.target_edgelist = [(1,2),(2,3),(3,4),(4,1)]
         self.embedding = minorminer.find_embedding(self.source_edgelist,self.target_edgelist)
+        self.sampleset = dimod.SampleSet.from_samples(
+                         [{1:-1, 2:1, 3:-1, 4:-1},{1:-1, 2:1, 3:1, 4:1}],
+                         'SPIN',0)
 
     def test_properties(self):
         source = self.source_edgelist
@@ -31,6 +34,26 @@ class TestEmbedding(unittest.TestCase):
         interactions = embedding_obj.interactions_histogram(S,T)
         self.assertEqual(interactions, {1:3})
 
+    def test_chain_breaks(self):
+        embedding_obj = Embedding(self.embedding)
+        broken = embedding_obj.chain_breaks(self.sampleset)
+        for v,b in broken.items():
+            if len(embedding_obj[v])==1:
+                self.assertEqual(b,1.0)
+            else:
+                self.assertLessEqual(b,1.0)
+
+    def test_comparison(self):
+        emb1 = self.embedding
+        emb1_obj = Embedding(emb1)
+        emb2 = minorminer.find_embedding(self.source_edgelist,self.target_edgelist)
+        emb2_obj = Embedding(emb2)
+
+        self.assertEqual(emb2_obj==emb1_obj, not emb1_obj!=emb2_obj)
+        self.assertFalse(emb2_obj > emb1_obj)
+        self.assertFalse(emb2_obj < emb1_obj)
+        self.assertTrue(emb2_obj >= emb1_obj)
+        self.assertTrue(emb2_obj <= emb1_obj)
 
 class TestDataBase(unittest.TestCase):
 
