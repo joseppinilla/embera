@@ -54,7 +54,7 @@ def embed_and_report(method, *args, **kwargs):
 def sample_and_report(bqm, sampler, **kwargs):
 
     sampleset = sampler.sample(bqm,**kwargs)
-    
+
     sampleset.info.update(bqm.info)
     sampleset.info.update({'parameters':kwargs})
 

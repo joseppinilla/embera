@@ -82,7 +82,7 @@ def plot_embeddings(embeddings, T, classes=[], savefig=True):
 
 def plot_joint_samplesets(samplesets, info_key=None, gray=True, savefig=True):
     nplots = len(samplesets)
-    fig = plt.figure(figsize=(nplots*3, 3))
+    fig = plt.figure(figsize=(nplots*3, 4))
     grid = plt.GridSpec(5, 5*nplots, hspace=0.0, wspace=0.0)
 
     def gray2bin(n):
@@ -157,7 +157,9 @@ def plot_joint_samplesets(samplesets, info_key=None, gray=True, savefig=True):
     for i,im in enumerate(ims):
         im.set_clim(vmin=min(vmin),vmax=max(vmax))
 
-    cax = fig.add_axes([0.25,-0.01,0.5,0.02]) # [left,bottom,width,height]
+    plt.subplots_adjust(top=1,bottom=0.25,left=.05,right=.95,hspace=0,wspace=0)
+
+    cax = fig.add_axes([0.25,0.15,0.5,0.02]) # [left,bottom,width,height]
     plt.colorbar(sct,orientation='horizontal',cax=cax)
     _ = cax.set_xlabel('Energy')
 
@@ -166,15 +168,15 @@ def plot_joint_samplesets(samplesets, info_key=None, gray=True, savefig=True):
         plt.savefig(path)
 
 def plot_chain_metrics(embeddings, S, T, classes=[], savefig=True):
-    fig, axs = plt.subplots(1,3,num=S.name,subplot_kw={'projection':'3d'})
-    fig.set_size_inches(15, 3)
-    chain_ax, inter_ax, conns_ax = axs.flat
+    fig, axs = plt.subplots(1,2,num=S.name,subplot_kw={'projection':'3d'})
+    fig.set_size_inches(10, 4)
+    chain_ax, inter_ax = axs.flat
 
     cnt_class = {}
     for embedding in embeddings:
         method = embedding.properties["embedding_method"]
         index = classes.index(method)
-        cnt_class[method] = 1+cnt_class.get(method,0)
+        cnt_class[method] = 1 + cnt_class.get(method,0)
 
         zs = index*50 + cnt_class[method]
         plt_args = {'color':palette(index),'edgecolor':'k','width':1,
@@ -187,18 +189,15 @@ def plot_chain_metrics(embeddings, S, T, classes=[], savefig=True):
         inter_hist = embedding.interactions_histogram(S.edges(),T.edges())
         inter_ax.bar(inter_hist.keys(),inter_hist.values(),**plt_args)
 
-
-        conns_hist = embedding.connectivity_histogram(S.edges(),T.edges())
-        conns_ax.bar(conns_hist.keys(),conns_hist.values(),**plt_args)
-
-    for ax in [chain_ax,inter_ax,conns_ax]:
+    for ax in [chain_ax,inter_ax]:
         ax.set_yticks([i*50 for i in range(len(classes))])
         ax.set_yticklabels(classes)
         ax.tick_params('y',labelrotation=-45)
 
     chain_ax.set_title('Chain Length')
     inter_ax.set_title('Chain Interactions')
-    conns_ax.set_title('Qubit Connectivity')
+
+    plt.subplots_adjust(top=1,bottom=0.15,left=0,right=1,hspace=0,wspace=0)
 
     if savefig:
         path = savefig if isinstance(savefig,str) else "./chain_metrics.pdf"

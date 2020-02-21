@@ -34,12 +34,27 @@ class TestEmbedding(unittest.TestCase):
         interactions = embedding_obj.interactions_histogram(S,T)
         self.assertEqual(interactions, {1:3})
 
+    def test_qubit_metrics(self):
+        S = self.source_edgelist
+        T = self.target_edgelist
+        embedding_obj = Embedding(self.embedding)
+
+        qubit_interactions = embedding_obj.qubit_interactions(S,T)
+        self.assertEqual(len(qubit_interactions),4)
+
+        qubit_not_interactions = embedding_obj.qubit_interactions(S,T,False)
+        self.assertFalse(qubit_not_interactions)
+
+        qubit_connectivity = embedding_obj.qubit_connectivity(S,T)
+        for s,c in qubit_connectivity.items():
+            self.assertLessEqual(c,1.0)
+
     def test_chain_breaks(self):
         embedding_obj = Embedding(self.embedding)
         broken = embedding_obj.chain_breaks(self.sampleset)
         for v,b in broken.items():
             if len(embedding_obj[v])==1:
-                self.assertEqual(b,1.0)
+                self.assertEqual(b,0.0)
             else:
                 self.assertLessEqual(b,1.0)
 

@@ -7,12 +7,17 @@ class Embedding(dict):
         super(Embedding,self).__init__(embedding)
         self.properties = properties
 
+    def qubit_labels(self):
+        """ Inverse mapping of qubits to source labels """
+        return {s:v for v,chain in self.items() for s in chain}
+
     """ ############################ Histograms ############################ """
     def chain_histogram(self):
         # Based on dwavesystems/minorminer quality_key by Boothby, K.
         hist = {}
         for s in map(len,self.values()):
             hist[s] = 1 + hist.get(s, 0)
+
         return hist
 
     def interactions_histogram(self, source_edgelist, target_edgelist):
@@ -24,26 +29,9 @@ class Embedding(dict):
 
         return hist
 
-    def connectivity_histogram(self, source_edgelist, target_edgelist):
-        connections = self.connections(source_edgelist,target_edgelist)
-
-        source_degree = {}
-        for u,v in source_edgelist:
-            if (u==v): continue
-            source_degree[u] = 1 + source_degree.get(u,0)
-            source_degree[v] = 1 + source_degree.get(v,0)
-
-        hist = {}
-        for t,edges in connections.items():
-            u,v = edges[0]
-            edgeset = set(edges)
-            connectivity = len(edgeset)/source_degree[u]
-            hist[connectivity] = 1 + hist.get(connectivity,0)
-
-        return hist
-
-    """ ############################## Metrics ############################# """
+    """ ########################## Source Metrics ########################## """
     def node_interactions(self, source_edgelist, target_edgelist):
+        """ List of qubit interactions for each source node """
         edge_inters = self.edge_interactions(source_edgelist,target_edgelist)
 
         node_inters = {}
@@ -54,22 +42,8 @@ class Embedding(dict):
 
         return node_inters
 
-    def node_connectivity(self, source_edgelist, target_edgelist):
-        node_inters = self.node_interactions(source_edgelist,target_edgelist)
-
-        source_adj = {}
-        for u,v in source_edgelist:
-            if (u==v): continue
-            source_adj[u] = [v] + source_adj.get(u,[])
-            source_adj[v] = [u] + source_adj.get(v,[])
-
-        node_conn = {}
-        for v,ie in node_inters.items():
-            node_conn[v] = len(ie)/len(source_adj[v])
-
-        return node_conn
-
     def edge_interactions(self, source_edgelist, target_edgelist):
+        """ List of qubit interactions for each source edge """
         if not self: return {}
         target_adj = {}
         for s,t in target_edgelist:
@@ -87,7 +61,9 @@ class Embedding(dict):
 
         return edge_inters
 
-    def connections(self,source_edgelist,target_edgelist):
+    """ ########################## Target Metrics ########################## """
+    def qubit_connections(self, source_edgelist, target_edgelist):
+        """ List of source node edges for each qubit """
         if not self: return {}
         interactions = self.edge_interactions(source_edgelist,target_edgelist)
 
@@ -99,6 +75,47 @@ class Embedding(dict):
 
         return connections
 
+    def qubit_connectivity(self, source_edgelist, target_edgelist):
+        """ Fraction of unique qubit interactions over degree of source node """
+        q_labels = self.qubit_labels()
+        connections = self.qubit_connections(source_edgelist,target_edgelist)
+
+        source_degree = {}
+        for u,v in source_edgelist:
+            if (u==v): continue
+            source_degree[u] = 1 + source_degree.get(u,0)
+            source_degree[v] = 1 + source_degree.get(v,0)
+
+        connectivity = {}
+        for s,edges in connections.items():
+            u = q_labels[s]
+            edgeset = set(edges)
+            connectivity[s] = len(edgeset)/source_degree[u]
+
+        return connectivity
+
+    def qubit_interactions(self, source_edgelist, target_edgelist, active=True):
+        """ List of active (or inactive) qubit interactions for each qubit """
+        q_labels = self.qubit_labels()
+
+        source_adj = {}
+        for u,v in source_edgelist:
+            if (u==v): continue
+            source_adj[u] = [v] + source_adj.get(u,[])
+            source_adj[v] = [u] + source_adj.get(v,[])
+
+        inters = {}
+        for s,t in target_edgelist:
+            u = q_labels[s]
+            v = q_labels[t]
+            if u==v: continue
+            if (v in source_adj[u]) ^ (not active):
+                inters[s] = [t] + inters.get(s,[])
+                inters[t] = [s] + inters.get(t,[])
+
+        return inters
+
+    """ ############################# Quality ############################# """
     @property
     def max_chain(self):
         hist = self.chain_histogram()
@@ -116,10 +133,12 @@ class Embedding(dict):
         for bin in sorted(hist.items(), reverse=True):
             for c in bin:
                 qkey.append(c)
+
         return qkey
 
     """ ############################# SampleSet ############################ """
     def chain_breaks(self, sampleset):
+        """ Fraction of chain breaks averaged over all samples """
 
         import numpy as np
         source_nodes = list(self)
@@ -131,15 +150,16 @@ class Embedding(dict):
         samples = sampleset.record.sample
         values = list(sampleset.vartype.value)
 
-        ratio = np.ones(len(self), dtype=float, order='F')
+        ratio = np.zeros(len(self), dtype=float, order='F')
 
         for cidx, chain in enumerate(chains):
             chain = np.asarray(chain)
             if len(chain) <= 1: continue
-
             np_params = {'assume_unique':True,'invert':True}
-            rat = np.isin(samples[:,chain].mean(axis=1), values, **np_params)
-            ratio[cidx] = rat.mean()
+            # If the average for each chain is not one of the possible values
+            # from vartype then there was a break
+            broken = np.isin(samples[:,chain].mean(axis=1), values, **np_params)
+            ratio[cidx] = broken.mean()
 
         return dict(zip(source_nodes,ratio))
 
@@ -164,6 +184,7 @@ class Embedding(dict):
             for t in sorted(chain):
                 chain_key+=str(t)
             embedding_key.append(int(chain_key))
+
         return embedding_key
 
     def __hash__(self):
