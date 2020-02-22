@@ -68,7 +68,7 @@ def draw_architecture_embedding(target_graph, *args, **kwargs):
     """ Draws an embedding onto the target graph G,
         according to G's family layout.
     """
-    family = target_graph.graph['family']
+    family = target_graph.graph.get('family')
 
     if family == 'chimera':
         dnx.draw_chimera_embedding(target_graph, *args, **kwargs)

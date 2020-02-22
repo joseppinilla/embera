@@ -71,8 +71,8 @@ def plot_embeddings(embeddings, T, classes=[], savefig=True):
     for ax,embedding in zip(axs.flat,embeddings):
         embera.draw_architecture_embedding(T,embedding,node_size=0.2,ax=ax)
         if not embedding: ax.set_title(f"N/A\nruntime: N/A\nN/A qubits"); continue
-        method = embedding.properties["embedding_method"]
-        runtime = embedding.properties["embedding_runtime"]
+        method = embedding.properties.get("embedding_method","N/A")
+        runtime = embedding.properties.get("embedding_runtime",0.0)
         ax.set_title(f"{method}\nruntime: {runtime:.2f}s\n{embedding.total_qubits} qubits")
     plt.subplots_adjust(left=0, right=1, bottom=0, top=.85, wspace=0, hspace=0)
 
@@ -80,18 +80,19 @@ def plot_embeddings(embeddings, T, classes=[], savefig=True):
         path = savefig if isinstance(savefig,str) else "./embeddings.pdf"
         plt.savefig(path)
 
-def plot_joint_samplesets(samplesets, info_key=None, gray=True, savefig=True):
+def plot_joint_samplesets(samplesets, info_key=None, gray=False, savefig=True):
     nplots = len(samplesets)
     fig = plt.figure(figsize=(nplots*3, 4))
     grid = plt.GridSpec(5, 5*nplots, hspace=0.0, wspace=0.0)
 
     def gray2bin(n):
+        w = len(n)
         n = int(n, 2)
         mask = n
         while mask != 0:
             mask >>= 1
             n ^= mask
-        return bin(n)[2:]
+        return format(n,f'0{w}b')
 
     minE = float('Inf')
     maxE = -float('Inf')
@@ -101,17 +102,17 @@ def plot_joint_samplesets(samplesets, info_key=None, gray=True, savefig=True):
         x[i] = []; y[i] = []; E[i] = []; c[i] = []
         if not sampleset: continue
 
-        size = len(sampleset.first.sample)
-        xmax = (2**(size//2))
-        ymax = (2**(size-size//2))
+        size = len(sampleset.variables)
+        width = 2**(size//2)-1
+        height = 2**(size-size//2)-1
 
         # Reverse iteration allows plotting lower (important) samples on top.
         for datum in sampleset.data(sorted_by='energy',reverse=True):
             value = ''.join(str((1+datum.sample[k])//2) for k in sorted(datum.sample))
             x_point = gray2bin(value[0:size//2]) if gray else value[0:size//2]
-            y_point = gray2bin(value[size//2:]) if gray else  value[size//2:]
-            x[i].append(int(x_point,2)/xmax)
-            y[i].append(int(y_point,2)/ymax)
+            y_point = gray2bin(value[size//2:]) if gray else value[size//2:]
+            x[i].append(int(x_point,2)/width)
+            y[i].append(int(y_point,2)/height)
             c[i].append(datum.num_occurrences)
             E[i].append(datum.energy)
             if datum.energy < minE: minE = datum.energy
@@ -123,14 +124,10 @@ def plot_joint_samplesets(samplesets, info_key=None, gray=True, savefig=True):
     for i,sampleset in enumerate(samplesets):
         # Set up the axes with gridspec
         main_ax = fig.add_subplot(grid[1:5,i*5:4+(i*5)],xlim=xlim,ylim=ylim)
-        y_hist = fig.add_subplot(grid[1:5,4+(i*5)],sharey=main_ax,frameon=False)
-        x_hist = fig.add_subplot(grid[0,i*5:4+(i*5)],sharex=main_ax,frameon=False)
 
-        # No ticks of histograms
-        y_hist.set_xticks([],[])
-        y_hist.set_yticks([],[])
-        x_hist.set_xticks([],[])
-        x_hist.set_yticks([],[])
+        h_params = {'frameon':False,'autoscale_on':False,'xticks':[],'yticks':[]}
+        y_hist = fig.add_subplot(grid[1:5,4+(i*5)],sharey=main_ax,**h_params)
+        x_hist = fig.add_subplot(grid[0,i*5:4+(i*5)],sharex=main_ax,**h_params)
 
         if not sampleset: main_ax.set_xlabel('N/A'); continue
 
@@ -149,7 +146,8 @@ def plot_joint_samplesets(samplesets, info_key=None, gray=True, savefig=True):
                     orientation='horizontal', color='gray')
 
         ims.append(sct)
-        main_ax.set_xlabel(sampleset.info[info_key])
+        main_ax.set_xlabel(sampleset.info.get(info_key,"N/A"))
+
 
     # Color Bar
     vmin,vmax = zip(*[im.get_clim() for im in ims])
@@ -167,18 +165,19 @@ def plot_joint_samplesets(samplesets, info_key=None, gray=True, savefig=True):
         path = savefig if isinstance(savefig,str) else "./samplesets_joint.pdf"
         plt.savefig(path)
 
-def plot_chain_metrics(embeddings, S, T, classes=[], savefig=True):
+def plot_chain_metrics(embeddings, S, T, key=None, tags=[], savefig=True):
+
     fig, axs = plt.subplots(1,2,num=S.name,subplot_kw={'projection':'3d'})
     fig.set_size_inches(10, 4)
     chain_ax, inter_ax = axs.flat
 
-    cnt_class = {}
+    tag_cnt = {}
     for embedding in embeddings:
-        method = embedding.properties["embedding_method"]
-        index = classes.index(method)
-        cnt_class[method] = 1 + cnt_class.get(method,0)
+        emb_tag = embedding.properties.get(key)
+        index = tags.index(emb_tag) if emb_tag is not None else 0
+        tag_cnt[emb_tag] = 1 + tag_cnt.get(emb_tag,0)
 
-        zs = index*50 + cnt_class[method]
+        zs = index*50 + tag_cnt[emb_tag]
         plt_args = {'color':palette(index),'edgecolor':'k','width':1,
                     'zorder':zs,'zs':zs,'zdir':'y','align':'edge'}
 
@@ -190,8 +189,8 @@ def plot_chain_metrics(embeddings, S, T, classes=[], savefig=True):
         inter_ax.bar(inter_hist.keys(),inter_hist.values(),**plt_args)
 
     for ax in [chain_ax,inter_ax]:
-        ax.set_yticks([i*50 for i in range(len(classes))])
-        ax.set_yticklabels(classes)
+        ax.set_yticks([i*50 for i in range(len(tags))])
+        ax.set_yticklabels(tags)
         ax.tick_params('y',labelrotation=-45)
 
     chain_ax.set_title('Chain Length')
