@@ -30,7 +30,7 @@ __all__ = ['graph_from_solver',
 def graph_from_solver(solver, **kwargs):
     """ D-Wave architecture graph from Dimod Structured Solver
     """
-    topology = solver.properties['topology']
+    topology = solver.properties.get('topology','N/A')
     type = topology['type']
     shape = topology['shape']
 
@@ -56,7 +56,7 @@ def dwave_online(squeeze=True, **kwargs):
     import dwave.cloud
     with dwave.cloud.Client.from_config(**kwargs) as client:
         solvers = client.get_solvers()
-    graphs = [graph_from_solver(s) for s in solvers]
+    graphs = [graph_from_solver(s) for s in solvers if s.properties.get('topology')]
     if squeeze:
         return graphs[0] if len(graphs)==1 else graphs
     else:
