@@ -44,10 +44,16 @@ class EmberaDataBase:
         if not os.path.isdir(self.samplesets_path):
             os.mkdir(self.samplesets_path)
 
+        self.reports_path = os.path.join(self.path,'reports')
+        if not os.path.isdir(self.reports_path):
+            os.mkdir(self.reports_path)
+
         self.aliases_path = os.path.join(self.path,'aliases.json')
         if os.path.exists(self.aliases_path):
             with open(self.aliases_path,'r') as fp:
                 self.aliases = _load(fp)
+
+
 
     def timestamp(self):
         return f"{time.time():.0f}"
@@ -409,3 +415,44 @@ class EmberaDataBase:
         with open(embedding_path,'w+') as fp:
             _dump(embedding_obj,fp,cls=EmberaEncoder)
         return embedding_obj.id
+
+    """ ############################# Reports ############################# """
+    def load_reports(self, bqm, target, tags=[]):
+        source_id = self.id_source(bqm)
+        bqm_id = self.id_bqm(bqm)
+        target_id = self.id_target(target)
+
+        dir_path = [self.reports_path,source_id,bqm_id,target_id]
+        reports_path = os.path.join(*dir_path)
+
+        reports = {}
+        for root, dirs, files in os.walk(reports_path):
+            root_dirs = os.path.normpath(root).split(os.path.sep)
+            if all(tag in root_dirs for tag in tags):
+                for file in files:
+                    report_path = os.path.join(root,file)
+                    with open(report_path,'r') as fp:
+                        report = _load(fp)
+                    metric, ext =  os.path.splitext(file)
+                    reports[metric] = report
+
+        return reports
+
+    def load_report(self, bqm, target, metric, tags=[]):
+        reports = self.load_reports(bqm,target,tags)
+        report = reports.get(metric,{})
+        return report
+
+    def dump_report(self, bqm, target, report, metric, tags=[]):
+        source_id = self.id_source(bqm)
+        bqm_id = self.id_bqm(bqm)
+        target_id = self.id_target(target)
+
+        reports_path = [self.reports_path,source_id,bqm_id,target_id]+tags
+
+        report_filename = metric
+        report_path = self.get_path(reports_path, report_filename)
+
+        with open(report_path,'w+') as fp:
+            _dump(report,fp)
+        return report_filename

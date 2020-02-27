@@ -64,7 +64,7 @@ def plot_topologies(topologies, nrows=1, ncols=None, spring_seed=None, savefig=T
         path = savefig if isinstance(savefig,str) else "./topologies.pdf"
         plt.savefig(path)
 
-def plot_embeddings(embeddings, T, classes=[], savefig=True):
+def plot_embeddings(embeddings, T, savefig=True):
     nplots = len(embeddings)
     fig, axs = plt.subplots(1, nplots, subplot_kw={'aspect':'equal'}, squeeze=False)
     fig.set_size_inches(2*nplots, 2)
@@ -165,7 +165,7 @@ def plot_joint_samplesets(samplesets, info_key=None, gray=False, savefig=True):
         path = savefig if isinstance(savefig,str) else "./samplesets_joint.pdf"
         plt.savefig(path)
 
-def plot_chain_metrics(embeddings, S, T, key=None, tags=[], savefig=True):
+def plot_chain_metrics(embeddings, S, T, property_key=None, tags=['N/A'], savefig=True):
 
     fig, axs = plt.subplots(1,2,num=S.name,subplot_kw={'projection':'3d'})
     fig.set_size_inches(10, 4)
@@ -173,7 +173,7 @@ def plot_chain_metrics(embeddings, S, T, key=None, tags=[], savefig=True):
 
     tag_cnt = {}
     for embedding in embeddings:
-        emb_tag = embedding.properties.get(key)
+        emb_tag = embedding.properties.get(property_key,'N/A')
         index = tags.index(emb_tag) if emb_tag is not None else 0
         tag_cnt[emb_tag] = 1 + tag_cnt.get(emb_tag,0)
 
