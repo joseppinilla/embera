@@ -45,19 +45,10 @@ def draw_architecture_yield(target_graph, **kwargs):
         attributes to identify faulty qubits.")
 
     if family == 'chimera':
-        perfect_graph = dnx.chimera_graph(m,n,t, coordinates=coordinates)
-        node_color = [unused_color if v in target_graph else faulty_color for v in perfect_graph.nodes()]
-        edge_color = [unused_color if v in target_graph.edges() else faulty_color for v in perfect_graph.edges()]
-        kwargs['node_color'] = node_color
-        kwargs['edge_color'] = edge_color
-        dnx.draw_chimera(perfect_graph, **kwargs)
+        dnx.draw_chimera_yield(target_graph, **kwargs)
 
     elif family == 'pegasus':
-        perfect_graph = dnx.pegasus_graph(m, coordinates=coordinates)
-        color_map = [unused_color if v in target_graph else faulty_color for v in perfect_graph.nodes()]
-        edge_color = [unused_color if v in target_graph.edges() else faulty_color for v in perfect_graph.edges()]
-        kwargs['node_color'] = color_map
-        dnx.draw_pegasus(perfect_graph, **kwargs)
+        dnx.draw_pegasus_yield(target_graph, **kwargs)
 
     else:
         nx.draw_spring(target_graph)

@@ -17,11 +17,10 @@ def plot(plot_method, args, plot_kw={}, subplot_kw={}, savefig=True):
         path = savefig if isinstance(savefig,str) else f"./{plot_method.__name}.pdf"
         plt.savefig(path)
 
-def plot_yields(solvers, savefig=True):
-    kwargs = {'plot_kw':{'node_size':1},
-              'subplot_kw':{'aspect':'equal'},
-              'savefig':'yield.pdf'}
-    plot(embera.draw_architecture_yield,solvers,**kwargs)
+def plot_yields(solvers, savefig='yield.pdf'):
+    kwargs = {'plot_kw':{'node_size':0.2},
+              'subplot_kw':{'aspect':'equal'}}
+    plot(embera.draw_architecture_yield,solvers,savefig=savefig,**kwargs)
 
 def plot_parameters(bqms, savefig=True):
     nplots = len(bqms)
@@ -69,7 +68,7 @@ def plot_embeddings(embeddings, T, savefig=True):
     fig, axs = plt.subplots(1, nplots, subplot_kw={'aspect':'equal'}, squeeze=False)
     fig.set_size_inches(2*nplots, 2)
     for ax,embedding in zip(axs.flat,embeddings):
-        embera.draw_architecture_embedding(T,embedding,node_size=0.2,ax=ax)
+        embera.draw_architecture_embedding(T,embedding,ax=ax)
         if not embedding: ax.set_title(f"N/A\nruntime: N/A\nN/A qubits"); continue
         method = embedding.properties.get("embedding_method","N/A")
         runtime = embedding.properties.get("embedding_runtime",0.0)
