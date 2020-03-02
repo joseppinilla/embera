@@ -8,6 +8,12 @@ import networkx as nx
 from embera.interfaces.embedding import Embedding
 from embera.interfaces.database import EmberaDataBase
 
+try: # Pandas isn't required. Tests are done if found.
+    import pandas as pd
+    _pandas = True
+except e:
+    _pandas = False
+
 class TestEmbedding(unittest.TestCase):
     def setUp(self):
         self.source_edgelist = [('a','A1.S'),('A1.S',(0,1)),((0,1),'a')]
@@ -141,8 +147,6 @@ class TestDataBase(unittest.TestCase):
         T = nx.Graph(self.target_edgelist)
         self.db.dump_report(bqm,T,report,'mock_metric')
         report_copy = self.db.load_report(bqm,T,'mock_metric')
-        report_df = self.db.load_report(bqm,T,'mock_metric',dataframe=True)
-        self.assertEqual(list(bqm),list(report_df.columns))
 
     def test_id_bqm(self):
         bqm = self.bqm
@@ -214,3 +218,12 @@ class TestDataBase(unittest.TestCase):
 
     def test_empty(self):
         self.db.dump_embedding([],[],{})
+
+    @unittest.skipUnless(_pandas, "No Pandas package found")
+    def test_dataframe(self):
+        bqm = self.bqm
+        report = self.report
+        T = nx.Graph(self.target_edgelist)
+        self.db.dump_report(bqm,T,report,'mock_pandas')
+        report_df = self.db.load_report(bqm,T,'mock_pandas',dataframe=True)
+        self.assertEqual(list(bqm),list(report_df.columns))
