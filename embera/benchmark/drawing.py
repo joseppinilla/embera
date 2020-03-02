@@ -6,19 +6,20 @@ import matplotlib.colors
 from mpl_toolkits.mplot3d import Axes3D
 palette = plt.get_cmap('Pastel2')
 
-def plot(plot_method, args, plot_kw={}, subplot_kw={}, savefig=True):
-    nplots = len(args)
+def plot(plot_method, *plot_args, plot_kwargs={}, subplot_kw={}, savefig=True):
+    nplots = len(plot_args)
     fig, axs = plt.subplots(1, nplots, squeeze=False, subplot_kw=subplot_kw)
 
-    for ax, arg in zip(axs.flat, args):
-        plot_method(arg, ax=ax, **plot_kw)
+    if isinstance(plot_kwargs,dict): plot_kwargs = [plot_kwargs]*nplots
+    for i, ax in enumerate(axs.flat):
+        plot_method(*plot_args[i], ax=ax, **plot_kwargs[i])
 
     if savefig:
-        path = savefig if isinstance(savefig,str) else f"./{plot_method.__name}.pdf"
+        path = savefig if isinstance(savefig,str) else f"./{plot_method.__name__}.pdf"
         plt.savefig(path)
 
 def plot_yields(solvers, savefig='yield.pdf'):
-    kwargs = {'plot_kw':{'node_size':0.2},
+    kwargs = {'plot_kwargs':{'node_size':0.2},
               'subplot_kw':{'aspect':'equal'}}
     plot(embera.draw_architecture_yield,solvers,savefig=savefig,**kwargs)
 
@@ -68,7 +69,7 @@ def plot_embeddings(embeddings, T, savefig=True):
     fig, axs = plt.subplots(1, nplots, subplot_kw={'aspect':'equal'}, squeeze=False)
     fig.set_size_inches(2*nplots, 2)
     for ax,embedding in zip(axs.flat,embeddings):
-        embera.draw_architecture_embedding(T,embedding,ax=ax)
+        embera.draw_architecture_embedding(T,embedding,node_size=1,ax=ax)
         if not embedding: ax.set_title(f"N/A\nruntime: N/A\nN/A qubits"); continue
         method = embedding.properties.get("embedding_method","N/A")
         runtime = embedding.properties.get("embedding_runtime",0.0)

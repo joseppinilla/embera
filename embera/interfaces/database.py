@@ -4,6 +4,8 @@ import time
 import dimod
 import numpy
 
+import pandas as pd
+
 from json import load as _load
 from json import dump as _dump
 
@@ -432,16 +434,21 @@ class EmberaDataBase:
                 for file in files:
                     report_path = os.path.join(root,file)
                     with open(report_path,'r') as fp:
-                        report = _load(fp)
+                        report = _load(fp,cls=EmberaDecoder)
                     metric, ext =  os.path.splitext(file)
                     reports[metric] = report
 
         return reports
 
-    def load_report(self, bqm, target, metric, tags=[]):
+    def load_report(self, bqm, target, metric, tags=[], dataframe=False):
         reports = self.load_reports(bqm,target,tags)
         report = reports.get(metric,{})
-        return report
+
+        if not dataframe:
+            return report
+        else:
+            df = pd.DataFrame.from_dict(report,columns=list(bqm),orient='index')
+            return df
 
     def dump_report(self, bqm, target, report, metric, tags=[]):
         source_id = self.id_source(bqm)
@@ -454,5 +461,5 @@ class EmberaDataBase:
         report_path = self.get_path(reports_path, report_filename)
 
         with open(report_path,'w+') as fp:
-            _dump(report,fp)
+            _dump(report,fp,cls=EmberaEncoder)
         return report_filename

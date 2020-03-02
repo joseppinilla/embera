@@ -92,6 +92,7 @@ class TestDataBase(unittest.TestCase):
         self.sampleset = dimod.SampleSet.from_samples(
                          [{1:-1, 2:1, 3:-1, 4:-1},{1:-1, 2:1, 3:1, 4:1}],
                          'SPIN',0)
+        self.report = {'emb1':{'a':4,'A1.S':8,(0,1):12}}
 
     def tearDown(self):
         shutil.rmtree("./TMP_DB")
@@ -133,6 +134,15 @@ class TestDataBase(unittest.TestCase):
         self.db.dump_sampleset(bqm,target_edgelist,embedding,sampleset)
         sampleset_copy = self.db.load_sampleset(bqm,target_edgelist,"")
         self.assertEqual(sampleset,sampleset_copy)
+
+    def test_report(self):
+        bqm = self.bqm
+        report = self.report
+        T = nx.Graph(self.target_edgelist)
+        self.db.dump_report(bqm,T,report,'mock_metric')
+        report_copy = self.db.load_report(bqm,T,'mock_metric')
+        report_df = self.db.load_report(bqm,T,'mock_metric',dataframe=True)
+        self.assertEqual(list(bqm),list(report_df.columns))
 
     def test_id_bqm(self):
         bqm = self.bqm
@@ -177,7 +187,6 @@ class TestDataBase(unittest.TestCase):
         self.assertRaises(ValueError,self.db.id_source,0)
 
     def test_id_embedding(self):
-
         embedding = self.embedding
         source = self.source_edgelist
         target = self.target_edgelist
