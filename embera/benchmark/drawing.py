@@ -1,10 +1,9 @@
 import embera
 import networkx as nx
+import dwave_networkx as dnx
 import matplotlib.pyplot as plt
-import matplotlib.colors
 
 from mpl_toolkits.mplot3d import Axes3D
-palette = plt.get_cmap('Pastel2')
 
 def plot(plot_method, *plot_args, plot_kwargs={}, subplot_kw={}, savefig=True):
     nplots = len(plot_args)
@@ -25,6 +24,7 @@ def plot_yields(solvers, savefig='yield.pdf'):
 
 def plot_parameters(bqms, savefig=True):
     nplots = len(bqms)
+    palette = plt.get_cmap('Pastel2')
 
     fig, axs = plt.subplots(1, nplots, squeeze=False)
     fig.set_size_inches(2*nplots, 2)
@@ -44,6 +44,7 @@ def plot_parameters(bqms, savefig=True):
         plt.savefig(path)
 
 def plot_topologies(topologies, nrows=1, ncols=None, spring_seed=None, savefig=True):
+    palette = plt.get_cmap('Pastel2')
     if ncols is None:
         ncols = len(topologies)//nrows + bool(len(topologies)%nrows)
 
@@ -166,7 +167,7 @@ def plot_joint_samplesets(samplesets, info_key=None, gray=False, savefig=True):
         plt.savefig(path)
 
 def plot_chain_metrics(embeddings, S, T, property_key=None, tags=['N/A'], savefig=True):
-
+    palette = plt.get_cmap('Pastel2')
     fig, axs = plt.subplots(1,2,num=S.name,subplot_kw={'projection':'3d'})
     fig.set_size_inches(10, 4)
     chain_ax, inter_ax = axs.flat
@@ -200,4 +201,22 @@ def plot_chain_metrics(embeddings, S, T, property_key=None, tags=['N/A'], savefi
 
     if savefig:
         path = savefig if isinstance(savefig,str) else "./chain_metrics.pdf"
+        plt.savefig(path)
+
+def plot_embedding_breaks(embeddings,samplesets,T,savefig=True):
+    nplots = len(embeddings)
+    palette = plt.get_cmap('coolwarm')
+    fig, axs = plt.subplots(1, nplots, subplot_kw={'aspect':'equal'}, squeeze=False)
+    fig.set_size_inches(2*nplots, 2)
+    for ax,samples,embedding in zip(axs.flat,samplesets,embeddings):
+        broken = embedding.chain_breaks(samples)
+        kwargs = {'chain_color':{v: palette(x) for v, x in broken.items()}}
+        kwargs.update({'node_size':1})
+        embera.draw_architecture_embedding(T,embedding,ax=ax,**kwargs)
+        method = embedding.properties.get("embedding_method","N/A")
+        ax.set_title(f"{method}")
+    plt.subplots_adjust(left=0, right=1, bottom=0, top=.85, wspace=0, hspace=0)
+
+    if savefig:
+        path = savefig if isinstance(savefig,str) else "./chain_breaks.pdf"
         plt.savefig(path)

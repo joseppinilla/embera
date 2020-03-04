@@ -55,8 +55,6 @@ class EmberaDataBase:
             with open(self.aliases_path,'r') as fp:
                 self.aliases = _load(fp)
 
-
-
     def timestamp(self):
         return f"{time.time():.0f}"
 
@@ -191,7 +189,6 @@ class EmberaDataBase:
                     with open(bqm_path,'r') as fp:
                         bqm = _load(fp,cls=DimodDecoder)
                     bqms.append(bqm)
-
         return bqms
 
     def load_bqm(self, source, tags=[], index=0):
@@ -419,7 +416,7 @@ class EmberaDataBase:
         return embedding_obj.id
 
     """ ############################# Reports ############################# """
-    def load_reports(self, bqm, target, tags=[]):
+    def load_reports(self, bqm, target, tags=[], dataframe=False):
         source_id = self.id_source(bqm)
         bqm_id = self.id_bqm(bqm)
         target_id = self.id_target(target)
@@ -436,19 +433,17 @@ class EmberaDataBase:
                     with open(report_path,'r') as fp:
                         report = _load(fp,cls=EmberaDecoder)
                     metric, ext =  os.path.splitext(file)
-                    reports[metric] = report
-
+                    if not dataframe:
+                        reports[metric] = report
+                    else:
+                        kwargs = {'columns':list(bqm),'orient':'index'}
+                        reports[metric] = pd.DataFrame.from_dict(report,**kwargs)
         return reports
 
     def load_report(self, bqm, target, metric, tags=[], dataframe=False):
-        reports = self.load_reports(bqm,target,tags)
+        reports = self.load_reports(bqm,target,tags,dataframe)
         report = reports.get(metric,{})
-
-        if not dataframe:
-            return report
-        else:
-            df = pd.DataFrame.from_dict(report,columns=list(bqm),orient='index')
-            return df
+        return report
 
     def dump_report(self, bqm, target, report, metric, tags=[]):
         source_id = self.id_source(bqm)
