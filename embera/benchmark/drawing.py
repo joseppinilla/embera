@@ -1,4 +1,5 @@
 import embera
+import scipy.stats
 import networkx as nx
 import dwave_networkx as dnx
 import matplotlib.pyplot as plt
@@ -257,7 +258,7 @@ def plot_sampleset_quality(union,energies,pockets_i,savefig=True):
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.25)
     for i,(i_ax,i_xs) in enumerate(zip(axs[1:],series_xs[1:])):
-        entr = scippy.stats.entropy(i_xs,union_xs)
+        entr = scipy.stats.entropy(i_xs,union_xs)
         textstr = fr'$\mathbf{{D_{{KL}}(U|S_{i}):{entr:.2}}}$'
         for j,(j_ax,j_xs) in enumerate(zip(axs[1:],series_xs[1:])):
             if j==i: continue
