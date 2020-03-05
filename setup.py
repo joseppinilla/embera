@@ -33,5 +33,6 @@ setup(name='embera',
       packages=packages,
       platforms='any',
       install_requires=install_requires,
+      python_requires='>=3.6', # f-string support
       license='MIT'
      )
