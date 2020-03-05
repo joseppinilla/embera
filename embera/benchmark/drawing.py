@@ -220,3 +220,59 @@ def plot_embedding_breaks(embeddings,samplesets,T,savefig=True):
     if savefig:
         path = savefig if isinstance(savefig,str) else "./chain_breaks.pdf"
         plt.savefig(path)
+
+def plot_sampleset_quality(union,energies,pockets_i,savefig=True):
+    palette = plt.get_cmap('cividis')
+
+    nplots = len(pockets_i)+1
+    fig = plt.figure(figsize=(nplots*3, 4))
+    union_ax = fig.add_subplot(1,nplots,1,autoscale_on=True)
+
+    y_labels = [f"{energies[v]:.2f}" for v in union]
+    union_xs = [union[v] for v in union]
+
+    energy_list = list(energies.values())
+    color_range = energy_list[-1] - energy_list[0]
+    colors = [palette((e-energy_list[0])/color_range) for e in energy_list]
+
+    union_ax.barh(y_labels,union_xs,color=colors)
+    plt.xticks(rotation=45)
+    union_ax.set_title('union')
+    union_ax.spines['top'].set_visible(False)
+    union_ax.spines['right'].set_visible(False)
+    axs = [union_ax]
+    series_xs = [union_xs]
+    for i,name in enumerate(pockets_i,2):
+        bins = pockets_i[name]
+        i_xs = [bins[v] for v in union]
+        i_ax = fig.add_subplot(1,nplots,i,sharex=union_ax,sharey=union_ax)
+        i_ax.barh(y_labels,i_xs,color=colors)
+        plt.setp(i_ax.get_yticklabels(),visible=False)
+        plt.xticks(rotation=45)
+        i_ax.set_title(name)
+        i_ax.spines['top'].set_visible(False)
+        i_ax.spines['right'].set_visible(False)
+        axs.append(i_ax)
+        series_xs.append(i_xs)
+
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.25)
+    for i,(i_ax,i_xs) in enumerate(zip(axs[1:],series_xs[1:])):
+        entr = scippy.stats.entropy(i_xs,union_xs)
+        textstr = fr'$\mathbf{{D_{{KL}}(U|S_{i}):{entr:.2}}}$'
+        for j,(j_ax,j_xs) in enumerate(zip(axs[1:],series_xs[1:])):
+            if j==i: continue
+            i_xs = [x if x else min(union_xs)/len(union_xs) for x in i_xs]
+            j_xs = [x if x else min(union_xs)/len(union_xs) for x in j_xs]
+            entr = scipy.stats.entropy(i_xs,j_xs)
+            textstr+='\n'+fr'$D_{{KL}}(S_{i}|S_{j}):{entr:.2}$'
+
+        i_ax.text(0.95, 0.95, textstr, fontsize=10,
+                  transform=i_ax.transAxes,
+                  horizontalalignment='right',verticalalignment='top',bbox=props)
+
+
+    plt.subplots_adjust(hspace=0,wspace=0)
+
+    if savefig:
+        path = savefig if isinstance(savefig,str) else "./sampleset_quality.pdf"
+        plt.savefig(path)
