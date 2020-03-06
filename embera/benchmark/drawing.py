@@ -1,9 +1,11 @@
 import embera
+import matplotlib
 import scipy.stats
 import networkx as nx
 import dwave_networkx as dnx
 import matplotlib.pyplot as plt
 
+from matplotlib.ticker import MaxNLocator
 from mpl_toolkits.mplot3d import Axes3D
 
 def plot(plot_method, *plot_args, plot_kwargs={}, subplot_kw={}, savefig=True):
@@ -69,7 +71,7 @@ def plot_topologies(topologies, nrows=1, ncols=None, spring_seed=None, savefig=T
 def plot_embeddings(embeddings, T, savefig=True):
     nplots = len(embeddings)
     fig, axs = plt.subplots(1, nplots, subplot_kw={'aspect':'equal'}, squeeze=False)
-    fig.set_size_inches(2*nplots, 2)
+    fig.set_size_inches(2*nplots, 3)
     for ax,embedding in zip(axs.flat,embeddings):
         embera.draw_architecture_embedding(T,embedding,node_size=1,ax=ax)
         if not embedding: ax.set_title(f"N/A\nruntime: N/A\nN/A qubits"); continue
@@ -241,6 +243,7 @@ def plot_sampleset_quality(union,energies,pockets_i,savefig=True):
     union_ax.set_title('union')
     union_ax.spines['top'].set_visible(False)
     union_ax.spines['right'].set_visible(False)
+
     axs = [union_ax]
     series_xs = [union_xs]
     for i,name in enumerate(pockets_i,2):
@@ -258,20 +261,20 @@ def plot_sampleset_quality(union,energies,pockets_i,savefig=True):
 
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.25)
     for i,(i_ax,i_xs) in enumerate(zip(axs[1:],series_xs[1:])):
-        entr = scipy.stats.entropy(i_xs,union_xs)
-        textstr = fr'$\mathbf{{D_{{KL}}(U|S_{i}):{entr:.2}}}$'
+        entr = scipy.stats.entropy(i_xs,union_xs,base=2)
+        textstr = fr'$\mathbf{{D_{{KL}}(U|S_{i}):{entr:.3f}}}$'
         for j,(j_ax,j_xs) in enumerate(zip(axs[1:],series_xs[1:])):
             if j==i: continue
             i_xs = [x if x else min(union_xs)/len(union_xs) for x in i_xs]
             j_xs = [x if x else min(union_xs)/len(union_xs) for x in j_xs]
-            entr = scipy.stats.entropy(i_xs,j_xs)
-            textstr+='\n'+fr'$D_{{KL}}(S_{i}|S_{j}):{entr:.2}$'
+            entr = scipy.stats.entropy(i_xs,j_xs,base=2)
+            textstr+='\n'+fr'$D_{{KL}}(S_{i}|S_{j}):{entr:.3f}$'
 
-        i_ax.text(0.95, 0.95, textstr, fontsize=10,
+        i_ax.text(0.95, 0.95, textstr, fontsize=9,
                   transform=i_ax.transAxes,
                   horizontalalignment='right',verticalalignment='top',bbox=props)
 
-
+    union_ax.yaxis.set_major_locator(MaxNLocator(nbins=10))
     plt.subplots_adjust(hspace=0,wspace=0)
 
     if savefig:
