@@ -1,5 +1,10 @@
+import os
 import dimod
 import embera
+import tarfile
+import requests
+
+import networkx as nx
 
 def init_bm(G, RNG_SEED=None):
     embera.random.seed(RNG_SEED)
@@ -10,7 +15,8 @@ def init_bm(G, RNG_SEED=None):
     edge_biases = embera.random.uniform(low=-2.0,high=2.0,size=len(G.edges))
     h = {v:b for v,b in zip(G.nodes,node_biases)}
     J = {(u,v):b for (u,v),b in zip(G.edges,edge_biases) if u!=v}
-    return h,J
+
+    return dimod.BinaryQuadraticModel.from_ising(h,J)
 
 def trained_bm(G, RNG_SEED=None):
     embera.random.seed(RNG_SEED)
@@ -19,7 +25,8 @@ def trained_bm(G, RNG_SEED=None):
     edge_biases = embera.random.normal(scale=0.5,size=len(G.edges))
     h = {v:b for v,b in zip(G.nodes,node_biases)}
     J = {(u,v):b for (u,v),b in zip(G.edges,edge_biases) if u!=v}
-    return h,J
+
+    return dimod.BinaryQuadraticModel.from_ising(h,J)
 
 def csp(G, RNG_SEED=None):
     embera.random.seed(RNG_SEED)
@@ -30,4 +37,49 @@ def csp(G, RNG_SEED=None):
     edge_biases = embera.random.categorical(len(G.edges), edge_vals)
     h = {v:b for v,b in zip(G.nodes,node_biases)}
     J = {(u,v):b for (u,v),b in zip(G.edges,edge_biases) if u!=v}
-    return h,J
+
+    return dimod.BinaryQuadraticModel.from_ising(h,J)
+
+def marshall_bench():
+    """" Toy problems and frustrated Ising problems with planted solutions used
+         by Marshall et al. in [1]. Linear biases are set to 0, and planted
+         solutions are created using [2].
+
+                | names         | nodes  | edges  | chimera  | E0        |
+                | ------------- |:------:| ------:|---------:|----------:|
+                | I_12_<0-10>   | 12     | 21     | 1x2      | Tractable |
+                | I_501_0       | 501    | 1231   | 8x8      | -2708.0   |
+                | I_501_1       | 501    | 1306   | 8x8      | -3764.0   |
+                | I_783         | 783    | 2080   | 10x10    | -3146.0   |
+
+         [1] Marshall, J., Venturelli, D., Hen, I., & Rieffel, E. G. (2019).
+         Power of Pausing: Advancing Understanding of Thermalization in
+         Experimental Quantum Annealers. Physical Review Applied, 11(4).
+         https://doi.org/10.1103/PhysRevApplied.11.044083
+         [2] Hen, I., Job, J., Albash, T., Rønnow, T. F., Troyer, M., & Lidar,
+         D. A. (2015). Probing for quantum speedup in spin-glass problems with
+         planted solutions. Physical Review A - Atomic, Molecular, and Optical
+         Physics, 92(4). https://doi.org/10.1103/PhysRevA.92.042325
+    """
+    benchmark_set = []
+    path = "./marshall.tar.gz"
+    url = "http://www.ece.ubc.ca/~jpinilla/resources/embera/marshall/marshall.tar.gz"
+
+    # Download
+    if not os.path.isfile(path):
+        print(f"-> Downloading Marshall benchmarks to {path}")
+        with open(path, 'wb') as f:
+            response = requests.get(url)
+            f.write(response.content)
+    # Unzip, untar, unpickle
+    with tarfile.open(path) as contents:
+        for member in contents.getmembers():
+            f = contents.extractfile(member)
+            G = nx.read_gpickle(f)
+
+            bqm = dimod.BinaryQuadraticModel.from_networkx_graph(G,'SPIN')
+            bqm.info.update(G.graph)
+
+            benchmark_set.append(bqm)
+
+    return benchmark_set

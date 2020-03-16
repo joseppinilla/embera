@@ -6,10 +6,17 @@ class TestParameters(unittest.TestCase):
 
     def test_bqm(self):
         G = embera.benchmark.topologies.complete_graph(4)
-        h,J = embera.benchmark.parameters.csp(G)
-        bqm = dimod.BinaryQuadraticModel(h,J,0.0,dimod.Vartype.SPIN)
-        assert(isinstance(bqm,dimod.BinaryQuadraticModel))
+        csp_bqm = embera.benchmark.parameters.csp(G)
+        self.assertIsInstance(csp_bqm,dimod.BinaryQuadraticModel)
+        init_bm_bqm = embera.benchmark.parameters.init_bm(G)
+        self.assertIsInstance(init_bm_bqm,dimod.BinaryQuadraticModel)
+        trained_bm_bqm = embera.benchmark.parameters.trained_bm(G)
+        self.assertIsInstance(trained_bm_bqm,dimod.BinaryQuadraticModel)
 
+    def test_marshall(self):
+        bqm_list = embera.benchmark.parameters.marshall_bench()
+        for bqm in bqm_list:
+            self.assertIsInstance(bqm,dimod.BinaryQuadraticModel)
 
 class TestTopologies(unittest.TestCase):
 
