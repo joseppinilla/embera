@@ -25,21 +25,35 @@ class StructuredSASampler(dimod.SimulatedAnnealingSampler,dimod.Structured):
         self.nodelist = list(G.nodes())
         self.edgelist = list(G.edges())
 
+    def validate_anneal_schedule(self,arg):
+        pass
+
+    def sample(self, *args, **kwargs):
+        child_kwargs = {k:v for k,v in kwargs.items() if k in self.parameters}
+        return super().sample(*args, **child_kwargs)
+
 class StructuredRandomSampler(dimod.RandomSampler,dimod.Structured):
     nodelist = None
     edgelist = None
     def __init__(self, failover=None,**config):
         super(StructuredRandomSampler, self).__init__()
         self.client = dwave.cloud.Client.from_config(**config)
-        solver = self.client.get_solver()
+        self.solver = self.client.get_solver()
 
-        self.properties.update(solver.properties)
+        self.properties.update(self.solver.properties)
         self.properties['category'] = 'software'
-        self.properties['chip_id'] = "RND_"+solver.name
+        self.properties['chip_id'] = "RND_"+self.solver.name
 
-        G = embera.architectures.graph_from_solver(solver)
+        G = embera.architectures.graph_from_solver(self.solver)
         self.nodelist = list(G.nodes())
         self.edgelist = list(G.edges())
+
+    def validate_anneal_schedule(self,arg):
+        pass
+
+    def sample(self, *args, **kwargs):
+        child_kwargs = {k:v for k,v in kwargs.items() if k in self.parameters}
+        return super().sample(*args, **child_kwargs)
 
 def embed_and_report(method, *args, **kwargs):
     report = {}
@@ -83,16 +97,17 @@ def measure_and_report(method, embeddings, samplesets, **kwargs):
 
 
 
-def k_hamming_trench(samplesets, bqm, hamm_k, norm=False, info_key=None):
+def k_hamming_trench(samplesets, hamm_k, norm=False, info_key=None):
+    # TODO: Avoid calculating hamming distance twice
     pockets = []
     energies = OrderedDict()
     union = dimod.concatenate(samplesets)
-    for sample in union.samples(sorted_by='energy'):
-        value = tuple(sample.values())
+    for data in union.data(sorted_by='energy'):
+        value = tuple(data.sample.values())
         local = (scipy.spatial.distance.hamming(value,p)<=hamm_k for p in pockets)
         if not any(local):
             pockets.append(value)
-            energies[value] = bqm.energy(sample)
+            energies[value] = data.energy
 
     pockets_i = OrderedDict()
     pockets_union = OrderedDict([(k,0) for k in pockets])
@@ -114,7 +129,7 @@ def k_hamming_trench(samplesets, bqm, hamm_k, norm=False, info_key=None):
                 bins[hit] = split + bins.get(hit,0)
                 pockets_union[hit] += split
         name = sampleset.info.get(info_key,str(i))
-        pockets_i[name] = bins
+        pockets_i[str(name)] = bins
 
     if norm:
         norm_pockets = OrderedDict()

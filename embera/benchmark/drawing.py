@@ -262,13 +262,13 @@ def plot_sampleset_quality(union,energies,pockets_i,savefig=True):
     props = dict(boxstyle='round', facecolor='wheat', alpha=0.25)
     for i,(i_ax,i_xs) in enumerate(zip(axs[1:],series_xs[1:])):
         entr = scipy.stats.entropy(i_xs,union_xs,base=2)
-        textstr = fr'$\mathbf{{D_{{KL}}(U|S_{i}):{entr:.3f}}}$'
+        textstr = fr'$\mathbf{{D_{{KL}}(U|S_{{{i}}}):{entr:.3f}}}$'
         for j,(j_ax,j_xs) in enumerate(zip(axs[1:],series_xs[1:])):
             if j==i: continue
             i_xs = [x if x else min(union_xs)/len(union_xs) for x in i_xs]
             j_xs = [x if x else min(union_xs)/len(union_xs) for x in j_xs]
             entr = scipy.stats.entropy(i_xs,j_xs,base=2)
-            textstr+='\n'+fr'$D_{{KL}}(S_{i}|S_{j}):{entr:.3f}$'
+            textstr+='\n'+fr'$D_{{KL}}(S_{{{i}}}|S_{{{j}}}):{entr:.3f}$'
 
         i_ax.text(0.95, 0.95, textstr, fontsize=9,
                   transform=i_ax.transAxes,

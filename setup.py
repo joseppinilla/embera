@@ -19,6 +19,7 @@ install_requires = ['dimod>=0.8.0,<0.9.0',
                     'networkx>=2.0,<3.0',
                     'numpy>=1.15.2,<2.00',
                     'pulp>=1.6.0,<2.0.0',
+                    'scipy>=1.4.0,<2.0.0',
                     ]
 
 setup(name='embera',
