@@ -224,7 +224,7 @@ def plot_embedding_breaks(embeddings,samplesets,T,savefig=True):
         path = savefig if isinstance(savefig,str) else "./chain_breaks.pdf"
         plt.savefig(path)
 
-def plot_sampleset_quality(union,energies,pockets_i,savefig=True):
+def plot_k_hamming_pockets(union,energies,pockets_i,savefig=True):
     palette = plt.get_cmap('cividis')
 
     nplots = len(pockets_i)+1
@@ -280,3 +280,35 @@ def plot_sampleset_quality(union,energies,pockets_i,savefig=True):
     if savefig:
         path = savefig if isinstance(savefig,str) else "./sampleset_quality.pdf"
         plt.savefig(path)
+
+def plot_sampleset_quality():
+    # Plot quality of samples
+    nplots = len(benchmark_set)
+    fig, axs = plt.subplots(1, nplots, squeeze=True)
+    fig.set_size_inches(5*nplots, 5)
+    shared_cax = False
+    ims = []
+    for (name,bqm),ax in zip(benchmark_set.items(),axs):
+        xs = []
+        ys = []
+        zs = []
+        for sch in schedules:
+            # Load results
+            embedding = db.load_embedding(name,solver)
+            sampleset = db.load_sampleset(bqm,solver,embedding,tags=[sch])
+            # Parse setups
+            E0 = bqm.info['E0']
+            pause = sampleset.info['sampler_method']['pause_length']
+            start = sampleset.info['sampler_method']['pause_start']
+            anneal = sampleset.info['sampler_method']['annealing_time']
+            # Data series
+            xs.append(start)
+            ys.append(pause)
+            zs.append(metric(bqm,sampleset))
+
+        # Plot
+        sct = ax.scatter(xs,ys,c=zs,cmap="viridis")
+        ax.set_title(name)
+        cb = fig.colorbar(sct,ax=ax,orientation='horizontal')
+        cax = cb.ax
+        cax.xaxis.set_major_locator(MaxNLocator(nbins=5))

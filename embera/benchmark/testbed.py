@@ -95,9 +95,7 @@ def measure_and_report(method, embeddings, samplesets, **kwargs):
 
     return report
 
-
-
-def k_hamming_trench(samplesets, hamm_k, norm=False, info_key=None):
+def relative_k_hamming_trench(samplesets, hamm_k, norm=False, info_key=None):
     # TODO: Avoid calculating hamming distance twice
     pockets = []
     energies = OrderedDict()
@@ -141,3 +139,41 @@ def k_hamming_trench(samplesets, hamm_k, norm=False, info_key=None):
         return norm_union, energies, norm_pockets
     else:
         return pockets_union, energies, pockets_i
+
+def absolute_k_hamming_trench(sampleset, hamm_k, norm=False, info_key=None):
+    pockets = OrderedDict()
+    energies = OrderedDict()
+    for data in sampleset.data(sorted_by='energy'):
+        value = tuple(data.sample.values())
+
+        hits = []
+        k = hamm_k
+        for pocket in pockets:
+            hamm_dist = scipy.spatial.distance.hamming(value,pocket)
+            if hamm_dist<k:
+                hits = [pocket]
+                k = hamm_dist
+            elif hamm_dist==k:
+                hits += [pocket]
+        if hits:
+            split = 1/len(hits)
+            for hit in hits:
+                pockets[hit] = split + pockets.get(hit,0.0)
+        else:
+            pockets[value] = 0.0
+            energies[value] = data.energy
+
+    if norm:
+        nsamples = len(sampleset)
+        norm_pockets = OrderedDict([(k,v/nsamples) for k,v in pockets.items()])
+        return energies, norm_pockets
+
+    return energies, pockets
+
+def figure_of_merit(energies, pockets, E0=None):
+    accum = 1.0
+    minE = next(iter(energies.values())) if E0 is None else E0
+    for pocket,prob in pockets.items():
+        energy = energies[pocket]
+        accum*=(energy/minE)*(1.0 + prob)
+    return accum/2.0
