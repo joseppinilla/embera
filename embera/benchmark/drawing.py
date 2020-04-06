@@ -140,7 +140,7 @@ def plot_joint_samplesets(samplesets, info_key=None, gray=False, savefig=True):
         sct = main_ax.scatter(x[i],y[i],s=ratE,c=E[i],cmap="jet",alpha=0.5)
 
         minXY = [(x[i][ie],y[i][ie]) for ie,e in enumerate(E[i]) if e==minE]
-        if minXY: main_ax.plot(*zip(*minXY),ms=25,mew=1,c='k',marker='x')
+        if minXY: main_ax.scatter(*zip(*minXY),s=100,linewidths=1,c='k',marker='x')
 
         # Histograms on the attached axes
         x_hist.hist(x[i], 100, histtype='stepfilled',
