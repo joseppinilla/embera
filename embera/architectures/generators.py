@@ -21,11 +21,12 @@
 import networkx as nx
 import dwave_networkx as dnx
 
-__all__ = ['graph_from_solver',
-           'dwave_online',
+__all__ = ['graph_from_solver','dwave_online',
            'rainier_graph', 'vesuvius_graph', 'dw2x_graph', 'dw2000q_graph',
            'p6_graph', 'p16_graph',
            'h20k_graph']
+
+""" ========================== D-Wave Solver Solutions ===================== """
 
 def graph_from_solver(solver, **kwargs):
     """ D-Wave architecture graph from Dimod Structured Solver
@@ -62,6 +63,7 @@ def dwave_online(squeeze=True, **kwargs):
     else:
         return graphs
 
+""" =========================== D-Wave Architectures ======================= """
 
 def rainier_graph(**kwargs):
     """ D-Wave One 'Rainier' Quantum Annealer graph
@@ -111,6 +113,8 @@ def p16_graph(**kwargs):
     target_graph.name = 'P16'
     return target_graph
 
+""" ============================== Miscellaneous =========================== """
+
 def h20k_graph(data=True, coordinates=False):
     """ HITACHI 20k-Spin CMOS digital annealer graph.
         https://ieeexplore.ieee.org/document/7350099/
@@ -141,3 +145,88 @@ def h20k_graph(data=True, coordinates=False):
         target_graph = nx.relabel_nodes(target_graph, coordinate_labels)
 
     return target_graph
+
+
+""" ============== Architecture agnostic coordinate converter ============== """
+
+class coordinates:
+    def __init__(self, **graph):
+        """
+        Provides a coordinate converter that is architecture-agnostic.
+
+        Parameter
+        ---------
+        graph : dict
+            family : | chimera | pegasus |
+            columns : int
+            rows : int
+            tile : int
+            labels : | int | coordinate | nice |
+        """
+
+        try:
+            family = graph["family"]
+            m = graph["columns"]
+            n = graph["rows"]
+            t = graph["tile"]
+            labels = graph["labels"]
+        except:
+            raise ValueError("Target graph needs to have family, columns, \
+            rows, tile, and labels attributes.")
+
+        if family=="chimera":
+            self._converter = dnx.chimera.chimera_coordinates(m,n=n,t=t)
+            if labels=="int":
+                self._int_getter = lambda v : v
+                self._tuple_getter = self._converter.linear_to_chimera
+                self._shore_getter = lambda v: self._tuple_getter(v)[2]
+                self._tile_getter = lambda v: self._tuple_getter(v)[:2]
+            elif labels=="coordinate":
+                self._int_getter = lambda *v : self._converter.int(v)
+                self._tuple_getter = lambda *v : v
+                self._shore_getter = lambda i, j, u, k: u
+                self._tile_getter = lambda i, j, u, k: (i, j)
+            else:
+                raise ValueError("Unsupported label type.")
+            self._nice_getter = self._tuple_getter
+
+        elif family=="pegasus":
+            self._converter = dnx.pegasus.pegasus_coordinates(m)
+            if labels=="int":
+                self._int_getter = lambda v : v
+                self._tuple_getter = self._converter.linear_to_pegasus
+                self._nice_getter = self._converter.linear_to_nice
+                self._shore_getter = lambda v: self._tuple_getter(v)[0]
+                self._tile_getter = lambda v: self.nice_getter(v)[:3]
+            elif labels=="coordinate":
+                self._int_getter = lambda *v : self._converter.int(v)
+                self._tuple_getter = lambda *v : v
+                self._nice_getter = self._converter.pegasus_to_nice
+                self._shore_getter = lambda u, w, k, z : u
+                self._tile_getter = lambda *v : self._nice_getter(v)[:3]
+            elif labels=="nice":
+                n2p = pegasus.get_nice_to_pegasus_fn()
+                self._int_getter = self._converter.nice_to_linear
+                self._tuple_getter = self._converter.nice_to_pegasus
+                self._nice_getter = lambda *v : v
+                self._shore_getter = lambda t, i, j, u, k: u
+                self._tile_getter = lambda t, i, j, u, k : (t, i, j)
+            else:
+                raise ValueError("Unsupported label type.")
+        else:
+            raise ValueError("Unsupported graph family.")
+
+    def get_int(self, *v):
+        return self._int_getter(*v)
+
+    def get_tuple(self, *v):
+        return self._tuple_getter(*v)
+
+    def get_shore(self, *v):
+        return self._shore_getter(*v)
+
+    def get_tile(self, *v):
+        return self._tile_getter(*v)
+
+    def get_nice(self, *v):
+        return self._nice_getter(*v)

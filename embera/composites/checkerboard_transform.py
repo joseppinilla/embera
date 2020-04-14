@@ -25,7 +25,7 @@ The gauge transformations are performed sequentially:
     -G: Checkered transformation    (spins flipped starting with shore 0)
 """
 
-from embera.architectures.parse import coordinates
+from embera.architectures import coordinates
 
 from dimod.core.composite import Composite
 from dimod.core.sampler import Sampler
