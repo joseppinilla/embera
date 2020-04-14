@@ -4,3 +4,4 @@ from .embedding import *
 from .layout_aware import *
 from .minorminer import *
 from .lenient_embedding import *
+from .checkerboard_transform import *
