@@ -24,7 +24,8 @@ import dwave_networkx as dnx
 __all__ = ['graph_from_solver','dwave_online',
            'rainier_graph', 'vesuvius_graph', 'dw2x_graph', 'dw2000q_graph',
            'p6_graph', 'p16_graph',
-           'h20k_graph']
+           'h20k_graph',
+           'coordinates']
 
 """ ========================== D-Wave Solver Solutions ===================== """
 
