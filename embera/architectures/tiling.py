@@ -10,8 +10,8 @@ from dwave_networkx.generators.pegasus import pegasus_coordinates
 
 class Tiling:
     """ Generate tiling from architecture graph construction.
-    According to the architecture family, create a grid of Tile
-    objects.
+        According to the architecture family, create a grid of Tile
+        objects.
     """
     def __init__(self, Tg):
         # Support for different target architectures

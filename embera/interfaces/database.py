@@ -145,7 +145,7 @@ class EmberaDataBase:
     def id_target(self, target):
         if isinstance(target,str):
             id = self.aliases.get('target',{}).get(target,target)
-        elif isinstance(target,(dimod.BinaryQuadraticModel,nx.Graph,list)):
+        elif isinstance(target,(nx.Graph,list)):
             id = "".join([str(v) for v in self.__graph_key(target)])[:8]
         else:
             raise ValueError("Target must be networkx.Graph, list of tuples or str")
