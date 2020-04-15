@@ -7,4 +7,5 @@ from .benchmark.topologies import *
 from .composites import *
 from .interfaces import *
 from .preprocess import *
+from .transform import *
 from .utilities import *

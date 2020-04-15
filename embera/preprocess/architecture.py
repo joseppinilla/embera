@@ -2,13 +2,13 @@
 
 """
 
-__all__ = ['Tiling']
+__all__ = ['DWaveNetworkXTiling']
 
 import dwave_networkx as dnx
 from dwave_networkx.generators.chimera import chimera_coordinates
 from dwave_networkx.generators.pegasus import pegasus_coordinates
 
-class Tiling:
+class DWaveNetworkXTiling:
     """ Generate tiling from architecture graph construction.
         According to the architecture family, create a grid of Tile
         objects.

@@ -1,6 +1,11 @@
 import numpy as np
-from numpy.random import choice, sample, seed, shuffle
+
+from random import sample
+from random import seed as _py_seed
+
+from numpy.random import choice, shuffle
 from numpy.random import multinomial, normal, uniform
+from numpy.random import seed as _np_seed
 
 
 __all__ = ["choice","sample","seed","shuffle",
@@ -9,6 +14,10 @@ __all__ = ["choice","sample","seed","shuffle",
 """ Probability functions and distributions useful in embedding and testing
     Ising models.
 """
+
+def seed(a):
+    _py_seed(a)
+    _np_seed(a)
 
 def prob_vector(N):
     vec = [normal(0, 1) for i in range(N)]

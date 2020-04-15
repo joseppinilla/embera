@@ -1,14 +1,14 @@
 import warnings
 
-from embera.architectures.tiling import Tiling
+from embera.preprocess.architecture import DWaveNetworkXTiling
 
 __all__ = ['find_candidates', 'SimulatedAnnealingPlacer']
 
-class SimulatedAnnealingPlacer(Tiling):
+class SimulatedAnnealingPlacer(DWaveNetworkXTiling):
     """ A simulated annealing based global placement
     """
     def __init__(self, S, T, **params):
-        Tiling.__init__(self, Tg)
+        DWaveNetworkXTiling.__init__(self, Tg)
 
         self.tries = params.pop('tries', 1)
         self.verbose = params.pop('verbose', 0)

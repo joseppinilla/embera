@@ -1,39 +1,44 @@
-""" Example of a systematic embedding approach for complete bipartite graphs.
-"""
+""" Example of a systematic embedding approach for complete bipartite graphs """
 
 import matplotlib.pyplot as plt
-from embera.benchmark.topologies import pruned_graph_gen
+from embera.utilities.random import seed
+from embera.transform.graph import prune
 from embera.architectures import drawing, generators
-from embera.preprocess.complete_bipartite_placer import CompleteBipartitePlacer, find_candidates
+from embera.preprocess.complete_bipartite_placer import find_candidates
 
+seed(42)
 # Problem dimensions
 p, q = 10, 6
 # The corresponding graph of the D-Wave C4 (Rainier) annealer with 0.95 qubit yield
-Tg = pruned_graph_gen(generators.rainier_graph, node_yield=0.95)(coordinates=True)
-plt.figure(0)
+Tg = prune(generators.rainier_graph(coordinates=True), node_yield=0.95)
+plt.subplot(2, 2, 1)
 drawing.draw_architecture_yield(Tg, node_size=20)
 
 # Systematically find the best candidates for K_{10,16} starting at row 3, col 6
 origin = (3,6)
-(P, Q), faults = find_candidates((p, q), Tg, origin=origin, shores=True, show_faults=True)
-print('Faults at: %s' % faults)
+params = {'origin':origin, 'shores':True, 'orientation':0, 'show_faults':True}
+(P, Q), faults = find_candidates((p, q), Tg, **params)
 candidates = {**P, **Q}
-plt.figure(1)
+plt.subplot(2, 2, 2)
 drawing.draw_architecture_embedding(Tg, candidates, node_size=20, show_labels=True)
-plt.show()
+
+""" Example of a transformable embedding for complete bipartite graphs """
+from embera.preprocess.complete_bipartite_placer import CompleteBipartitePlacer
 
 # Create placer object from candidates and perform transformations
 placer = CompleteBipartitePlacer.from_candidates((p,q), Tg, candidates)
-assert(placer.origin==origin)
-print(placer.origin, origin)
+assert(origin==placer.origin)
+
+# ...or, create the placer object from scratch:
+placer = CompleteBipartitePlacer((p,q), Tg)
+(P, Q), faults = placer.run()
+
+plt.subplot(2, 2, 3)
+drawing.draw_architecture_embedding(Tg, {**P, **Q}, node_size=20, show_labels=True)
+
+# and performa transformations:
 placer.rotate()
 placer.shuffle()
-assert(placer.origin==origin)
-print(placer.origin, origin)
-plt.figure(2)
-drawing.draw_architecture_embedding(Tg, {**placer.P, **placer.Q}, node_size=20, show_labels=True)
-plt.show()
 
-plt.figure(3)
-placer.sort()
-drawing.draw_architecture_embedding(Tg, {**placer.P, **placer.Q}, node_size=20, show_labels=True)
+plt.subplot(2, 2, 4)
+drawing.draw_architecture_embedding(Tg, {**P, **Q}, node_size=20, show_labels=True)

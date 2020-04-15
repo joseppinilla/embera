@@ -3,16 +3,16 @@ import warnings
 import networkx as nx
 import matplotlib.pyplot as plt
 
-from embera.architectures.tiling import Tiling
+from embera.preprocess.architecture import DWaveNetworkXTiling
 from embera.architectures.drawing import draw_tiled_graph
 
 __all__ = ['find_candidates']
 
-class DiffusionPlacer(Tiling):
+class DiffusionPlacer(DWaveNetworkXTiling):
     """ Diffusion-based migration of a graph layout
     """
     def __init__(self, S, Tg, **params):
-        Tiling.__init__(self, Tg)
+        DWNetworkXTiling.__init__(self, Tg)
 
         self.p_size = len(S)
 
