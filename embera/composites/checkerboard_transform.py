@@ -25,7 +25,7 @@ The gauge transformations are performed sequentially:
     -G: Checkered transformation    (spins flipped starting with shore 0)
 """
 
-from embera.architectures import coordinates
+from embera.architectures import dwave_coordinates
 
 from dimod.core.composite import Composite
 from dimod.core.sampler import Sampler
@@ -77,7 +77,7 @@ class CheckerboardTransformComposite(Sampler, Composite, Structured):
         child.properties['graph'] = target_graph_dnx.graph
         self.properties = {"child_properties": child.properties}
 
-        self.coordinates = coordinates(**target_graph_dnx.graph)
+        self.coordinates = dwave_coordinates(target_graph_dnx.graph)
 
     def sample(self, bqm, **kwargs):
         """Sample from the binary quadratic model.

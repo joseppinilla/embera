@@ -3,7 +3,7 @@ import warnings
 import networkx as nx
 import matplotlib.pyplot as plt
 
-from embera.preprocess.architecture import DWaveNetworkXTiling
+from embera.preprocess.tiling_parser import DWaveNetworkXTiling
 from embera.architectures.drawing import draw_tiled_graph
 
 __all__ = ['find_candidates']

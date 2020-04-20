@@ -2,6 +2,7 @@ import networkx as nx
 import dwave_networkx  as dnx
 
 from decorator import decorator
+from embera.architectures import dwave_coordinates
 
 """ =============================== NetworkX ============================= """
 
@@ -49,7 +50,7 @@ def dnx_graph(*graph_index,nice_coordinates=False):
             converter = dnx.chimera_coordinates(m, n, t)
             if labels == 'int':
                 node_list = converter.iter_linear_to_chimera(G.nodes)
-                edge_list = list(converter.iter_linear_to_chimera_pairs(G.edges))
+                edge_list = converter.iter_linear_to_chimera_pairs(G.edges)
             else:
                 raise ValueError("Label type not supported.")
             H = dnx.chimera_graph(m, n, t,
@@ -80,7 +81,7 @@ def dnx_graph(*graph_index,nice_coordinates=False):
             H = dnx.pegasus_graph(m,
                                   node_list=node_list,
                                   edge_list=edge_list,
-                                  nice_coordinates=True)
+                                  nice_coordinates=nice_coordinates)
         return H
 
     @decorator
@@ -90,3 +91,26 @@ def dnx_graph(*graph_index,nice_coordinates=False):
             new_args[i] =  _parse_graph(new_args[i])
         return func(*new_args, **kwargs)
     return _graph_argument
+
+""" ===================== D-Wave NetworkX w/ Embedding ===================== """
+
+def dnx_graph_embedding(dnx_graph_index, *embedding_index):
+    """ Given one D-Wave NetworkX and at least one embedding
+    """
+    def _translate_labels(embedding, dnx_coords):
+        if all([isinstance(v,int) for chain in embedding.values() for q in chain]):
+            return {v:dnx_coords.iter_linear_to_coordinate(chain)
+                    for v,chain in embedding.items()}
+        else:
+            return embedding
+
+    @decorator
+    def _embedding_argument(func, *args, **kwargs):
+        new_args = list(args)
+        dnx_graph = new_args[dnx_graph_index]
+        dnx_coords = dwave_coordinates(dnx_graph.graph,nice_coordinates=True)
+        for i in embedding_index:
+            new_args[i] =  _translate_labels(new_args[i], dnx_coords)
+        embedding = func(*new_args, **kwargs)
+        return _translate_labels(embedding)
+    return _embedding_argument

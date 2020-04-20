@@ -1,5 +1,4 @@
 from .architectures import *
-
 from .benchmark import *
 from .benchmark.testbed import *
 from .benchmark.topologies import *

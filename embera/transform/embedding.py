@@ -3,21 +3,12 @@ import minorminer
 import networkx as nx
 import dwave_networkx as dnx
 
-from embera.utilities.decorators import nx_graph, dnx_graph
-from embera.preprocess.architecture import DWaveNetworkXTiling
-
-
-# S = nx.complete_bipartite_graph(10,10)
-# T = dnx.chimera_graph(4)
-# T = dnx.pegasus_graph(4)
-# embedding = minorminer.find_embedding(S,T,random_seed=1)
-# dnx.draw_pegasus_embedding(T,embedding)
-#
-# embedding = sliding_window(S,T,embedding)
-
+from embera.utilities.decorators import nx_graph, dnx_graph, dnx_graph_embedding
+from embera.preprocess.tiling_parser import DWaveNetworkXTiling
 
 @nx_graph(0)
 @dnx_graph(1)
+@dnx_graph_embedding(1,2)
 def sliding_window(S, T, embedding):
     """ TODO: Using a sling window approach, transform the embedding from one region
         of the Chimera graph to another. This is useful when an embedding is
@@ -43,18 +34,22 @@ def sliding_window(S, T, embedding):
     """
 
     T_tiling = DWaveNetworkXTiling(T)
-
+    print(T.graph['labels'])
     for v,chain in embedding.items():
         for q in chain:
-
             t = T_tiling.get_tile(q)
-
 
 
 
     return embedding
 
-
+def rotate(S, T, embedding):
+    """ TODO: Rotate the embedding on the same graph to re-distribute qubit
+        assignments. If a perfect fit isn't found, due to disabled qubits,
+        a minor-embedding heuristic is used in a "relaxed" way to find a valid
+        assignment.
+    """
+    return embedding
 
 def spread_out(S, T, embedding):
     """ TODO: Alter the embedding to add qubit chains by moving qubit

@@ -1,6 +1,4 @@
-""" Architecture specific tilings for target graphs
-
-"""
+""" Architecture specific tilings for target graphs """
 
 __all__ = ['DWaveNetworkXTiling']
 

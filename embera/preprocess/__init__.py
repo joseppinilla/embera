@@ -1,5 +1,5 @@
 # Parsing
-from .architecture import *
+from .tiling_parser import *
 # Global Placement
 from .diffusion_placer import *
 from .simulated_annealing_placer import *
