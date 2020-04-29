@@ -30,57 +30,44 @@ def nx_graph(*graph_index):
 """ =========================== D-Wave NetworkX ============================ """
 
 def dnx_graph(*graph_index,nice_coordinates=False):
-    """ Supports multiple D-Wave graph arguments but return dwave_networkx
-        with given label type.
-    """
+    """ Parse D-Wave NetworkX graph arguments and return with coordinates """
     def _parse_graph(G):
-        if hasattr(G, 'graph'):
-            labels = G.graph.get('labels')
-            if labels=='coordinate' and not nice_coordinates: return G
-            elif labels=='nice' and nice_coordinates: return G
+        labels = G.graph['labels']
+        converter = dwave_coordinates.from_graph_dict(G.graph)
+        if nice_coordinates:
+            if labels is 'int':
+                node_list = converter.iter_linear_to_nice(G.nodes)
+                edge_list = converter.iter_linear_to_nice_pairs(G.edges)
+            elif labels is 'coordinate':
+                node_list = converter.iter_coordinate_to_nice(G.nodes)
+                edge_list = converter.iter_coordinate_to_nice_pairs(G.edges)
+            elif labels is 'nice':
+                return G
+            else:
+                raise ValueError("Label type not supported.")
         else:
-            raise ValueError("D-Wave NetworkX graph must have `graph` attribute")
+            if labels is 'int':
+                node_list = converter.iter_linear_to_coordinate(G.nodes)
+                edge_list = converter.iter_linear_to_coordinate_pairs(G.edges)
+            elif labels is 'nice':
+                node_list = converter.iter_nice_to_coordinate(G.nodes)
+                edge_list = converter.iter_nice_to_coordinate_pairs(G.edges)
+            elif labels is 'coordinate':
+                return G
+            else:
+                raise ValueError("Label type not supported.")
 
         family = G.graph.get('family')
-
-        if family=='chimera':
+        if family is 'chimera':
             n = G.graph['columns']
             m = G.graph['rows']
             t = G.graph['tile']
-            converter = dnx.chimera_coordinates(m, n, t)
-            if labels == 'int':
-                node_list = converter.iter_linear_to_chimera(G.nodes)
-                edge_list = converter.iter_linear_to_chimera_pairs(G.edges)
-            else:
-                raise ValueError("Label type not supported.")
-            H = dnx.chimera_graph(m, n, t,
-                                 node_list=node_list,
-                                 edge_list=edge_list,
-                                 coordinates=True)
+            if nice_coordinates: raise ValueError("Nice Chimera coordinates not supported")
+            H = dnx.chimera_graph(m,n,t,node_list=node_list,edge_list=edge_list,
+                                  coordinates=True)
         elif family=='pegasus':
             m = G.graph['rows']
-            converter = dnx.pegasus_coordinates(m)
-            if nice_coordinates:
-                if labels == 'int':
-                    node_list = converter.iter_linear_to_nice(G.nodes)
-                    edge_list = converter.iter_linear_to_nice_pairs(G.edges)
-                elif labels == 'coordinate':
-                    node_list = converter.iter_pegasus_to_nice(G.nodes)
-                    edge_list = converter.iter_pegasus_to_nice_pairs(G.edges)
-                else:
-                    raise ValueError("Label type not supported.")
-            else:
-                if labels == 'int':
-                    node_list = converter.iter_linear_to_pegasus(G.nodes)
-                    edge_list = converter.iter_linear_to_pegasus_pairs(G.edges)
-                elif labels == 'nice':
-                    node_list = converter.iter_nice_to_pegasus(G.nodes)
-                    edge_list = converter.iter_nice_to_pegasus_pairs(G.edges)
-                else:
-                    raise ValueError("Label type not supported.")
-            H = dnx.pegasus_graph(m,
-                                  node_list=node_list,
-                                  edge_list=edge_list,
+            H = dnx.pegasus_graph(m,node_list=node_list,edge_list=edge_list,
                                   nice_coordinates=nice_coordinates)
         return H
 

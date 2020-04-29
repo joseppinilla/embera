@@ -88,9 +88,7 @@ class DiffusionPlacer(DWaveNetworkXTiling):
         return candidates
 
     def _scale(self):
-        """ Assign node locations to in-scale values of the dimension
-        of the target graph.
-        """
+        """ Assign node locations to in-scale values of the dimension of Tg """
         P = self.p_size
         T = self.t_size
         n = self.n

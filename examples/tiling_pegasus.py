@@ -1,16 +1,16 @@
-""" Example of tiling a Pegasus architecture graph.
-"""
+""" Example of tiling a Pegasus architecture graph. """
 import dwave_networkx as dnx
 import matplotlib.pyplot as plt
 from embera.architectures import drawing, generators
-from embera.architectures.tiling import Tiling
+from embera.preprocess.tiling_parser import DWaveNetworkXTiling
 
-p=3
-Tg = generators.p6_graph()
+colours = {'u':{},'w':{},'k':{},'z':{},'t':{},'ij':{},'k2':{},'tij':{}}
+Tg = dnx.pegasus_graph(3,coordinates=True)
+
 colours = {}
-for tile, data in Tiling(Tg).tiles.items():
-    if data.qubits:
-        colours[tile] = data.qubits
+for index, tile in DWaveNetworkXTiling(Tg).items():
+    if tile.qubits:
+        colours[index] = list(tile.qubits)
 
-drawing.draw_architecture_embedding(Tg, colours, show_labels=True)
+drawing.draw_architecture_embedding(Tg, colours, show_labels=True, node_size=10)
 plt.show()

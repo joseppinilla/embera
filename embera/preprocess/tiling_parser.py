@@ -1,6 +1,8 @@
 import embera
 import numpy as np
 
+from embera.utilities.decorators import dnx_graph
+
 __all__ = ['DWaveNetworkXTiling']
 
 class DWaveNetworkXTiling:
@@ -8,15 +10,15 @@ class DWaveNetworkXTiling:
         According to the architecture family, create a grid of Tile
         objects.
     """
+    @dnx_graph(1)
     def __init__(self, Tg):
-        self.qubits = Tg.nodes
-        self.couplers = Tg.edges
+        self.qubits = list(Tg.nodes)
+        self.couplers = list(Tg.edges)
         # Coordinate converter
         self.converter = embera.dwave_coordinates.from_graph_dict(Tg.graph)
         # Graph attributes
         self.labels = Tg.graph['labels']
         self.family = Tg.graph['family']
-
         # Graph dimensions
         m = Tg.graph["columns"]
         n = Tg.graph["rows"]
@@ -32,13 +34,24 @@ class DWaveNetworkXTiling:
         # Add Tile objects
         self.t = t
         self.shape = (p,m,n)
-        self.tiles = np.empty(self.shape, dtype=object)
-        for t in range(p):
-            for j in range(n):
-                for i in range(m):
-                    tile = (t,i,j)
-                    qubits = self.get_tile_qubits(tile)
-                    self.tiles[tile] = Tile(tile, self.shape, qubits)
+        self.tiles = {}
+        for q in self.qubits:
+            t,i,j,u,k = self.converter.coordinate_to_nice(q)
+            tile = (t,i,j)
+            qubits = self.get_tile_qubits(tile)
+            self.tiles[tile] = Tile(tile, self.shape, qubits)
+
+    def __iter__(self):
+        return self.tiles
+
+    def __getitem__(self, key):
+        return self.tiles[key]
+
+    def __delitem__(self, key):
+        del self.tiles[key]
+
+    def items(self):
+        return self.tiles.items()
 
     def get_tile_qubits(self, tile):
         """ Finds the available qubits associated to tile (t,i,j) of the
@@ -64,7 +77,7 @@ class DWaveNetworkXTiling:
                     from 0 to t inclusive
         """
         t,i,j = tile
-        qubits = set()
+        qubits = []
         for u in range(self.shores):
             for k in range(self.t):
                 nice_index = (t, i, j, u, k)
@@ -76,11 +89,14 @@ class DWaveNetworkXTiling:
                     label = self.converter.nice_to_coordinate(nice_index)
                 else:
                     raise Exception("Label not in {'nice','int','coordinate'}")
-
                 if label in self.qubits:
-                    qubits.add(label)
-
+                    qubits.append(label)
         return qubits
+
+    def get_tile_neighbors(self,tile):
+        t,i,j = tile
+        neighbors = [(t+1,i,j),(t-1,i,j),(t,i+1,j),(t,i-1,j),(t,i,j+1),(t,i,j-1)]
+        return [tile for tile in neighbors if tile in self.tiles]
 
 class Tile:
     """ Tile Class """
@@ -94,10 +110,10 @@ class Tile:
     def supply(self):
         return self.qubits
 
-    def links(self, tile, edge_list):
+    def links(self, tile, edges):
         for q in self.qubits:
             for p in tile.qubits:
-                if (q,p) in edge_list:
+                if (q,p) in edges:
                     yield (q,p)
 
     def is_connected(self, tile, edge_list):
@@ -107,4 +123,4 @@ class Tile:
         return str(self.qubits)
 
     def __str__(self):
-        return str(self.name)
+        return str(self.index)

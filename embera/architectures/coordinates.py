@@ -46,11 +46,11 @@ class agnostic_coordinates:
 
     def linear_to_coordinate(self, r):
         method = getattr(self, f'linear_to_{self.family}')
-        return method(q)
+        return method(r)
 
     def nice_to_coordinate(self, n):
         method = getattr(self, f'nice_to_{self.family}')
-        return method(q)
+        return method(n)
 
     def iter_coordinate_to_linear(self, qlist):
         method = getattr(self, f'iter_{self.family}_to_linear')
