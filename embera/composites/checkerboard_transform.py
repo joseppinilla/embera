@@ -77,7 +77,7 @@ class CheckerboardTransformComposite(Sampler, Composite, Structured):
         child.properties['graph'] = target_graph_dnx.graph
         self.properties = {"child_properties": child.properties}
 
-        self.coordinates = dwave_coordinates(target_graph_dnx.graph)
+        self.coordinates = dwave_coordinates.from_graph_dict(target_graph_dnx.graph)
 
     def sample(self, bqm, **kwargs):
         """Sample from the binary quadratic model.
@@ -125,8 +125,8 @@ class CheckerboardTransformComposite(Sampler, Composite, Structured):
         for flip_even in [0, 1, 0]:
             # Create flipped BQM
             for v in bqm:
-                u = self.coordinates.get_shore(v)
-                tile = self.coordinates.get_tile(v)
+                t,i,j,u,k = self.coordinates.linear_to_nice(v)
+                tile = (t,i,j)
                 is_even_tile = not sum(tile)%2
 
                 flip = u==flip_even if is_even_tile else u!=flip_even

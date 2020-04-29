@@ -34,23 +34,37 @@ def sliding_window(S, T, embedding):
     """
 
     T_tiling = DWaveNetworkXTiling(T)
-    print(T.graph['labels'])
+
+    width = 0
+    height = 0
+    x_offset = 0
+    y_offset = 0
     for v,chain in embedding.items():
         for q in chain:
-            t = T_tiling.get_tile(q)
+            (t,i,j) = T_tiling.get_tile(q)
 
 
 
     return embedding
 
+@nx_graph(0)
+@dnx_graph(1)
+@dnx_graph_embedding(1,2)
 def rotate(S, T, embedding):
-    """ TODO: Rotate the embedding on the same graph to re-distribute qubit
+    """ Rotate the embedding on the same graph to re-distribute qubit
         assignments. If a perfect fit isn't found, due to disabled qubits,
         a minor-embedding heuristic is used in a "relaxed" way to find a valid
         assignment.
     """
+    for v, chain in embedding.items():
+        pass
+
+
     return embedding
 
+@nx_graph(0)
+@dnx_graph(1)
+@dnx_graph_embedding(1,2)
 def spread_out(S, T, embedding):
     """ TODO: Alter the embedding to add qubit chains by moving qubit
         assignments onto qubit in tiles farther from the center of the device
@@ -62,6 +76,9 @@ def spread_out(S, T, embedding):
     """
     return embedding
 
+@nx_graph(0)
+@dnx_graph(1)
+@dnx_graph_embedding(1,2)
 def lp_chain_reduce(S, T, embedding):
     """ TODO: Use a linear programming formulation to resolve shorter chains
         from a given embedding.

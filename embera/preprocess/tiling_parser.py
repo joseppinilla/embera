@@ -1,10 +1,7 @@
-""" Architecture specific tilings for target graphs """
+import embera
+import numpy as np
 
 __all__ = ['DWaveNetworkXTiling']
-
-import dwave_networkx as dnx
-from dwave_networkx.generators.chimera import chimera_coordinates
-from dwave_networkx.generators.pegasus import pegasus_coordinates
 
 class DWaveNetworkXTiling:
     """ Generate tiling from architecture graph construction.
@@ -12,205 +9,102 @@ class DWaveNetworkXTiling:
         objects.
     """
     def __init__(self, Tg):
-        # Support for different target architectures
-        self.family = Tg.graph['family']
-        self.m = Tg.graph['rows']
-        self.t = Tg.graph['tile']
+        self.qubits = Tg.nodes
+        self.couplers = Tg.edges
+        # Coordinate converter
+        self.converter = embera.dwave_coordinates.from_graph_dict(Tg.graph)
+        # Graph attributes
         self.labels = Tg.graph['labels']
-        self.t_size = float(len(Tg))
-        # Mapping of source nodes to tile
-        self.mapping = {}
+        self.family = Tg.graph['family']
 
+        # Graph dimensions
+        m = Tg.graph["columns"]
+        n = Tg.graph["rows"]
+        t = Tg.graph["tile"]
         if self.family=='chimera':
-            self.n = Tg.graph['columns']
-            self.max_degree = 6
-            TileClass = ChimeraTile
-            self.converter = chimera_coordinates(self.m, self.n, self.t )
+            p = 1
+            self.shores = 2
         elif self.family=='pegasus':
-            self.n = Tg.graph['columns']*3
-            self.max_degree = 15
-            TileClass = PegasusTile
-            self.converter = pegasus_coordinates(self.m)
+            p = 3
+            self.shores = 2
         else:
             raise ValueError("Invalid family. {'chimera', 'pegasus'}")
-
         # Add Tile objects
-        self.tiles = {}
-        for j in range(self.n):
-            for i in range(self.m):
-                tile = (i,j)
-                self.tiles[tile] = TileClass(Tg, i, j, self.m, self.n)
+        self.t = t
+        self.shape = (p,m,n)
+        self.tiles = np.empty(self.shape, dtype=object)
+        for t in range(p):
+            for j in range(n):
+                for i in range(m):
+                    tile = (t,i,j)
+                    qubits = self.get_tile_qubits(tile)
+                    self.tiles[tile] = Tile(tile, self.shape, qubits)
 
-        # Dummy tile to represent boundaries
-        self.tiles[None] = DummyTile()
+    def get_tile_qubits(self, tile):
+        """ Finds the available qubits associated to tile (t,i,j) of the
+            Chimera or Pegasus Graph and returns the supply or qubits found.
 
-    def get_tile(self, qubit_label):
-        """ Given a qubit tuple, return the i and j values of the
-        corresponding tile.
-        """
-        if self.family=='chimera':
-            if self.labels=='coordinate':
-                (i,j,_,_) = qubit_label
-            elif self.labels=='int':
-                (i,j,_,_) = self.converter.tuple(qubit_label)
-
-        elif self.family=='pegasus':
-            if self.labels=='coordinate':
-                (u,w,k,z) = qubit_label
-            elif self.labels=='int':
-                (u,w,k,z) = self.converter.tuple(qubit_label)
-            if u ==0:
-                q = w
-                r = k//4
-                j = q*3+r
-                i = z+1 if j%3 else z
-            else:
-                i = w
-                r = (2-k//4)
-                q = z+1 if r==0 else z
-                j = q*3+r
-        return i,j
-
-class Tile:
-    """ Tile Class
-    """
-    def __init__(self, Tg, i, j, m, n):
-        self.m = m
-        self.n = n
-        self.t = Tg.graph['tile']
-        self.labels = Tg.graph['labels']
-        self.name = (i,j)
-        self.nodes = set()
-        index = i*self.n + j
-        self.index = index
-        self.neighbors = self._get_neighbors(i, j, index)
-
-    def _i2c(self, index, n):
-        """ Convert tile array index to coordinate
-        """
-        i, j = divmod(index,n)
-        return i, j
-
-    def _get_neighbors(self, i, j, index):
-        """ Calculate indices and names of negihbouring tiles to use recurrently
-            during migration and routing.
-            The vicinity parameter is later used to prune out the neighbors of
-            interest.
-            Uses cardinal notation north, south, west, east
-        """
-        m = self.m
-        n = self.n
-
-        north = self._i2c(index - n, n)   if (i > 0)      else   None
-        south = self._i2c(index + n, n)   if (i < m-1)    else   None
-        west =  self._i2c(index - 1, n)   if (j > 0)      else   None
-        east =  self._i2c(index + 1, n)   if (j < n-1)    else   None
-
-        nw = self._i2c(index - n - 1, n)  if (i > 0    and j > 0)    else None
-        ne = self._i2c(index - n + 1, n)  if (i > 0    and j < n-1)  else None
-        se = self._i2c(index + n + 1, n)  if (i < m-1  and j < n-1)  else None
-        sw = self._i2c(index + n - 1, n)  if (i < m-1  and j > 0)    else None
-
-        neighbors = [north, south, west, east, nw, ne, se, sw]
-
-        return neighbors
-
-class DummyTile:
-    """ Dummy Tile Class to use as boundaries
-    """
-    def __init__(self):
-        # Keyed in tile dictionary as None
-        self.name = None
-        # Treat as a fully occupied tile
-        self.supply = 0.0
-        self.concentration = 1.0
-        # Dummy empty sets
-        self.nodes = set()
-        self.qubits = set()
-
-class ChimeraTile(Tile):
-    """ Tile configuration for Chimera Architecture
-    """
-    def __init__(self, Tg, i, j, m, n):
-        Tile.__init__(self, Tg, i, j, m, n)
-        self.converter = chimera_coordinates(self.m, self.n, self.t )
-        self.supply = self._get_chimera_qubits(Tg, i, j)
-        self.concentration = 1.0 if not self.supply else 0.0
-
-    def _get_chimera_qubits(self, Tg, i, j):
-        """ Finds the available qubits associated to tile (i,j) of the Chimera
-            Graph and returns the supply or number of qubits found.
-
-            The notation (i, j, u, k) is called the chimera index:
+            The notation (i, j, u, k) is called the chimera coordinates index:
+                i : indexes the row of the Chimera tile from 0 to m inclusive
+                j : indexes the column of the Chimera tile from 0 to n inclusive
+                u : qubit orientation (0 = left-hand nodes, 1 = right-hand nodes)
+                k : indexes the qubit within either the left- or right-hand shore
+                    from 0 to t inclusive
+            The notation (u, w, k, z) is called the pegasus coordinates index:
+                u : qubit orientation (0 = vertical, 1 = horizontal)
+                w : orthogonal major offset
+                k : orthogonal minor offset
+                z : parallel offset
+            The notation (t, i, j, u, k) is called the nice coordinates index:
+                t : indexes the Chimera subgraph. Chimera t=0. Pegasus 0 <= t < 3
                 i : indexes the row of the Chimera tile from 0 to m inclusive
                 j : indexes the column of the Chimera tile from 0 to n inclusive
                 u : qubit orientation (0 = left-hand nodes, 1 = right-hand nodes)
                 k : indexes the qubit within either the left- or right-hand shore
                     from 0 to t inclusive
         """
-        t = self.t
-        self.qubits = set()
-        v = 0.0
-        for u in range(2):
-            for k in range(t):
-                chimera_index = (i, j, u, k)
-                if self.labels == 'coordinate':
-                    chimera_label = chimera_index
+        t,i,j = tile
+        qubits = set()
+        for u in range(self.shores):
+            for k in range(self.t):
+                nice_index = (t, i, j, u, k)
+                if self.labels == 'nice':
+                    label = nice_index
                 elif self.labels == 'int':
-                    chimera_label = self.converter.int(chimera_index)
+                    label = self.converter.nice_to_linear(nice_index)
+                elif self.labels == 'coordinate':
+                    label = self.converter.nice_to_coordinate(nice_index)
                 else:
-                    raise Exception("Invalid labeling. {'coordinate', 'int'}")
-                if chimera_label in Tg.nodes:
-                    self.qubits.add(chimera_label)
-                    v += 1.0
-        return v
+                    raise Exception("Label not in {'nice','int','coordinate'}")
 
-class PegasusTile(Tile):
-    """ Tile configuration for Pegasus Architecture
-    """
-    def __init__(self, Tg, i, j, m, n):
-        Tile.__init__(self, Tg, i, j, m, n)
-        self.converter = pegasus_coordinates(self.m)
-        self.supply = self._get_pegasus_qubits(Tg, i, j)
-        self.concentration = 1.0 if not self.supply else 0.0
+                if label in self.qubits:
+                    qubits.add(label)
 
-    def _get_pegasus_qubits(self, Tg, i, j):
-        """ Finds the avilable qubits associated to tile (i,j) of the Pegasus
-            Graph and returns the supply or number of qubits found.
+        return qubits
 
-            The notation (u, w, k, z) is called the pegasus index:
-                u : qubit orientation (0 = vertical, 1 = horizontal)
-                w : orthogonal major offset
-                k : orthogonal minor offset
-                z : parallel offset
-        """
-        v=0.0
-        self.qubits = set()
+class Tile:
+    """ Tile Class """
+    def __init__(self, index, shape, qubits):
+        t,i,j = index
+        m,n,p = shape
+        self.index = index
+        self.qubits = qubits
 
-        for u in range(2):
-            for k_j in range(4):
-                if u==0:
-                    k = (j%3)*4 + k_j
-                    w = j//3
-                    z = i if j%3==0 else i-1
-                    pegasus_index = (0, w, k, z)
-                else:
-                    k = (2-j%3)*4 + k_j
-                    w = i
-                    z = (j-1)//3
-                    pegasus_index = (1, w, k, z)
+    @property
+    def supply(self):
+        return self.qubits
 
-                if self.labels == 'coordinate':
-                    pegasus_label = pegasus_index
-                elif self.labels == 'int':
-                    pegasus_label = self.converter.int(pegasus_index)
-                    if self.converter.tuple(pegasus_label) != pegasus_index:
-                        continue
-                else:
-                    raise Exception("Invalid labeling. {'coordinate', 'int'}")
+    def links(self, tile, edge_list):
+        for q in self.qubits:
+            for p in tile.qubits:
+                if (q,p) in edge_list:
+                    yield (q,p)
 
-                if pegasus_label in Tg.nodes:
-                    self.qubits.add(pegasus_label)
-                    v += 1.0
+    def is_connected(self, tile, edge_list):
+        return any(self.links(tile,edge_list))
 
-        return v
+    def __repr__(self):
+        return str(self.qubits)
+
+    def __str__(self):
+        return str(self.name)

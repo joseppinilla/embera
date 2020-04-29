@@ -20,6 +20,9 @@ class SimulatedAnnealingPlacer(DWaveNetworkXTiling):
         for name in params:
             raise ValueError("%s is not a valid parameter." % name)
 
+        # Mapping of source nodes to tile
+        self.mapping = {}
+
     def _assign_candidates(self):
         """ Use tiling to create the sets of target nodes assigned
         to each source node.

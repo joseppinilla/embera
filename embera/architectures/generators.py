@@ -21,69 +21,11 @@
 import networkx as nx
 import dwave_networkx as dnx
 
-__all__ = ['dwave_coordinates','graph_from_solver','dwave_online',
+__all__ = ['graph_from_solver','dwave_online',
            'rainier_graph', 'vesuvius_graph', 'dw2x_graph', 'dw2000q_graph',
            'p6_graph', 'p16_graph',
            'h20k_graph',
            ]
-
-""" ============== Architecture agnostic coordinate converter ============== """
-
-class dwave_coordinates(object):
-    def __init__(self, graph, nice_coordinates=False):
-        try:
-            self.family = graph["family"]
-            self.m = graph["columns"]
-            self.n = graph["rows"]
-            self.t = graph["tile"]
-            self.labels = graph["labels"]
-        except:
-            raise ValueError("Target graph needs to have family, columns, \
-            rows, tile, and labels attributes.")
-
-        if self.family == 'chimera':
-            coordinates = dnx.chimera_coordinates(self.m, self.n, self.t)
-            self.linear_to_coordinate = coordinates.linear_to_chimera
-            self.coordinate_to_linear = coordinates.chimera_to_linear
-            self.iter_linear_to_coordinate = coordinates.iter_linear_to_chimera
-            self.iter_coordinate_to_linear = coordinates.iter_chimera_to_linear
-            self.iter_linear_to_coordinate_pairs = coordinates.iter_linear_to_chimera_pairs
-            self.iter_coordinate_to_linear_pairs = coordinates.iter_chimera_to_linear_pairs
-        elif self.family == 'pegasus':
-            self.coordinates = dnx.pegasus_coordinates(self.m)
-            if nice_coordinates:
-                self.linear_to_coordinate = coordinates.linear_to_pegasus
-                self.coordinate_to_linear = coordinates.pegasus_to_linear
-                self.iter_linear_to_coordinate = coordinates.iter_linear_to_nice
-                self.iter_coordinate_to_linear = coordinates.iter_nice_to_linear
-                self.iter_linear_to_coordinate_pairs = coordinates.iter_linear_to_nice_pairs
-                self.iter_coordinate_to_linear_pairs = coordinates.iter_nice_to_linear_pairs
-            else:
-                self.linear_to_coordinate = coordinates.linear_to_nice
-                self.coordinate_to_linear = coordinates.nice_to_linear
-                self.iter_linear_to_coordinate = coordinates.iter_linear_to_pegasus
-                self.iter_coordinate_to_linear = coordinates.iter_pegasus_to_linear
-                self.iter_linear_to_coordinate_pairs = coordinates.iter_linear_to_pegasus_pairs
-                self.iter_coordinate_to_linear_pairs = coordinates.iter_pegasus_to_linear_pairs
-        else:
-            raise ValueError('Graph family not supported')
-
-        if nice_coordinates:
-            self._shore_getter = lambda t, i, j, u, k: u
-            self._tile_getter = lambda t, i, j, u, k : (t, i, j)
-        else:
-            self._shore_getter = lambda i, j, u, k: u
-            self._tile_getter = lambda i, j, u, k: (i, j)
-
-    def get_shore(self, q):
-        if isinstance(q,int):
-            q = self.linear_to_coordinate(q)
-        return self._shore_getter(*q)
-
-    def get_tile(self, q):
-        if isinstance(q,int):
-            q = self.linear_to_coordinate(q)
-        return self._tile_getter(*q)
 
 """ ========================== D-Wave Solver Solutions ===================== """
 
