@@ -28,7 +28,6 @@ def sliding_window(S, T, embedding):
 
             embedding (dict/:obj:`embera.Embedding`):
 
-
         Returns:
             embedding:
     """
@@ -71,10 +70,25 @@ def spread_out(S, T, embedding):
         graph.
             1) Use Chimera/Pegasus index to determine tile of each node
             2) Transform the tile assignment to spread out the embedding
-            3) Assign nodes to corresponding qubit in new tiles (or equivalent)
+            3) Assign nodes to corresponding qubit in new tiles
             4) Perform an "embedding pass" or path search to reconnect all nodes
     """
+    T_tiling = DWaveNetworkXTiling(T)
+
+
+    origin = T_tiling.shape
+    end = (0,)*len(origin)
+    for v,chain in embedding.items():
+        for q in chain:
+            tile = T_tiling.get_tile(q)
+            if tile < origin:
+                origin = tile
+            if tile > end:
+                end = tile
+
     return embedding
+
+
 
 @nx_graph(0)
 @dnx_graph(1)

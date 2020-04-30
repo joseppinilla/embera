@@ -1,12 +1,33 @@
-""" ============== Architecture agnostic coordinate converter ============== """
-
 import dwave_networkx as dnx
 
 __all__ = ['dwave_coordinates']
 
 class dwave_coordinates:
-
-    def __init__(self):
+    """ Architecture agnostic coordinate converter
+            The notation (i, j, u, k) is called the chimera coordinates index:
+                i : indexes the row of the Chimera tile from 0 to m inclusive
+                j : indexes the column of the Chimera tile from 0 to n inclusive
+                u : qubit orientation (0 = left-hand nodes, 1 = right-hand nodes)
+                k : indexes the qubit within either the left- or right-hand shore
+                    from 0 to t inclusive
+            The notation (u, w, k, z) is called the pegasus coordinates index:
+                u : qubit orientation (0 = vertical, 1 = horizontal)
+                w : orthogonal major offset
+                k : orthogonal minor offset
+                z : parallel offset
+            The notation (t, i, j, u, k) is called the nice coordinates index:
+                t : indexes the Chimera subgraph. Chimera t=0. Pegasus 0 <= t < 3
+                i : indexes the row of the Chimera tile from 0 to m inclusive
+                j : indexes the column of the Chimera tile from 0 to n inclusive
+                u : qubit orientation (0 = left-hand nodes, 1 = right-hand nodes)
+                k : indexes the qubit within either the left- or right-hand shore
+                    from 0 to t inclusive
+            The notation `int` is called the linear index:
+                A single positive integer indexes the whole graph. Chimera and
+                Pegasus linear indices may coincide differ:
+                    i.e. linear_to_chimera(int) != linear_to_pegasus(int)
+    """
+    def __init__(self,*args,**kwargs):
         raise RuntimeError("Use classmethods {from_dwave_networkx, from_graph_dict}")
 
     @classmethod
@@ -126,6 +147,6 @@ class chimera_coordinates(dnx.chimera_coordinates, agnostic_coordinates):
 
 class pegasus_coordinates(dnx.pegasus_coordinates, agnostic_coordinates):
     """ Augmented chimera_coordinates class """
-    def __init__(self, m, n=None, t=None):
+    def __init__(self, m):
         agnostic_coordinates.__init__(self, 'pegasus')
         dnx.pegasus_coordinates.__init__(self, m)

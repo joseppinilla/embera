@@ -29,8 +29,18 @@ def nx_graph(*graph_index):
 
 """ =========================== D-Wave NetworkX ============================ """
 
-def dnx_graph(*graph_index,nice_coordinates=False):
-    """ Parse D-Wave NetworkX graph arguments and return with coordinates """
+def dnx_graph(*graph_index, nice_coordinates=False):
+    """ Parse D-Wave NetworkX graph arguments and return with coordinates
+        Args:
+            graph_index (iter):
+                One or more numbers representing where in the argument list of
+                the warpped function is the `dwave_networkx` graph.
+
+            nice_coordinates (bool):
+                Wether or not to return nice_coordinates. Only applies to
+                Pegasus architectures. Chimera coordinates are `nice`.
+    """
+
     def _parse_graph(G):
         labels = G.graph['labels']
         converter = dwave_coordinates.from_graph_dict(G.graph)
@@ -62,7 +72,6 @@ def dnx_graph(*graph_index,nice_coordinates=False):
             n = G.graph['columns']
             m = G.graph['rows']
             t = G.graph['tile']
-            if nice_coordinates: raise ValueError("Nice Chimera coordinates not supported")
             H = dnx.chimera_graph(m,n,t,node_list=node_list,edge_list=edge_list,
                                   coordinates=True)
         elif family=='pegasus':
@@ -72,12 +81,12 @@ def dnx_graph(*graph_index,nice_coordinates=False):
         return H
 
     @decorator
-    def _graph_argument(func, *args, **kwargs):
+    def _dnx_graph_argument(func, *args, **kwargs):
         new_args = list(args)
         for i in graph_index:
             new_args[i] =  _parse_graph(new_args[i])
         return func(*new_args, **kwargs)
-    return _graph_argument
+    return _dnx_graph_argument
 
 """ ===================== D-Wave NetworkX w/ Embedding ===================== """
 
