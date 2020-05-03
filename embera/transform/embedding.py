@@ -1,14 +1,12 @@
-import dwave
 import minorminer
+
+import numpy as np
 import networkx as nx
 import dwave_networkx as dnx
 
 from embera.utilities.decorators import nx_graph, dnx_graph, dnx_graph_embedding
 from embera.preprocess.tiling_parser import DWaveNetworkXTiling
 
-@nx_graph(0)
-@dnx_graph(1)
-@dnx_graph_embedding(1,2)
 def sliding_window(S, T, embedding):
     """ TODO: Using a sling window approach, transform the embedding from one region
         of the Chimera graph to another. This is useful when an embedding is
@@ -46,53 +44,164 @@ def sliding_window(S, T, embedding):
 
     return embedding
 
-@nx_graph(0)
-@dnx_graph(1)
-@dnx_graph_embedding(1,2)
-def rotate(S, T, embedding):
+def mirror(S, T, embedding, axis=0):
+    """ Flip the embedding on the same graph to re-distribute qubit
+        assignments. If a perfect fit isn't found, due to disabled qubits,
+        the invalid embedding is still returned.
+
+        Example:
+            %matplotlib
+            >>> import embera
+            >>> import matplotlib.pyplot as plt
+            >>> S = nx.complete_graph(11)
+            >>> T = dnx.chimera_graph(7)
+            >>> embedding = minorminer.find_embedding(S,T)
+            >>> dnx.draw_chimera_embedding(T,embedding,node_size=10)
+            >>> axis = 1
+            >>> new_embedding = embera.transform.embedding.rotate(S,T,embedding,axis)
+            >>> dnx.draw_chimera_embedding(T,new_embedding,node_size=10)
+    """
+    tiling = DWaveNetworkXTiling(T)
+    shape = np.array(tiling.shape)
+    # Initialize edges
+    origin = shape
+    end = (0,)*len(origin)
+    # Find edges
+    for v,chain in embedding.items():
+        for q in chain:
+            tile = np.array(tiling.get_tile(q))
+            origin = [min(t,o) for t,o in zip(tile,origin)]
+            end = [max(t,e) for t,e in zip(tile,end)]
+    # Define flips
+    m,n = tiling.shape
+    t = tiling.graph['tile']
+    if axis is 0:
+        new_tile = lambda i,j: (i,n-j-1)
+        new_k = lambda k,shore: k if shore else t-k-1
+    elif axis is 1:
+        new_tile = lambda i,j: (m-i-1,j)
+        new_k = lambda k,shore: t-k-1 if shore else k
+    else:
+        raise ValueError("Value of axis not supported")
+    # Rotate all qubits by chain
+    new_embedding = {}
+    for v,chain in embedding.items():
+        new_chain = []
+        for q in chain:
+            k = tiling.get_k(q)
+            tile = tiling.get_tile(q)
+            shore = tiling.get_shore(q)
+            new_coordinates = (new_tile(*tile),shore,new_k(k,shore))
+            new_chain.append(next(tiling.get_qubits(*new_coordinates)))
+        new_embedding[v] = new_chain
+
+    return new_embedding
+
+def rotate(S, T, embedding, theta=90):
     """ Rotate the embedding on the same graph to re-distribute qubit
         assignments. If a perfect fit isn't found, due to disabled qubits,
-        a minor-embedding heuristic is used in a "relaxed" way to find a valid
-        assignment.
+        the invalid embedding is still returned.
+
+        Example:
+            >>> import embera
+            >>> import matplotlib.pyplot as plt
+            >>> S = nx.complete_graph(11)
+            >>> T = dnx.chimera_graph(7)
+            >>> embedding = minorminer.find_embedding(S,T)
+            >>> dnx.draw_chimera_embedding(T,embedding,node_size=10)
+            >>> theta = 270
+            >>> new_embedding = embera.transform.embedding.rotate(S,T,embedding,theta)
+            >>> dnx.draw_chimera_embedding(T,new_embedding,node_size=10)
     """
-    for v, chain in embedding.items():
-        pass
+    tiling = DWaveNetworkXTiling(T)
+    shape = np.array(tiling.shape)
+    # Initialize edges
+    origin = shape
+    end = (0,)*len(origin)
+    # Find edges
+    for v,chain in embedding.items():
+        for q in chain:
+            tile = np.array(tiling.get_tile(q))
+            origin = [min(t,o) for t,o in zip(tile,origin)]
+            end = [max(t,e) for t,e in zip(tile,end)]
+    # Define rotations
+    m,n = tiling.shape
+    t = tiling.graph['tile']
+    if theta in [90,-270]:
+        new_tile = lambda i,j: (j, m-i-1)
+        new_shore = lambda shore: 0 if shore else 1
+        new_k = lambda k,shore: t-k-1 if shore else k
+    elif theta in [180,-180]:
+        new_tile = lambda i,j: (m-i-1,n-j-1)
+        new_shore = lambda shore: shore
+        new_k = lambda k,shore: t-k-1
+    elif theta in [-90,270]:
+        new_tile = lambda i,j: (n-j-1, i)
+        new_shore = lambda shore: 0 if shore else 1
+        new_k = lambda k,shore: k if shore else t-k-1
+    elif theta in [0,360]:
+        return embedding
+    else:
+        raise ValueError("Value of theta not supported")
+    # Rotate all qubits by chain
+    new_embedding = {}
+    for v,chain in embedding.items():
+        new_chain = []
+        for q in chain:
+            k = tiling.get_k(q)
+            tile = tiling.get_tile(q)
+            shore = tiling.get_shore(q)
+            new_coordinates = (new_tile(*tile),new_shore(shore),new_k(k,shore))
+            new_chain.append(next(tiling.get_qubits(*new_coordinates)))
+        new_embedding[v] = new_chain
 
+    return new_embedding
 
-    return embedding
-
-@nx_graph(0)
-@dnx_graph(1)
-@dnx_graph_embedding(1,2)
 def spread_out(S, T, embedding):
-    """ TODO: Alter the embedding to add qubit chains by moving qubit
+    """ Alter the embedding to add qubit chains by moving qubit
         assignments onto qubit in tiles farther from the center of the device
         graph.
             1) Use Chimera/Pegasus index to determine tile of each node
             2) Transform the tile assignment to spread out the embedding
             3) Assign nodes to corresponding qubit in new tiles
             4) Perform an "embedding pass" or path search to reconnect all nodes
+
+        Example:
+            >>> import embera
+            >>> S = nx.complete_graph(10)
+            >>> T = dnx.chimera_graph(8)
+            >>> embedding = minorminer.find_embedding(S,T)
+            >>> spread = embera.transform.embedding.spread_out(S,T,embedding)
+            >>> dnx.draw_chimera_embedding(T,embedding)
+            >>> dnx.draw_chimera_embedding(T,spread)
     """
-    T_tiling = DWaveNetworkXTiling(T)
-
-
-    origin = T_tiling.shape
+    tiling = DWaveNetworkXTiling(T)
+    shape = np.array(tiling.shape)
+    # Initialize edges
+    origin = shape
     end = (0,)*len(origin)
+    # Find edges
     for v,chain in embedding.items():
         for q in chain:
-            tile = T_tiling.get_tile(q)
-            if tile < origin:
-                origin = tile
-            if tile > end:
-                end = tile
+            tile = np.array(tiling.get_tile(q))
+            origin = [min(t,o) for t,o in zip(tile,origin)]
+            end = [max(t,e) for t,e in zip(tile,end)]
+    # Make sure it fits
+    if tuple((np.array(end)-np.array(origin))*2) > tiling.shape:
+        raise RuntimeError("Can't spread out")
+    # Spread out all qubits by chain
+    new_embedding = {}
+    for v,chain in embedding.items():
+        new_chain = []
+        for q in chain:
+            tile = np.array(tiling.get_tile(q))
+            new_tile = tuple((tile - np.array(origin))*2)
+            new_q = tiling.set_tile(q,new_tile)
+            new_chain.append([new_q])
+        new_embedding[v] = new_chain
 
-    return embedding
+    return new_embedding
 
-
-
-@nx_graph(0)
-@dnx_graph(1)
-@dnx_graph_embedding(1,2)
 def lp_chain_reduce(S, T, embedding):
     """ TODO: Use a linear programming formulation to resolve shorter chains
         from a given embedding.
@@ -101,3 +210,10 @@ def lp_chain_reduce(S, T, embedding):
             3) Resolve chains
     """
     return embedding
+
+def reconnect(S,T,embedding, return_overlap=False):
+    """ Perform a short run of minorminer to find a valid embedding """
+    miner_params = {'suspend_chains':embedding,
+                    'chainlength_patience':0,
+                    'return_overlap':return_overlap}
+    return minorminer.find_embedding(S,T,**miner_params)

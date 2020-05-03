@@ -94,7 +94,7 @@ def dnx_graph_embedding(dnx_graph_index, *embedding_index):
     """ Given one D-Wave NetworkX and at least one embedding
     """
     def _translate_labels(embedding, dnx_coords):
-        if all([isinstance(v,int) for chain in embedding.values() for q in chain]):
+        if all([isinstance(q,int) for chain in embedding.values() for q in chain]):
             return {v:dnx_coords.iter_linear_to_coordinate(chain)
                     for v,chain in embedding.items()}
         else:
@@ -104,9 +104,9 @@ def dnx_graph_embedding(dnx_graph_index, *embedding_index):
     def _embedding_argument(func, *args, **kwargs):
         new_args = list(args)
         dnx_graph = new_args[dnx_graph_index]
-        dnx_coords = dwave_coordinates(dnx_graph.graph,nice_coordinates=True)
+        dnx_coords = dwave_coordinates.from_dwave_networkx(dnx_graph)
         for i in embedding_index:
             new_args[i] =  _translate_labels(new_args[i], dnx_coords)
         embedding = func(*new_args, **kwargs)
-        return _translate_labels(embedding)
+        return _translate_labels(embedding,dnx_coords)
     return _embedding_argument

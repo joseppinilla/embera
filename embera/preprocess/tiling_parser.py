@@ -8,14 +8,14 @@ class DWaveNetworkXTiling:
     """
     def __init__(self, Tg):
         # Graph elements
+        self.graph = Tg.graph
         self.qubits = list(Tg.nodes)
         self.couplers = list(Tg.edges)
         # Graph dimensions
-        m = Tg.graph["columns"]
-        n = Tg.graph["rows"]
-        t = Tg.graph["tile"]
+        m = self.graph["columns"]
+        n = self.graph["rows"]
         # Graph type
-        family = Tg.graph['family']
+        family = self.graph['family']
         if family=='chimera':
             self.shape = (m,n)
         elif family=='pegasus':
@@ -24,15 +24,17 @@ class DWaveNetworkXTiling:
             raise ValueError("Invalid family. {'chimera', 'pegasus'}")
         # Graph cooordinates
         dim = len(self.shape)
-        labels = Tg.graph['labels']
+        labels = self.graph['labels']
+        converter = embera.dwave_coordinates.from_graph_dict(self.graph)
         if labels is 'int':
-            converter = embera.dwave_coordinates.from_graph_dict(Tg.graph)
-            self._get_tile = lambda q: converter.linear_to_nice(q)[3-dim:3]
+            self.to_nice = converter.linear_to_nice
+            self.from_nice = converter.nice_to_linear
         elif labels is 'coordinate':
-            converter = embera.dwave_coordinates.from_graph_dict(Tg.graph)
-            self._get_tile = lambda q: converter.coordinate_to_nice(q)[3-dim:3]
+            self.to_nice = converter.coordinate_to_nice
+            self.from_nice = converter.nice_to_coordinate
         elif labels is 'nice':
-            self._get_tile = lambda q: q[3-dim:3]
+            self.to_nice = lambda n: n
+            self.from_nice = lambda n: n
         # Add Tile objects
         self.tiles = {}
         for q in self.qubits:
@@ -54,10 +56,40 @@ class DWaveNetworkXTiling:
     def items(self):
         return self.tiles.items()
 
-    def get_tile(self, q):
-        return self._get_tile(q)
+    def get_tile(self, x):
+        t,i,j,u,k = self.to_nice(x)
+        return (t,i,j)[-len(self.shape):]
 
-    def get_tile_neighbors(self,tile):
+    def set_tile(self, x, tile):
+        _,_,_,u,k = self.to_nice(x)
+        return self.from_nice((0,)*(3-len(tile)) + tile + (u,k))
+
+    def get_shore(self, x):
+        _,_,_,u,_ = self.to_nice(x)
+        return u
+
+    def set_shore(self, x, u):
+        t,i,j,_,k = self.to_nice(x)
+        return self.from_nice((t,i,j,u,k))
+
+    def get_k(self, x):
+        _,_,_,_,k = self.to_nice(x)
+        return k
+
+    def set_k(self, x, k):
+        t,i,j,u,_ = self.to_nice(x)
+        return self.from_nice((t,i,j,u,k))
+
+    def get_qubits(self, tile, shore=None, k=None):
+        shores = (0,1) if shore is None else (shore,)
+        indices = range(self.graph['tile']) if k is None else (k,)
+        nice_tile = (0,)+tile if len(tile)==2 else tile
+        for u in shores:
+            for k in indices:
+                n = nice_tile + (u,) + (k,)
+                yield self.from_nice(n)
+
+    def get_tile_neighbors(self, tile):
         neighbors = set()
         for i, d in enumerate(tile):
             neg = tile[0:i] + (d-1,) + tile[i+1:]

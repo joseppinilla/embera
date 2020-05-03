@@ -105,7 +105,7 @@ class agnostic_coordinates:
         method = getattr(self, f'iter_nice_to_{self.family}_pairs')
         return method(nlist)
 
-class chimera_coordinates(dnx.chimera_coordinates, agnostic_coordinates):
+class chimera_coordinates(agnostic_coordinates, dnx.chimera_coordinates):
     """ Augmented chimera_coordinates class """
     def __init__(self, m, n=None, t=None):
         agnostic_coordinates.__init__(self, 'chimera')
@@ -145,7 +145,7 @@ class chimera_coordinates(dnx.chimera_coordinates, agnostic_coordinates):
             t,i,j,u,k = n
             yield (i,j,u,k)
 
-class pegasus_coordinates(dnx.pegasus_coordinates, agnostic_coordinates):
+class pegasus_coordinates(agnostic_coordinates, dnx.pegasus_coordinates):
     """ Augmented chimera_coordinates class """
     def __init__(self, m):
         agnostic_coordinates.__init__(self, 'pegasus')
