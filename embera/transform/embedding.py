@@ -7,42 +7,49 @@ import dwave_networkx as dnx
 from embera.utilities.decorators import nx_graph, dnx_graph, dnx_graph_embedding
 from embera.preprocess.tiling_parser import DWaveNetworkXTiling
 
-def sliding_window(S, T, embedding):
-    """ TODO: Using a sling window approach, transform the embedding from one region
-        of the Chimera graph to another. This is useful when an embedding is
-        done for a D-Wave machine and it's necessary to find an identical
-        embedding on another D-Wave machine with different yield.
+def translate(S, T, embedding, origin=(0,0)):
+    """ Transport the embedding on the same graph to re-distribute qubit
+        assignments.
 
-        Algorithm:
-            1) Parse embedding and target graph to find margins.
-            2) Move qubit to window i and check if nodes are available
-            3) If all nodes are available, go to 4, else go to 3
-            4) Check if edges are available, if not, return to 2.
+        Example:
 
-        Args:
-            S (:obj:`networkx.Graph`):
-
-            T (:obj:`networkx.Graph`):
-
-            embedding (dict/:obj:`embera.Embedding`):
-
-        Returns:
-            embedding:
+            >>> import embera
+            >>> import matplotlib.pyplot as plt
+            >>> S = nx.complete_graph(11)
+            >>> T = dnx.chimera_graph(7)
+            >>> embedding = minorminer.find_embedding(S,T)
+            >>> dnx.draw_chimera_embedding(T,embedding,node_size=10)
+            >>> offset = (2,3)
+            >>> new_embedding = embera.transform.embedding.translate(S,T,embedding,offset)
+            >>> dnx.draw_chimera_embedding(T,new_embedding,node_size=10)
     """
 
-    T_tiling = DWaveNetworkXTiling(T)
-
-    width = 0
-    height = 0
-    x_offset = 0
-    y_offset = 0
+    tiling = DWaveNetworkXTiling(T)
+    shape = tiling.shape
+    # Initialize offset
+    offset = shape
+    # Find margins
     for v,chain in embedding.items():
         for q in chain:
-            (t,i,j) = T_tiling.get_tile(q)
+            tile = np.array(tiling.get_tile(q))
+            offset = [min(t,o) for t,o in zip(tile,offset)]
+    # Define flips
+    m,n = tiling.shape
+    t = tiling.graph['tile']
+    new_embedding = {}
+    for v,chain in embedding.items():
+        new_chain = []
+        for q in chain:
+            k = tiling.get_k(q)
+            tile = tiling.get_tile(q)
+            shore = tiling.get_shore(q)
+            new_tile = tuple(np.array(tile) - np.array(offset) + np.array(origin))
+            new_q = tiling.set_tile(q,new_tile)
+            new_chain.append(new_q)
+        new_embedding[v] = new_chain
 
+    return new_embedding
 
-
-    return embedding
 
 def mirror(S, T, embedding, axis=0):
     """ Flip the embedding on the same graph to re-distribute qubit
@@ -50,7 +57,6 @@ def mirror(S, T, embedding, axis=0):
         the invalid embedding is still returned.
 
         Example:
-            %matplotlib
             >>> import embera
             >>> import matplotlib.pyplot as plt
             >>> S = nx.complete_graph(11)
@@ -58,20 +64,11 @@ def mirror(S, T, embedding, axis=0):
             >>> embedding = minorminer.find_embedding(S,T)
             >>> dnx.draw_chimera_embedding(T,embedding,node_size=10)
             >>> axis = 1
-            >>> new_embedding = embera.transform.embedding.rotate(S,T,embedding,axis)
+            >>> new_embedding = embera.transform.embedding.mirror(S,T,embedding,axis)
             >>> dnx.draw_chimera_embedding(T,new_embedding,node_size=10)
     """
     tiling = DWaveNetworkXTiling(T)
     shape = np.array(tiling.shape)
-    # Initialize edges
-    origin = shape
-    end = (0,)*len(origin)
-    # Find edges
-    for v,chain in embedding.items():
-        for q in chain:
-            tile = np.array(tiling.get_tile(q))
-            origin = [min(t,o) for t,o in zip(tile,origin)]
-            end = [max(t,e) for t,e in zip(tile,end)]
     # Define flips
     m,n = tiling.shape
     t = tiling.graph['tile']
@@ -115,15 +112,6 @@ def rotate(S, T, embedding, theta=90):
     """
     tiling = DWaveNetworkXTiling(T)
     shape = np.array(tiling.shape)
-    # Initialize edges
-    origin = shape
-    end = (0,)*len(origin)
-    # Find edges
-    for v,chain in embedding.items():
-        for q in chain:
-            tile = np.array(tiling.get_tile(q))
-            origin = [min(t,o) for t,o in zip(tile,origin)]
-            end = [max(t,e) for t,e in zip(tile,end)]
     # Define rotations
     m,n = tiling.shape
     t = tiling.graph['tile']
@@ -171,9 +159,9 @@ def spread_out(S, T, embedding):
             >>> S = nx.complete_graph(10)
             >>> T = dnx.chimera_graph(8)
             >>> embedding = minorminer.find_embedding(S,T)
-            >>> spread = embera.transform.embedding.spread_out(S,T,embedding)
             >>> dnx.draw_chimera_embedding(T,embedding)
-            >>> dnx.draw_chimera_embedding(T,spread)
+            >>> new_embedding = embera.transform.embedding.spread_out(S,T,embedding)
+            >>> dnx.draw_chimera_embedding(T,new_embedding,node_size=10)
     """
     tiling = DWaveNetworkXTiling(T)
     shape = np.array(tiling.shape)
@@ -197,7 +185,54 @@ def spread_out(S, T, embedding):
             tile = np.array(tiling.get_tile(q))
             new_tile = tuple((tile - np.array(origin))*2)
             new_q = tiling.set_tile(q,new_tile)
-            new_chain.append([new_q])
+            new_chain.append(new_q)
+        new_embedding[v] = new_chain
+
+    return new_embedding
+
+def open_seam(S, T, embedding, seam, direction=None):
+    """
+        Args:
+            seam
+            direction (str:{'left','right','up','down'})
+
+        Example:
+            >>> import embera
+            >>> S = nx.complete_graph(10)
+            >>> T = dnx.chimera_graph(8)
+            >>> embedding = minorminer.find_embedding(S,T,random_seed=10)
+            >>> dnx.draw_chimera_embedding(T,embedding,node_size=10)
+            >>> seam = 2
+            >>> direction = 'right'
+            >>> new_embedding = embera.transform.embedding.open_seam(S,T,embedding,seam,direction)
+            >>> dnx.draw_chimera_embedding(T,new_embedding,node_size=10)
+
+    """
+    tiling = DWaveNetworkXTiling(T)
+
+    if direction is 'left':
+        shift = lambda tile: tile[1]<=seam
+        offset = np.array([0,-1])
+    elif direction is 'right':
+        shift = lambda tile: tile[1]>=seam
+        offset = np.array([0,+1])
+    elif direction is 'up':
+        shift = lambda tile: tile[0]<=seam
+        offset = np.array([-1,0])
+    elif direction is 'down':
+        shift = lambda tile: tile[0]>=seam
+        offset = np.array([+1,0])
+    else:
+        raise ValueError("Direction not in {'left','right','up','down'}")
+
+    new_embedding = {}
+    for v,chain in embedding.items():
+        new_chain = []
+        for q in chain:
+            tile = np.array(tiling.get_tile(q))
+            new_tile = tuple(tile + offset) if shift(tile) else tuple(tile)
+            new_q = tiling.set_tile(q,new_tile)
+            new_chain.append(new_q)
         new_embedding[v] = new_chain
 
     return new_embedding
@@ -211,9 +246,41 @@ def lp_chain_reduce(S, T, embedding):
     """
     return embedding
 
-def reconnect(S,T,embedding, return_overlap=False):
+def greedy_fit(S, T, embedding):
+    """ Using a sling window approach, transform the embedding from one region
+        of the Chimera graph to another. This is useful when an embedding is
+        done for a D-Wave machine and it's necessary to find an identical
+        embedding on another D-Wave machine with different yield.
+
+        Algorithm:
+            1) Parse embedding and target graph to find margins.
+            2) Move qubit to window i and check if nodes are available
+            3) If all nodes are available, go to 4, else go to 3
+            4) Check if edges are available, if not, return to 2.
+    """
+    tiling = DWaveNetworkXTiling(T)
+    shape = np.array(tiling.shape)
+    # Initialize edges
+    origin = shape
+    end = (0,)*len(origin)
+    # Find edges
+    for v,chain in embedding.items():
+        for q in chain:
+            tile = np.array(tiling.get_tile(q))
+            origin = [min(t,o) for t,o in zip(tile,origin)]
+            end = [max(t,e) for t,e in zip(tile,end)]
+    # Define flips
+    m,n = tiling.shape
+    t = tiling.graph['tile']
+    #
+
+
+def reconnect(S, T, embedding, return_overlap=False):
     """ Perform a short run of minorminer to find a valid embedding """
-    miner_params = {'suspend_chains':embedding,
+    # Assign current embedding to suspend_chains to preserve the layout
+    suspend_chains = {k:[[q] for q in chain] for k,chain in embedding.items()}
+    # Run minorminer as a short run without chainlength optimization
+    miner_params = {'suspend_chains':suspend_chains,
                     'chainlength_patience':0,
                     'return_overlap':return_overlap}
     return minorminer.find_embedding(S,T,**miner_params)
