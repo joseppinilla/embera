@@ -12,7 +12,6 @@ def translate(S, T, embedding, origin=(0,0)):
         assignments.
 
         Example:
-
             >>> import embera
             >>> import matplotlib.pyplot as plt
             >>> S = nx.complete_graph(11)
@@ -23,7 +22,6 @@ def translate(S, T, embedding, origin=(0,0)):
             >>> new_embedding = embera.transform.embedding.translate(S,T,embedding,offset)
             >>> dnx.draw_chimera_embedding(T,new_embedding,node_size=10)
     """
-
     tiling = DWaveNetworkXTiling(T)
     shape = tiling.shape
     # Initialize offset
@@ -80,7 +78,7 @@ def mirror(S, T, embedding, axis=0):
         new_k = lambda k,shore: t-k-1 if shore else k
     else:
         raise ValueError("Value of axis not supported")
-    # Rotate all qubits by chain
+    # Mirror all qubits by chain
     new_embedding = {}
     for v,chain in embedding.items():
         new_chain = []
@@ -246,7 +244,7 @@ def lp_chain_reduce(S, T, embedding):
     """
     return embedding
 
-def greedy_fit(S, T, embedding):
+def iter_sliding_window(S, T, embedding):
     """ Using a sling window approach, transform the embedding from one region
         of the Chimera graph to another. This is useful when an embedding is
         done for a D-Wave machine and it's necessary to find an identical
@@ -257,6 +255,18 @@ def greedy_fit(S, T, embedding):
             2) Move qubit to window i and check if nodes are available
             3) If all nodes are available, go to 4, else go to 3
             4) Check if edges are available, if not, return to 2.
+
+        Example:
+            >>> import embera
+            >>> import matplotlib.pyplot as plt
+            >>> S = nx.complete_graph(11)
+            >>> T = dnx.chimera_graph(7)
+            >>> embedding = minorminer.find_embedding(S,T)
+            >>> dnx.draw_chimera_embedding(T,embedding,node_size=10)
+            >>> slide = embera.transform.embedding.sliding_window(S,T,embedding)
+            >>> for new_embedding in slide:
+            ...     dnx.draw_chimera_embedding(T,new_embedding,node_size=10)
+            ...     plt.pause(0.2)
     """
     tiling = DWaveNetworkXTiling(T)
     shape = np.array(tiling.shape)
@@ -269,11 +279,65 @@ def greedy_fit(S, T, embedding):
             tile = np.array(tiling.get_tile(q))
             origin = [min(t,o) for t,o in zip(tile,origin)]
             end = [max(t,e) for t,e in zip(tile,end)]
-    # Define flips
-    m,n = tiling.shape
-    t = tiling.graph['tile']
-    #
 
+    # Move tiles to origin and translate to try and find valid embedding
+    size = np.array(end) - np.array(origin)
+    interactions = lambda u,v,E:((s,t) for s in E[u] for t in E[v])
+    is_connected = lambda edges: any(T.has_edge(s,t) for s,t in edges)
+    for x in range(shape[1]-size[1]):
+        for y in range(shape[0]-size[0]):
+            slide = {}
+            offset = np.array([x,y])
+            # Translate all qubits
+            for v,chain in embedding.items():
+                new_chain = []
+                for q in chain:
+                    tile = np.array(tiling.get_tile(q))
+                    new_tile = tuple(tile - np.array(origin) + offset)
+                    new_q = tiling.set_tile(q,new_tile)
+                    new_chain.append(new_q)
+                slide[v] = new_chain
+            yield slide
+
+def greedy_fit(S, T, embedding):
+    """ Using a sling window approach, transform the embedding from one region
+        of the Chimera graph to another. This is useful when an embedding is
+        done for a D-Wave machine and it's necessary to find an identical
+        embedding on another D-Wave machine with different yield.
+
+        Algorithm:
+            1) Parse embedding and target graph to find margins.
+            2) Move qubit to window i and check if nodes are available
+            3) If all nodes are available, go to 4, else go to 3
+            4) Check if edges are available, if not, return to 2.
+
+        Example:
+            >>> import embera
+            >>> import matplotlib.pyplot as plt
+            >>> S = nx.complete_graph(11)
+            >>> T = dnx.chimera_graph(7)
+            >>> embedding = minorminer.find_embedding(S,T)
+            >>> dnx.draw_chimera_embedding(T,embedding,node_size=10)
+            >>> new_embedding = embera.transform.embedding.greedy_fit(S,T,embedding)
+            >>> dnx.draw_chimera_embedding(T,new_embedding,node_size=10)
+    """
+    interactions = lambda u,v,E:((s,t) for s in E[u] for t in E[v])
+    is_connected = lambda edges: any(T.has_edge(s,t) for s,t in edges)
+    for emb in iter_sliding_window(S,T,embedding):
+        if all(is_connected(interactions(u,v,emb)) for u,v in S.edges):
+            return emb
+        mir = mirror(S,T,emb)
+        if all(is_connected(interactions(u,v,mir)) for u,v in S.edges):
+            return mir
+        e90 = rotate(S,T,emb,90)
+        if all(is_connected(interactions(u,v,mir)) for u,v in S.edges):
+            return e90
+        e180 = rotate(S,T,emb,180)
+        if all(is_connected(interactions(u,v,mir)) for u,v in S.edges):
+            return e180
+        e270 = rotate(S,T,emb,270)
+        if all(is_connected(interactions(u,v,mir)) for u,v in S.edges):
+            return e270
 
 def reconnect(S, T, embedding, return_overlap=False):
     """ Perform a short run of minorminer to find a valid embedding """

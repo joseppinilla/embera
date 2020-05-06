@@ -39,6 +39,12 @@ class TestTransformEmbedding(unittest.TestCase):
         embedding_0 = embera.transform.embedding.mirror(S,T,embedding,0)
         embedding_1 = embera.transform.embedding.mirror(S,T,embedding,1)
 
+    def test_greedy_fit(self):
+        S = self.S
+        T = self.T
+        embedding = self.embedding
+        new_embedding = embera.transform.embedding.greedy_fit(S,T,embedding)
+
     def test_open_seam(self):
         S = self.S
         T = self.T

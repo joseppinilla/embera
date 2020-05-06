@@ -34,8 +34,8 @@ class dwave_coordinates:
     def from_graph_dict(cls, graph):
         try:
             family = graph["family"]
-            m = graph["columns"]
-            n = graph["rows"]
+            m = graph["rows"]
+            n = graph["columns"]
             t = graph["tile"]
         except:
             raise ValueError("Target graph needs to have family, columns, rows,\

@@ -12,8 +12,8 @@ class DWaveNetworkXTiling:
         self.qubits = list(Tg.nodes)
         self.couplers = list(Tg.edges)
         # Graph dimensions
-        m = self.graph["columns"]
-        n = self.graph["rows"]
+        m = self.graph["rows"]
+        n = self.graph["columns"]
         # Graph type
         family = self.graph['family']
         if family=='chimera':
