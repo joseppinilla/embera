@@ -1,10 +1,9 @@
 import os
+import json
 import dimod
 import embera
 import tarfile
 import requests
-
-import networkx as nx
 
 def init_bm(G, RNG_SEED=None):
     embera.random.seed(RNG_SEED)
@@ -40,17 +39,18 @@ def csp(G, RNG_SEED=None):
 
     return dimod.BinaryQuadraticModel.from_ising(h,J)
 
-def marshall_bench():
-    """" Toy problems and frustrated Ising problems with planted solutions used
-         by Marshall et al. in [1]. Linear biases are set to 0, and planted
+def frust_loops_bench():
+    """" Frustrated Ising problems with planted solutions used by Marshall et
+         al. in [1]. Linear biases are set to 0, and planted
          solutions are created using [2].
 
-                | names         | nodes  | edges  | chimera  | E0        |
-                | ------------- |:------:| ------:|---------:|----------:|
-                | I_12_<0-10>   | 12     | 21     | 1x2      | Tractable |
-                | I_501_0       | 501    | 1231   | 8x8      | -2708.0   |
-                | I_501_1       | 501    | 1306   | 8x8      | -3764.0   |
-                | I_783         | 783    | 2080   | 10x10    | -3146.0   |
+        Each benchmark is a dimod.BinaryQuadraticModel with added information:
+            'E0' : <float>
+                Ground State if known
+            'energy' : list
+                Sorted list of known energies
+            'degeneracy' : list
+                Sorted list of known degeneracies
 
          [1] Marshall, J., Venturelli, D., Hen, I., & Rieffel, E. G. (2019).
          Power of Pausing: Advancing Understanding of Thermalization in
@@ -62,12 +62,12 @@ def marshall_bench():
          Physics, 92(4). https://doi.org/10.1103/PhysRevA.92.042325
     """
     benchmark_set = []
-    path = "./marshall.tar.gz"
-    url = "http://www.ece.ubc.ca/~jpinilla/resources/embera/marshall/marshall.tar.gz"
+    path = "./frust_loops.tar.gz"
+    url = "http://www.ece.ubc.ca/~jpinilla/resources/embera/frust_loops/frust_loops.tar.gz"
 
     # Download
     if not os.path.isfile(path):
-        print(f"-> Downloading Marshall benchmarks to {path}")
+        print(f"-> Downloading Frustrated Loops benchmarks to {path}")
         with open(path, 'wb') as f:
             response = requests.get(url)
             f.write(response.content)
@@ -75,11 +75,8 @@ def marshall_bench():
     with tarfile.open(path) as contents:
         for member in contents.getmembers():
             f = contents.extractfile(member)
-            G = nx.read_gpickle(f)
-
-            bqm = dimod.BinaryQuadraticModel.from_networkx_graph(G,'SPIN')
-            bqm.info.update(G.graph)
-
+            bqm_ser = json.load(f)
+            bqm = dimod.BinaryQuadraticModel.from_serializable(bqm_ser)
             benchmark_set.append(bqm)
 
     return benchmark_set

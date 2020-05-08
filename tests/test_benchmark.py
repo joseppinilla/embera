@@ -13,8 +13,8 @@ class TestParameters(unittest.TestCase):
         trained_bm_bqm = embera.benchmark.parameters.trained_bm(G)
         self.assertIsInstance(trained_bm_bqm,dimod.BinaryQuadraticModel)
 
-    def test_marshall(self):
-        bqm_list = embera.benchmark.parameters.marshall_bench()
+    def test_frust_loops(self):
+        bqm_list = embera.benchmark.parameters.frust_loops_bench()
         for bqm in bqm_list:
             self.assertIsInstance(bqm,dimod.BinaryQuadraticModel)
 
