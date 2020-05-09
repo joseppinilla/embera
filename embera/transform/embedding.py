@@ -7,6 +7,9 @@ import dwave_networkx as dnx
 from embera.utilities.decorators import nx_graph, dnx_graph, dnx_graph_embedding
 from embera.preprocess.tiling_parser import DWaveNetworkXTiling
 
+__all__ = ['translate','mirror','rotate','spread_out','open_seam',
+           'iter_sliding_window', 'greedy_fit','reconnect']
+
 def translate(S, T, embedding, origin=(0,0)):
     """ Transport the embedding on the same graph to re-distribute qubit
         assignments.
@@ -143,7 +146,7 @@ def rotate(S, T, embedding, theta=90):
 
     return new_embedding
 
-def spread_out(S, T, embedding):
+def spread_out(S, T, embedding, axis='both'):
     """ Alter the embedding to add qubit chains by moving qubit
         assignments onto qubit in tiles farther from the center of the device
         graph.
@@ -152,14 +155,20 @@ def spread_out(S, T, embedding):
             3) Assign nodes to corresponding qubit in new tiles
             4) Perform an "embedding pass" or path search to reconnect all nodes
 
+        Arguments:
+            axis: {'both',0, 1}
+
         Example:
             >>> import embera
-            >>> S = nx.complete_graph(10)
+            >>> S = nx.complete_graph(17)
             >>> T = dnx.chimera_graph(8)
             >>> embedding = minorminer.find_embedding(S,T)
-            >>> dnx.draw_chimera_embedding(T,embedding)
+            >>> dnx.draw_chimera_embedding(T,embedding, node_size=10)
+            >>> axis = 1
             >>> new_embedding = embera.transform.embedding.spread_out(S,T,embedding)
             >>> dnx.draw_chimera_embedding(T,new_embedding,node_size=10)
+            emb = embera.transform.embedding.reconnect(S,T,new_embedding)
+                >>> dnx.draw_chimera_embedding(T,emb,node_size=10)
     """
     tiling = DWaveNetworkXTiling(T)
     shape = np.array(tiling.shape)
@@ -177,11 +186,18 @@ def spread_out(S, T, embedding):
         raise RuntimeError("Can't spread out")
     # Spread out all qubits by chain
     new_embedding = {}
+    if axis == 'both':
+        shift = lambda tile,origin: (tile-origin)*2
+    elif axis == 0:
+        shift = lambda tile,origin: (tile-origin)*[1,2]+np.flip((tile-origin)%[2,1])
+    elif axis == 1:
+        shift = lambda tile,origin: (tile-origin)*[2,1]+np.flip((tile-origin)%[1,2])
+
     for v,chain in embedding.items():
         new_chain = []
         for q in chain:
             tile = np.array(tiling.get_tile(q))
-            new_tile = tuple((tile - np.array(origin))*2)
+            new_tile = tuple(shift(tile,origin))
             new_q = tiling.set_tile(q,new_tile)
             new_chain.append(new_q)
         new_embedding[v] = new_chain
@@ -338,13 +354,16 @@ def greedy_fit(S, T, embedding):
         e270 = rotate(S,T,emb,270)
         if all(is_connected(interactions(u,v,mir)) for u,v in S.edges):
             return e270
+    return {}
 
 def reconnect(S, T, embedding, return_overlap=False):
     """ Perform a short run of minorminer to find a valid embedding """
     # Assign current embedding to suspend_chains to preserve the layout
-    suspend_chains = {k:[[q] for q in chain] for k,chain in embedding.items()}
+    suspend_chains = {k:[[q] for q in chain if q in T] for k,chain in embedding.items()}
     # Run minorminer as a short run without chainlength optimization
     miner_params = {'suspend_chains':suspend_chains,
                     'chainlength_patience':0,
                     'return_overlap':return_overlap}
     return minorminer.find_embedding(S,T,**miner_params)
+
+np.array([1,3])%[1,2]
