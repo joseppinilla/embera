@@ -167,8 +167,6 @@ def spread_out(S, T, embedding, axis='both'):
             >>> axis = 1
             >>> new_embedding = embera.transform.embedding.spread_out(S,T,embedding)
             >>> dnx.draw_chimera_embedding(T,new_embedding,node_size=10)
-            emb = embera.transform.embedding.reconnect(S,T,new_embedding)
-                >>> dnx.draw_chimera_embedding(T,emb,node_size=10)
     """
     tiling = DWaveNetworkXTiling(T)
     shape = np.array(tiling.shape)
@@ -189,9 +187,9 @@ def spread_out(S, T, embedding, axis='both'):
     if axis == 'both':
         shift = lambda tile,origin: (tile-origin)*2
     elif axis == 0:
-        shift = lambda tile,origin: (tile-origin)*[1,2]+np.flip((tile-origin)%[2,1])
+        shift = lambda tile,origin: (tile-origin)*2+np.flip((tile-origin)%[2,1])
     elif axis == 1:
-        shift = lambda tile,origin: (tile-origin)*[2,1]+np.flip((tile-origin)%[1,2])
+        shift = lambda tile,origin: (tile-origin)*2+np.flip((tile-origin)%[1,2])
 
     for v,chain in embedding.items():
         new_chain = []
@@ -362,8 +360,5 @@ def reconnect(S, T, embedding, return_overlap=False):
     suspend_chains = {k:[[q] for q in chain if q in T] for k,chain in embedding.items()}
     # Run minorminer as a short run without chainlength optimization
     miner_params = {'suspend_chains':suspend_chains,
-                    'chainlength_patience':0,
                     'return_overlap':return_overlap}
     return minorminer.find_embedding(S,T,**miner_params)
-
-np.array([1,3])%[1,2]
