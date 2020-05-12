@@ -3,8 +3,8 @@ import json
 import time
 import dimod
 import numpy
-
 import pandas as pd
+import networkx as nx
 
 from json import load as _load
 from json import dump as _dump
@@ -16,7 +16,6 @@ from dimod.serialization.json import DimodEncoder, DimodDecoder
 
 from dwave.embedding import unembed_sampleset
 
-import networkx as nx
 from networkx.readwrite.json_graph import node_link_data as _serialize_graph
 from networkx.readwrite.json_graph import node_link_graph as _deserialize_graph
 
@@ -24,11 +23,14 @@ __all__ = ["EmberaDataBase"]
 
 
 class EmberaDataBase:
-    """ DataBase class to store bqms, embeddings, and samplesets. """
+    """ DataBase class to store bqms, embeddings, samplesets, and reports """
     path = None
     aliases = {}
 
     def __init__(self, path="./EmberaDB/"):
+        # WIP
+        import warnings
+        warnings.warn("EmberaDataBase is a Work In Progress. All file formats and indexing is subject to change.")
 
         self.path = path
         if not os.path.isdir(self.path):
@@ -91,6 +93,7 @@ class EmberaDataBase:
         self.aliases['embedding'] = embedding_aliases
         self.update_aliases()
 
+    """ ############################### Hashing ############################ """
     def id_bqm(self, bqm):
         if isinstance(bqm,dimod.BinaryQuadraticModel):
             lin_key = bqm.linear.values()
