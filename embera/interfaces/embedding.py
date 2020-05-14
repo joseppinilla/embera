@@ -200,9 +200,9 @@ class Embedding(dict):
     def __hash__(self):
         return hash(self.to_serializable())
     def __eq__(self, other):
-        return self.__key() == other.__key()
+        return self.to_serializable() == other.to_serializable()
     def __ne__(self, other):
-        return self.__key() != other.__key()
+        return self.to_serializable() != other.to_serializable()
     def __lt__(self, other):
         return self.quality_key < other.quality_key
     def __le__(self, other):

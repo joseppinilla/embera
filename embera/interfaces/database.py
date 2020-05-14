@@ -11,6 +11,7 @@ from hashlib import md5
 from json import load as _load
 from json import dump as _dump
 
+from embera.interfaces.graph import Graph
 from embera.interfaces.embedding import Embedding
 from embera.interfaces.json import EmberaEncoder, EmberaDecoder
 
@@ -23,7 +24,6 @@ from networkx.readwrite.json_graph import node_link_data as _serialize_graph
 from networkx.readwrite.json_graph import node_link_graph as _deserialize_graph
 
 __all__ = ["EmberaDataBase"]
-
 
 class EmberaDataBase:
     """ DataBase class to store bqms, embeddings, samplesets, and reports """
@@ -62,9 +62,6 @@ class EmberaDataBase:
 
         self.hash = lambda ser: hash_method(ser).hexdigest()
 
-    def timestamp(self):
-        return f"{time.time():.0f}"
-
     def update_aliases(self):
         with open(self.aliases_path,'w+') as fp:
             _dump(self.aliases,fp)
@@ -90,28 +87,19 @@ class EmberaDataBase:
         self.aliases['target'] = target_aliases
         self.update_aliases()
 
-    def set_embedding_alias(self, embedding, alias):
-        assert(isinstance(embedding,Embedding))
-        id = self.id_embedding(embedding)
-        embedding_aliases = self.aliases.get('embedding',{})
-        embedding_aliases[alias] = id
-        self.aliases['embedding'] = embedding_aliases
-        self.update_aliases()
-
     """ ############################### Hashing ############################ """
-    def id_bqm(self, bqm):
+    def id_bqm(self, bqm, alias=None):
         if isinstance(bqm,str):
             return self.aliases.get('bqm',{}).get(bqm,bqm)
 
         if isinstance(bqm,dimod.BinaryQuadraticModel):
             ser = bqm.to_serializable()
         elif isinstance(bqm,nx.Graph):
-            ser = dimod.BinaryQuadraticModel.from_networkx(bqm).to_serializable()
+            ser = dimod.BinaryQuadraticModel.from_networkx_graph(bqm).to_serializable()
         else:
             raise ValueError("BQM must be dimod.BinaryQuadraticModel, networkx.Graph, or str")
 
-        # TMP: Check if BQM is sortable in Python>3
-        try:
+        try: # TMP: Check if BQM is sortable in Python>3
             list(bqm.variables).sort()
         except:
             import warnings
@@ -120,49 +108,50 @@ class EmberaDataBase:
         keys = ['variable_labels','linear_biases','quadratic_biases']
         filtered = {k:v for k,v in ser.items() if k in keys}
         json_bqm = json.dumps(filtered,sort_keys=True)
-        return self.hash(json_bqm.encode("utf-8"))
+        id = self.hash(json_bqm.encode("utf-8"))
 
-    def __graph_key(self, graph):
-        if isinstance(graph, nx.Graph):
-            degree = graph.degree()
-        else:
-            if isinstance(graph, dimod.BinaryQuadraticModel):
-                edgelist = graph.quadratic
-            else:
-                edgelist = graph
-            degree_dict = {}
-            for u,v in edgelist:
-                if (u==v): continue
-                degree_dict[u] = 1 + degree_dict.get(u,0)
-                degree_dict[v] = 1 + degree_dict.get(v,0)
-            degree = degree_dict.items()
-        degree_hist = {}
-        for v,d in degree:
-            degree_hist[d] = 1+degree_hist.get(d,0)
+        if not alias is None:
+            self.set_bqm_alias(id,alias)
+        return id
 
-        return (c for bin in sorted(degree_hist.items(), reverse=True) for c in bin)
-
-    def id_source(self, source):
+    def id_source(self, source, alias=None):
         if isinstance(source,str):
             return self.aliases.get('source',{}).get(source,source)
 
-        if isinstance(source,(dimod.BinaryQuadraticModel,nx.Graph,list)):
-            id = "".join(map(str,self.__graph_key(source)))[:8]
+        if isinstance(source,dimod.BinaryQuadraticModel):
+            ser = Graph(source.quadratic).to_serializable()
+        elif isinstance(source,nx.Graph):
+            ser = Graph(source.edges).to_serializable()
+        elif isinstance(source,list):
+            ser = Graph(source).to_serializable()
         else:
             raise ValueError("Source must be dimod.BinaryQuadraticModel, networkx.Graph, list of tuples or str")
 
-        if hasattr(source,'name'): self.set_source_alias(id,source.name)
+        json_source = json.dumps(ser)
+        id = self.hash(json_source.encode("utf-8"))
+
+        if alias!=None:
+            self.set_source_alias(id,alias)
+
         return id
 
-    def id_target(self, target):
+    def id_target(self, target, alias=None):
         if isinstance(target,str):
-            id = self.aliases.get('target',{}).get(target,target)
-        elif isinstance(target,(nx.Graph,list)):
-            id = "".join([str(v) for v in self.__graph_key(target)])[:8]
+            return self.aliases.get('target',{}).get(target,target)
+
+        if isinstance(target,nx.Graph):
+            ser = Graph(target.edges).to_serializable()
+        elif isinstance(target,list):
+            ser = Graph(target).to_serializable()
         else:
             raise ValueError("Target must be networkx.Graph, list of tuples or str")
 
-        if hasattr(target,'name'): self.set_target_alias(id,target.name)
+        json_target = json.dumps(ser)
+        id = self.hash(json_target.encode("utf-8"))
+
+        if alias!=None:
+            self.set_target_alias(id,alias)
+
         return id
 
     def id_embedding(self, embedding):
@@ -180,7 +169,6 @@ class EmberaDataBase:
         json_embedding = json.dumps({k:v for k,v in ser.items() if k in keys})
         return self.hash(json_embedding.encode("utf-8"))
 
-
     def get_path(self, dir_path, filename=None):
         path = ""
         for dir in dir_path:
@@ -194,7 +182,6 @@ class EmberaDataBase:
     """ ######################## BinaryQuadraticModels ##################### """
     def load_bqms(self, source, tags=[]):
         source_id = self.id_source(source)
-
         bqms_path = os.path.join(self.bqms_path,source_id)
 
         bqms = []
@@ -204,7 +191,7 @@ class EmberaDataBase:
                 for file in files:
                     bqm_path = os.path.join(root,file)
                     with open(bqm_path,'r') as fp:
-                        bqm = _load(fp,cls=DimodDecoder)
+                        bqm = json.load(fp,cls=EmberaDecoder)
                     bqms.append(bqm)
         return bqms
 
@@ -218,14 +205,14 @@ class EmberaDataBase:
 
     def dump_bqm(self, bqm, tags=[]):
         source_id = self.id_source(bqm)
-        bqm_id = self.id_bqm(bqm)
         bqms_path = [self.bqms_path,source_id]+tags
 
-        bqm_path = self.get_path(bqms_path, bqm_id)
+        bqm_ser = json.dumps(bqm,cls=EmberaEncoder)
 
+        bqm_id = self.id_bqm(bqm)
+        bqm_path = self.get_path(bqms_path, bqm_id)
         with open(bqm_path,'w+') as fp:
-            bqm_ser = bqm.to_serializable(bias_dtype=numpy.float64)
-            json.dump(bqm_ser,fp)
+            fp.write(bqm_ser)
         return bqm_id
 
     def dump_ising(self, h, J, tags=[], return_bqm=False):
@@ -279,7 +266,7 @@ class EmberaDataBase:
 
     def load_sampleset(self, bqm, target, embedding, tags=[], unembed_args=None, index=None):
         """ Load a sampleset object from JSON format, filed under:
-            <EmberaDB>/<bqm_id>/<target_id>/<embedding_id>/<tags>/<timestamp>.json
+            <EmberaDB>/<bqm_id>/<target_id>/<embedding_id>/<tags>/<sampleset_id>.json
             If more than one sampleset is found, returns the concatenation
             of all samples found under the given criteria.
 

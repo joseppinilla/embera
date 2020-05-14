@@ -110,7 +110,7 @@ class TestDataBase(unittest.TestCase):
 
         self.db.dump_bqm(bqm)
         bqm_copy = self.db.load_bqm(source)
-        self.assertEqual(bqm, bqm_copy)
+        self.assertEqual(bqm,bqm_copy)
         copy_id = self.db.id_bqm(bqm_copy)
         self.assertEqual(bqm_id,copy_id)
 
@@ -195,16 +195,10 @@ class TestDataBase(unittest.TestCase):
         source = self.source_edgelist
         target = self.target_edgelist
         embedding_obj = Embedding(embedding)
-        embedding_id = self.db.id_embedding(embedding_obj)
-        self.assertEqual(embedding_id,embedding_obj.id)
 
-        dict_id = self.db.id_embedding(embedding)
-        self.assertEqual(embedding_id,dict_id)
-
-        self.db.set_embedding_alias(embedding_obj,'TEST')
-        name_id = self.db.id_embedding('TEST')
-        self.assertEqual(dict_id,name_id)
-
+        emb_id = self.db.id_embedding(embedding_obj)
+        dic_id = self.db.id_embedding(embedding)
+        self.assertEqual(emb_id,dic_id)
         self.assertRaises(ValueError,self.db.id_embedding,0)
 
     def test_load_embeddings(self):
@@ -213,11 +207,11 @@ class TestDataBase(unittest.TestCase):
         target = nx.path_graph(8)
         self.db.dump_embedding(source,target,embedding,tags=['tag1'])
         self.db.dump_embedding(source,target,embedding,tags=['tag2'])
-        copy1,copy2 = self.db.load_embeddings(source,target)
+        embedding_copies = self.db.load_embeddings(source,target)
         # When stored, chains are sorted, so:
-        for k in embedding:
-            self.assertCountEqual(embedding[k],copy1[k])
-            self.assertCountEqual(embedding[k],copy2[k])
+        for emb_copy in embedding_copies:
+            for k in embedding:
+                self.assertCountEqual(embedding[k],emb_copy[k])
 
     def test_empty(self):
         self.db.dump_embedding([],[],{})
