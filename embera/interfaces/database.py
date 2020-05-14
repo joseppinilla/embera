@@ -275,7 +275,6 @@ class EmberaDataBase:
 
             target: (networkx.Graph, list, or str)
 
-
         Optional Arguments:
             If none of the optional arguments are given, all samplesets under
             that path are concatenated.

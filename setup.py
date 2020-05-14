@@ -8,6 +8,7 @@ packages = ['embera',
             'embera.composites',
             'embera.interfaces',
             'embera.preprocess',
+            'embera.transform',
             'embera.utilities',
             ]
 

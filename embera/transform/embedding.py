@@ -1,28 +1,54 @@
 import minorminer
 
 import numpy as np
-import networkx as nx
-import dwave_networkx as dnx
 
-from embera.utilities.decorators import nx_graph, dnx_graph, dnx_graph_embedding
 from embera.preprocess.tiling_parser import DWaveNetworkXTiling
 
 __all__ = ['translate','mirror','rotate','spread_out','open_seam',
            'iter_sliding_window', 'greedy_fit','reconnect']
 
-def translate(S, T, embedding, origin=(0,0)):
+""" ################### Naive Embedding Transformations ####################
+    Transformation methods for embeddings onto Tiled D-Wave Architectures
+
+    Arguments:
+        T: (networkx.Graph)
+            A NetworkX Graph with the construction parameters generated using
+            `dwave_networkx`:
+                    family : {'chimera','pegasus', ...}
+                    rows : (int)
+                    columns : (int)
+                    labels : {'coordinate', 'int', 'nice'}
+
+        embedding: (dict)
+            A dictionary mapping variable names to lists of labels in T
+
+    Note:
+        A valid embedding is not guaranteed from these transformations. To
+        generate a valid embedding from the result of this transformation, use
+        `embera.transform.embedding.reconnect(S,T,new_embedding)` or similar.
+
+"""
+
+def translate(T, embedding, origin=(0,0)):
     """ Transport the embedding on the same graph to re-distribute qubit
         assignments.
 
+        Optional arguments:
+            origin: (tuple)
+                A tuple of tile coordinates pointing to where the left-uppermost
+                occupied tile in the embedding should move to. All other tiles
+                are moved relative to the origin.
+
         Example:
             >>> import embera
-            >>> import matplotlib.pyplot as plt
+            >>> import networkx as nx
+            >>> import dwave_networkx as dnx
             >>> S = nx.complete_graph(11)
             >>> T = dnx.chimera_graph(7)
             >>> embedding = minorminer.find_embedding(S,T)
             >>> dnx.draw_chimera_embedding(T,embedding,node_size=10)
-            >>> offset = (2,3)
-            >>> new_embedding = embera.transform.embedding.translate(S,T,embedding,offset)
+            >>> origin = (2,3)
+            >>> new_embedding = embera.transform.embedding.translate(T,embedding,origin)
             >>> dnx.draw_chimera_embedding(T,new_embedding,node_size=10)
     """
     tiling = DWaveNetworkXTiling(T)
@@ -52,20 +78,25 @@ def translate(S, T, embedding, origin=(0,0)):
     return new_embedding
 
 
-def mirror(S, T, embedding, axis=0):
+def mirror(T, embedding, axis=0):
     """ Flip the embedding on the same graph to re-distribute qubit
-        assignments. If a perfect fit isn't found, due to disabled qubits,
-        the invalid embedding is still returned.
+        assignments.
+
+        Optional arguments:
+
+            axis: {0,1}
+                0 toflip on horizontal and 1 to flip on vertical
 
         Example:
             >>> import embera
-            >>> import matplotlib.pyplot as plt
+            >>> import networkx as nx
+            >>> import dwave_networkx as dnx
             >>> S = nx.complete_graph(11)
             >>> T = dnx.chimera_graph(7)
             >>> embedding = minorminer.find_embedding(S,T)
             >>> dnx.draw_chimera_embedding(T,embedding,node_size=10)
             >>> axis = 1
-            >>> new_embedding = embera.transform.embedding.mirror(S,T,embedding,axis)
+            >>> new_embedding = embera.transform.embedding.mirror(T,embedding,axis)
             >>> dnx.draw_chimera_embedding(T,new_embedding,node_size=10)
     """
     tiling = DWaveNetworkXTiling(T)
@@ -95,20 +126,26 @@ def mirror(S, T, embedding, axis=0):
 
     return new_embedding
 
-def rotate(S, T, embedding, theta=90):
+def rotate(T, embedding, theta=90):
     """ Rotate the embedding on the same graph to re-distribute qubit
         assignments. If a perfect fit isn't found, due to disabled qubits,
         the invalid embedding is still returned.
 
+        Optional arguments:
+
+            theta: ({0,90,180,270,360,-90,-180,-270})
+                Rotation angle.
+
         Example:
             >>> import embera
-            >>> import matplotlib.pyplot as plt
+            >>> import networkx as nx
+            >>> import dwave_networkx as dnx
             >>> S = nx.complete_graph(11)
             >>> T = dnx.chimera_graph(7)
             >>> embedding = minorminer.find_embedding(S,T)
             >>> dnx.draw_chimera_embedding(T,embedding,node_size=10)
             >>> theta = 270
-            >>> new_embedding = embera.transform.embedding.rotate(S,T,embedding,theta)
+            >>> new_embedding = embera.transform.embedding.rotate(T,embedding,theta)
             >>> dnx.draw_chimera_embedding(T,new_embedding,node_size=10)
     """
     tiling = DWaveNetworkXTiling(T)
@@ -146,26 +183,25 @@ def rotate(S, T, embedding, theta=90):
 
     return new_embedding
 
-def spread_out(S, T, embedding, axis='both'):
-    """ Alter the embedding to add qubit chains by moving qubit
-        assignments onto qubit in tiles farther from the center of the device
-        graph.
-            1) Use Chimera/Pegasus index to determine tile of each node
-            2) Transform the tile assignment to spread out the embedding
-            3) Assign nodes to corresponding qubit in new tiles
-            4) Perform an "embedding pass" or path search to reconnect all nodes
+def spread_out(T, embedding, sheer=None):
+    """ Transform the tile assignment to spread out the embedding starting from
+        tile (0,0) and placing originally adjacent tiles 1 extra tile away.
 
-        Arguments:
-            axis: {'both',0, 1}
+        Optional arguments:
+
+            sheer: {None,0, 1}
+                Perform a translation of every odd column (sheer=0) or row
+                (sheer=1)
 
         Example:
             >>> import embera
+            >>> import networkx as nx
+            >>> import dwave_networkx as dnx
             >>> S = nx.complete_graph(17)
             >>> T = dnx.chimera_graph(8)
             >>> embedding = minorminer.find_embedding(S,T)
             >>> dnx.draw_chimera_embedding(T,embedding, node_size=10)
-            >>> axis = 1
-            >>> new_embedding = embera.transform.embedding.spread_out(S,T,embedding)
+            >>> new_embedding = embera.transform.embedding.spread_out(T,embedding)
             >>> dnx.draw_chimera_embedding(T,new_embedding,node_size=10)
     """
     tiling = DWaveNetworkXTiling(T)
@@ -184,11 +220,11 @@ def spread_out(S, T, embedding, axis='both'):
         raise RuntimeError("Can't spread out")
     # Spread out all qubits by chain
     new_embedding = {}
-    if axis == 'both':
+    if sheer is None:
         shift = lambda tile,origin: (tile-origin)*2
-    elif axis == 0:
+    elif sheer == 0:
         shift = lambda tile,origin: (tile-origin)*2+np.flip((tile-origin)%[2,1])
-    elif axis == 1:
+    elif sheer == 1:
         shift = lambda tile,origin: (tile-origin)*2+np.flip((tile-origin)%[1,2])
 
     for v,chain in embedding.items():
@@ -202,23 +238,30 @@ def spread_out(S, T, embedding, axis='both'):
 
     return new_embedding
 
-def open_seam(S, T, embedding, seam, direction=None):
+def open_seam(T, embedding, seam, direction):
     """
-        Args:
-            seam
-            direction (str:{'left','right','up','down'})
+        Arguments (continued):
+            seam: (int)
+                If direction is 'left' or 'right', seam corresponds to the
+                column number. If direction is 'up' or 'down', seam corresponds
+                to the row number.
+
+            direction: (None or str:{'left','right','up','down'})
+                Given a seam index, that column/row is cleared and all utilized
+                qubits in the embedding are shifted in this direction.
 
         Example:
             >>> import embera
+            >>> import networkx as nx
+            >>> import dwave_networkx as dnx
             >>> S = nx.complete_graph(10)
             >>> T = dnx.chimera_graph(8)
             >>> embedding = minorminer.find_embedding(S,T,random_seed=10)
             >>> dnx.draw_chimera_embedding(T,embedding,node_size=10)
             >>> seam = 2
             >>> direction = 'right'
-            >>> new_embedding = embera.transform.embedding.open_seam(S,T,embedding,seam,direction)
+            >>> new_embedding = embera.transform.embedding.open_seam(T,embedding,seam,direction)
             >>> dnx.draw_chimera_embedding(T,new_embedding,node_size=10)
-
     """
     tiling = DWaveNetworkXTiling(T)
 
@@ -249,35 +292,20 @@ def open_seam(S, T, embedding, seam, direction=None):
 
     return new_embedding
 
-def lp_chain_reduce(S, T, embedding):
-    """ TODO: Use a linear programming formulation to resolve shorter chains
-        from a given embedding.
-            1) Turn chains into shared qubits
-            2) Create LP formulation
-            3) Resolve chains
-    """
-    return embedding
-
-def iter_sliding_window(S, T, embedding):
-    """ Using a sling window approach, transform the embedding from one region
-        of the Chimera graph to another. This is useful when an embedding is
-        done for a D-Wave machine and it's necessary to find an identical
-        embedding on another D-Wave machine with different yield.
-
-        Algorithm:
-            1) Parse embedding and target graph to find margins.
-            2) Move qubit to window i and check if nodes are available
-            3) If all nodes are available, go to 4, else go to 3
-            4) Check if edges are available, if not, return to 2.
+def iter_sliding_window(T, embedding):
+    """ Use a sliding window approach to iteratively transport the embedding
+        from one region of the Chimera graph to another.
 
         Example:
             >>> import embera
+            >>> import networkx as nx
+            >>> import dwave_networkx as dnx
             >>> import matplotlib.pyplot as plt
             >>> S = nx.complete_graph(11)
             >>> T = dnx.chimera_graph(7)
             >>> embedding = minorminer.find_embedding(S,T)
             >>> dnx.draw_chimera_embedding(T,embedding,node_size=10)
-            >>> slide = embera.transform.embedding.sliding_window(S,T,embedding)
+            >>> slide = embera.transform.embedding.sliding_window(T,embedding)
             >>> for new_embedding in slide:
             ...     dnx.draw_chimera_embedding(T,new_embedding,node_size=10)
             ...     plt.pause(0.2)
@@ -313,6 +341,36 @@ def iter_sliding_window(S, T, embedding):
                 slide[v] = new_chain
             yield slide
 
+""" ########################### Optimize Embedding #########################
+    Transformation methods to try and find a valid embedding from an invalid one
+
+    Arguments:
+        S: (networkx.Graph)
+            A NetworkX Graph with the adjacency of the embedded graph
+
+        T: (networkx.Graph)
+            A NetworkX Graph with the construction parameters generated using
+            `dwave_networkx`:
+                    family : {'chimera','pegasus', ...}
+                    rows : (int)
+                    columns : (int)
+                    labels : {'coordinate', 'int', 'nice'}
+
+        embedding: (dict)
+            A dictionary mapping variable names to lists of labels in T
+"""
+
+def lp_chain_reduce(S, T, embedding):
+    """ TODO: Use a linear programming formulation to resolve shorter chains
+        from a given embedding.
+            1) Turn chains into shared qubits
+            2) Create LP formulation
+            3) Resolve chains
+    """
+    import warnings
+    warnings.warn("WIP: Not implemented yet")
+    return embedding
+
 def greedy_fit(S, T, embedding):
     """ Using a sling window approach, transform the embedding from one region
         of the Chimera graph to another. This is useful when an embedding is
@@ -322,12 +380,13 @@ def greedy_fit(S, T, embedding):
         Algorithm:
             1) Parse embedding and target graph to find margins.
             2) Move qubit to window i and check if nodes are available
-            3) If all nodes are available, go to 4, else go to 3
-            4) Check if edges are available, if not, return to 2.
+            3) If all edges are available, return embedding, else go to 4
+            4) Test same window with 90, 180, and 270 rotations.
 
         Example:
             >>> import embera
-            >>> import matplotlib.pyplot as plt
+            >>> import networkx as nx
+            >>> import dwave_networkx as dnx
             >>> S = nx.complete_graph(11)
             >>> T = dnx.chimera_graph(7)
             >>> embedding = minorminer.find_embedding(S,T)
@@ -340,16 +399,16 @@ def greedy_fit(S, T, embedding):
     for emb in iter_sliding_window(S,T,embedding):
         if all(is_connected(interactions(u,v,emb)) for u,v in S.edges):
             return emb
-        mir = mirror(S,T,emb)
+        mir = mirror(T,emb)
         if all(is_connected(interactions(u,v,mir)) for u,v in S.edges):
             return mir
-        e90 = rotate(S,T,emb,90)
+        e90 = rotate(T,emb,90)
         if all(is_connected(interactions(u,v,mir)) for u,v in S.edges):
             return e90
-        e180 = rotate(S,T,emb,180)
+        e180 = rotate(T,emb,180)
         if all(is_connected(interactions(u,v,mir)) for u,v in S.edges):
             return e180
-        e270 = rotate(S,T,emb,270)
+        e270 = rotate(T,emb,270)
         if all(is_connected(interactions(u,v,mir)) for u,v in S.edges):
             return e270
     return {}
