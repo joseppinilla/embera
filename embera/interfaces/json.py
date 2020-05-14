@@ -1,34 +1,28 @@
 import json
+import dimod
+import numpy
 import embera
 
-class EmberaEncoder(json.JSONEncoder):
-    def iterencode(self, obj,_one_shot=False):
-        if isinstance(obj,embera.Embedding):
-            embedding = obj.items()
-            embedding_serial = [f"{repr(k)}:{repr(v)}" for k,v in obj.items()]
-            embedding_dict = {"type": "Embedding",
-                              "embedding": f"{{{','.join(embedding_serial)}}}",
-                              "properties": obj.properties}
-            return super(EmberaEncoder, self).iterencode(embedding_dict,_one_shot)
-        elif isinstance(obj,dict):
-            serial = [f"{repr(k)}:{repr(v)}" for k,v in obj.items()]
-            obj_dict = {"type": "dict",
-                        "items": f"{{{','.join(serial)}}}"}
-            return super(EmberaEncoder, self).iterencode(obj_dict,_one_shot)
 
-        return super(EmberaEncoder, self).iterencode(obj,_one_shot)
+class EmberaEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (dimod.SampleSet, embera.Embedding, embera.Graph)):
+            return obj.to_serializable()
+        elif isinstance(obj,dimod.BQM):
+            return obj.to_serializable(bias_dtype=numpy.float64)
+        return json.JSONEncoder.default(self, obj)
 
 class EmberaDecoder(json.JSONDecoder):
     def __init__(self, *args, **kwargs):
         json.JSONDecoder.__init__(self, object_hook=self.object_hook, *args, **kwargs)
 
     def object_hook(self, obj):
-        if isinstance(obj,dict):
-            if obj.get("type")=="Embedding":
-                embedding = eval(obj["embedding"])
-                properties = obj["properties"]
-                embedding_obj = embera.Embedding(embedding,**properties)
-                return embedding_obj
-            elif obj.get("type")=="dict":
-                return eval(obj.get("items","{}"))
+        if obj.get("type","") == "SampleSet":
+            return dimod.SampleSet.from_serializable(obj)
+        elif obj.get("type","") == "BinaryQuadraticModel":
+            return dimod.BinaryQuadraticModel.from_serializable(obj)
+        elif obj.get("type","") == "Embedding":
+            return embera.Embedding.from_serializable(obj)
+        elif obj.get("type","") == "Graph":
+            return embera.Graph.from_serializable(obj)
         return obj

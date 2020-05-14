@@ -87,10 +87,10 @@ class TestDataBase(unittest.TestCase):
         self.db = EmberaDataBase("./TMP_DB")
         # Toy Problem
         self.bqm = dimod.BinaryQuadraticModel(
-                   {'a':2,'A1.S':2,(0,1):2},
-                   {('a','A1.S'):-1,('A1.S',(0,1)):-1,((0,1),'a'):-1},
+                   {'a':2,'A1.S':2,'(0,1)':2},
+                   {('a','A1.S'):-1,('A1.S','(0,1)'):-1,('(0,1)','a'):-1},
                    0.0,dimod.Vartype.SPIN)
-        self.source_edgelist = [('a','A1.S'),('A1.S',(0,1)),((0,1),'a')]
+        self.source_edgelist = [('a','A1.S'),('A1.S','(0,1)'),('(0,1)','a')]
         self.target_edgelist = [(1,2),(2,3),(3,4),(4,1)]
         # Toy Entries
         self.embedding = minorminer.find_embedding(self.source_edgelist,
@@ -98,7 +98,7 @@ class TestDataBase(unittest.TestCase):
         self.sampleset = dimod.SampleSet.from_samples(
                          [{1:-1, 2:1, 3:-1, 4:-1},{1:-1, 2:1, 3:1, 4:1}],
                          'SPIN',0)
-        self.report = {'emb1':{'a':4,'A1.S':8,(0,1):12}}
+        self.report = {'emb1':{'a':4,'A1.S':8,'(0,1)':12}}
 
     def tearDown(self):
         shutil.rmtree("./TMP_DB")
@@ -110,7 +110,7 @@ class TestDataBase(unittest.TestCase):
 
         self.db.dump_bqm(bqm)
         bqm_copy = self.db.load_bqm(source)
-        self.assertEqual(bqm, bqm_copy)
+        self.assertEqual(bqm,bqm_copy)
         copy_id = self.db.id_bqm(bqm_copy)
         self.assertEqual(bqm_id,copy_id)
 
@@ -195,16 +195,10 @@ class TestDataBase(unittest.TestCase):
         source = self.source_edgelist
         target = self.target_edgelist
         embedding_obj = Embedding(embedding)
-        embedding_id = self.db.id_embedding(embedding_obj)
-        self.assertEqual(embedding_id,embedding_obj.id)
 
-        dict_id = self.db.id_embedding(embedding)
-        self.assertEqual(embedding_id,dict_id)
-
-        self.db.set_embedding_alias(embedding_obj,'TEST')
-        name_id = self.db.id_embedding('TEST')
-        self.assertEqual(dict_id,name_id)
-
+        emb_id = self.db.id_embedding(embedding_obj)
+        dic_id = self.db.id_embedding(embedding)
+        self.assertEqual(emb_id,dic_id)
         self.assertRaises(ValueError,self.db.id_embedding,0)
 
     def test_load_embeddings(self):
@@ -213,8 +207,11 @@ class TestDataBase(unittest.TestCase):
         target = nx.path_graph(8)
         self.db.dump_embedding(source,target,embedding,tags=['tag1'])
         self.db.dump_embedding(source,target,embedding,tags=['tag2'])
-        embedding_copy = self.db.load_embeddings(source,target)
-        self.assertDictEqual(embedding,dict(embedding_copy[0]))
+        embedding_copies = self.db.load_embeddings(source,target)
+        # When stored, chains are sorted, so:
+        for emb_copy in embedding_copies:
+            for k in embedding:
+                self.assertCountEqual(embedding[k],emb_copy[k])
 
     def test_empty(self):
         self.db.dump_embedding([],[],{})
