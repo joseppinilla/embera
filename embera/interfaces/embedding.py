@@ -1,4 +1,5 @@
 """ Embera Embedding Class """
+from dimod.variables import iter_serialize_variables
 
 class Embedding(dict):
 
@@ -164,32 +165,40 @@ class Embedding(dict):
         return dict(zip(source_nodes,ratio))
 
     """ ############################# Interface ############################ """
-    @property
-    def id(self):
-        """ The Embedding IDentifier is made up of two parts:
-                Quality ID: String of the Chain Histogram
-                Chains ID: String of the 8 last digits of the chain key.
-        """
-        chains_id = f"{self.__hash__():08}"
-        quality_id = "".join(map(str,self.quality_key))
-        if not self:
-            return "XXXXXXXX_XXXXXXXX"
-        else:
-            return quality_id[:8] + "_" + chains_id[:8]
+    def to_serializable(self):
+        variables = list(iter_serialize_variables(self.keys()))
+        variables.sort(key=lambda x: str(x))
 
-    def __key(self):
-        embedding_key = []
-        for v,chain in self.items():
-            chain_key = ""
-            for t in sorted(chain):
-                chain_key+=str(t)
-            embedding_key.append(int(chain_key))
+        num_variables = len(variables)
 
-        return embedding_key
+        chains = []
+        for v in variables:
+            chain = list(iter_serialize_variables(self[v]))
+            chain.sort(key=lambda x: str(x))
+            chains.append(chain)
+
+        doc = {# metadata
+               "type": 'Embedding',
+               # embedding
+               "num_variables": num_variables,
+               "variable_labels": variables,
+               "chains": chains,
+               "properties": self.properties}
+
+        return doc
+
+    @classmethod
+    def from_serializable(cls, obj):
+        variables = [tuple(v) if isinstance(v,list) else v
+                     for v in obj["variable_labels"]]
+
+        embedding = {k:[tuple(v) if isinstance(v,list) else v for v in chain]
+                    for k,chain in zip(variables,obj["chains"])}
+
+        return cls(embedding,**obj['properties'])
 
     def __hash__(self):
-        return sum(self.__key())
-
+        return hash(self.to_serializable())
     def __eq__(self, other):
         return self.__key() == other.__key()
     def __ne__(self, other):
