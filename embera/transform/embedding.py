@@ -396,7 +396,7 @@ def greedy_fit(S, T, embedding):
     """
     interactions = lambda u,v,E:((s,t) for s in E[u] for t in E[v])
     is_connected = lambda edges: any(T.has_edge(s,t) for s,t in edges)
-    for emb in iter_sliding_window(S,T,embedding):
+    for emb in iter_sliding_window(T,embedding):
         if all(is_connected(interactions(u,v,emb)) for u,v in S.edges):
             return emb
         mir = mirror(T,emb)
