@@ -2,6 +2,7 @@ import minorminer
 
 import numpy as np
 
+from embera.utilities.decorators import nx_graph
 from embera.preprocess.tiling_parser import DWaveNetworkXTiling
 
 __all__ = ['translate','mirror','rotate','spread_out','open_seam',
@@ -345,8 +346,9 @@ def iter_sliding_window(T, embedding):
     Transformation methods to try and find a valid embedding from an invalid one
 
     Arguments:
-        S: (networkx.Graph)
-            A NetworkX Graph with the adjacency of the embedded graph
+        S: (networkx.Graph or list of 2-tuples)
+            A NetworkX Graph with the adjacency of the embedded graph, or a list
+            of edges.
 
         T: (networkx.Graph)
             A NetworkX Graph with the construction parameters generated using
@@ -359,7 +361,7 @@ def iter_sliding_window(T, embedding):
         embedding: (dict)
             A dictionary mapping variable names to lists of labels in T
 """
-
+@nx_graph(0)
 def lp_chain_reduce(S, T, embedding):
     """ TODO: Use a linear programming formulation to resolve shorter chains
         from a given embedding.
@@ -371,6 +373,7 @@ def lp_chain_reduce(S, T, embedding):
     warnings.warn("WIP: Not implemented yet")
     return embedding
 
+@nx_graph(0)
 def greedy_fit(S, T, embedding):
     """ Using a sling window approach, transform the embedding from one region
         of the Chimera graph to another. This is useful when an embedding is

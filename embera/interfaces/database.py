@@ -203,19 +203,20 @@ class EmberaDataBase:
 
         return bqms.pop(index)
 
-    def dump_bqm(self, bqm, tags=[]):
+    def dump_bqm(self, bqm, tags=[], alias=None):
         source_id = self.id_source(bqm)
         bqms_path = [self.bqms_path,source_id]+tags
 
         bqm_ser = json.dumps(bqm,cls=EmberaEncoder)
 
-        bqm_id = self.id_bqm(bqm)
+        bqm_id = self.id_bqm(bqm, alias=alias)
         bqm_path = self.get_path(bqms_path, bqm_id)
         with open(bqm_path,'w+') as fp:
             fp.write(bqm_ser)
+
         return bqm_id
 
-    def dump_ising(self, h, J, tags=[], return_bqm=False):
+    def dump_ising(self, h, J, tags=[], alias=None, return_bqm=False):
         """ Convert Ising parameters into BQM and dump to JSON file
 
             Arguments:
@@ -229,7 +230,7 @@ class EmberaDataBase:
                     If True, return a tuple of (BQM, ID(BQM)).
         """
         bqm = dimod.BinaryQuadraticModel(h,J,0.0,'SPIN',tags=tags)
-        bqm_id = self.dump_bqm(bqm,tags)
+        bqm_id = self.dump_bqm(bqm,tags,alias=alias)
         if return_bqm:
             return bqm, bqm_id
         else:

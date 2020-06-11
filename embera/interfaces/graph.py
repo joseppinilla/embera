@@ -4,6 +4,7 @@ class Graph(list):
         edges = []
         for u,v in self:
             edge = sorted([u,v],key=lambda x:str(x))
+            edges.append(edge)
 
         doc = {# metadata
                "type": 'Graph',
