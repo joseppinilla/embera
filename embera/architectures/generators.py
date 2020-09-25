@@ -18,6 +18,9 @@
         Nodes are labeled by integers.
 
 """
+import os
+import tarfile
+import requests
 import networkx as nx
 import dwave_networkx as dnx
 
@@ -63,6 +66,51 @@ def dwave_online(squeeze=True, **kwargs):
         return graphs[0] if len(graphs)==1 else graphs
     else:
         return graphs
+
+def dwave_collection(name=None):
+    """ Architecture graphs from current and legacy D-Wave devices
+
+        |name           | nodes    | edges  |
+        | ------------- |:--------:| ------:|
+        |DW_2000Q_6     | 2041     | 5974   |
+        |DW_2000Q_5     | 2030     | 5909   |
+        |DW_2000Q_2_1   | 2038     | 5955   |
+        |DW_2000Q_QuAIL | 2031     | 5919   |
+        |DW_2X_LANL     | 1141     | 3298   |
+
+        Returns list of NetworkX graphs with parameters:
+            >>> G.graph = {'columns': <int>,
+                           'data': bool,
+                           'family': <string>,
+                           'labels': <string>,
+                           'name': <string>,
+                           'rows': <int>,
+                           'tile': <int>}
+    """
+    graph_list = []
+    path = "./collection.tar.gz"
+    url = "http://www.ece.ubc.ca/~jpinilla/resources/embera/architectures/dwave/collection.tar.gz"
+
+    # Download
+    if not os.path.isfile(path):
+        print(f"-> Downloading D-Wave architecture collection to {path}")
+        with open(path, 'wb') as f:
+            response = requests.get(url)
+            f.write(response.content)
+    # Unzip, untar, unpickle
+    with tarfile.open(path) as contents:
+        for member in contents.getmembers():
+            f = contents.extractfile(member)
+            G = nx.read_gpickle(f)
+            graph_list.append(G)
+
+    if name is None:
+        return graph_list
+    else:
+        try:
+            return next(g for g in graph_list if g.name==name)
+        except:
+            raise KeyError("Architecture graph name not found in collection")
 
 """ =========================== D-Wave Architectures ======================= """
 
