@@ -160,7 +160,7 @@ def h20k_graph(data=True, coordinates=False):
 
     target_graph = nx.grid_graph(dim=[t, m, n])
 
-    targat_graph.name = 'hitachi_graph(128,80,2)'
+    target_graph.name = 'hitachi_graph(128,80,2)'
     target_graph.graph['chip_id'] = 'HITACHI 20k'
     construction = (("family", "hitachi"),
                     ("rows", 5), ("columns", 4),
