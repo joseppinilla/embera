@@ -21,6 +21,7 @@
 import os
 import tarfile
 import requests
+import dwave.system
 import networkx as nx
 import dwave_networkx as dnx
 
@@ -35,25 +36,11 @@ __all__ = ['graph_from_solver','dwave_online',
 def graph_from_solver(solver, **kwargs):
     """ D-Wave architecture graph from Dimod Structured Solver
     """
-    topology = solver.properties.get('topology','N/A')
-    type = topology['type']
-    shape = topology['shape']
+    chip_id = solver.properties['chip_id']
+    sampler = dwave.system.DWaveSampler(solver=chip_id)
+    target_graph = sampler.to_networkx_graph()
+    target_graph.graph['chip_id'] = chip_id
 
-    edgelist = solver.properties['couplers']
-    kwargs['edge_list'] = edgelist
-
-    if type=='chimera':
-        target_graph = dnx.generators.chimera_graph(*shape, **kwargs)
-        indices = nx.get_node_attributes(target_graph,'chimera_index')
-        target_graph.graph['pos'] = {v:(i,j) for v, (i,j,u,k) in indices.items()}
-    elif type=='pegasus':
-        target_graph = dnx.generators.pegasus_graph(*shape, **kwargs)
-        indices = nx.get_node_attributes(target_graph,'pegasus_index')
-        target_graph.graph['pos'] = {v:(x,y) for v, (t,y,x,u,k) in indices.items()}
-    else:
-        raise TypeError("Solver provided is not any of the supported types.")
-
-    target_graph.name = solver.properties['chip_id']
     return target_graph
 
 def dwave_online(squeeze=True, **kwargs):
@@ -70,13 +57,14 @@ def dwave_online(squeeze=True, **kwargs):
 def dwave_collection(name=None):
     """ Architecture graphs from current and legacy D-Wave devices
 
-        |name           | nodes    | edges  |
-        | ------------- |:--------:| ------:|
-        |DW_2000Q_6     | 2041     | 5974   |
-        |DW_2000Q_5     | 2030     | 5909   |
-        |DW_2000Q_2_1   | 2038     | 5955   |
-        |DW_2000Q_QuAIL | 2031     | 5919   |
-        |DW_2X_LANL     | 1141     | 3298   |
+        |name                 | nodes    | edges  |
+        | ------------------- |:--------:| ------:|
+        |Advantage_system1.1  | 5436     | 37440  |
+        |DW_2000Q_6           | 2041     | 5974   |
+        |DW_2000Q_5           | 2030     | 5909   |
+        |DW_2000Q_2_1         | 2038     | 5955   |
+        |DW_2000Q_QuAIL       | 2031     | 5919   |
+        |DW_2X_LANL           | 1141     | 3298   |
 
         Returns list of NetworkX graphs with parameters:
             >>> G.graph = {'columns': <int>,
@@ -119,7 +107,7 @@ def rainier_graph(**kwargs):
         https://en.wikipedia.org/wiki/D-Wave_Systems
     """
     target_graph = dnx.generators.chimera_graph(4, 4, 4, **kwargs)
-    target_graph.name = 'Rainier'
+    target_graph.graph['chip_id'] = 'Rainier'
     return target_graph
 
 def vesuvius_graph(**kwargs):
@@ -127,7 +115,7 @@ def vesuvius_graph(**kwargs):
         https://en.wikipedia.org/wiki/D-Wave_Systems
     """
     target_graph = dnx.generators.chimera_graph(8, 8, 4, **kwargs)
-    target_graph.name = 'Vesuvius'
+    target_graph.graph['chip_id'] = 'Vesuvius'
     return target_graph
 
 def dw2x_graph(**kwargs):
@@ -135,7 +123,7 @@ def dw2x_graph(**kwargs):
         https://en.wikipedia.org/wiki/D-Wave_Systems
     """
     target_graph = dnx.generators.chimera_graph(12, 12, 4, **kwargs)
-    target_graph.name = 'DW2X'
+    target_graph.graph['chip_id'] = 'DW_2X'
     return target_graph
 
 def dw2000q_graph(**kwargs):
@@ -143,7 +131,7 @@ def dw2000q_graph(**kwargs):
         https://en.wikipedia.org/wiki/D-Wave_Systems
     """
     target_graph = dnx.generators.chimera_graph(16, 16, 4, **kwargs)
-    target_graph.name = 'DW2000Q'
+    target_graph.graph['chip_id'] = 'DW_2000Q'
     return target_graph
 
 def p6_graph(**kwargs):
@@ -151,7 +139,7 @@ def p6_graph(**kwargs):
         https://www.dwavesys.com/sites/default/files/mwj_dwave_qubits2018.pdf
     """
     target_graph = dnx.generators.pegasus_graph(6, **kwargs)
-    target_graph.name = 'P6'
+    target_graph.graph['chip_id'] = 'P6'
     return target_graph
 
 def p16_graph(**kwargs):
@@ -159,7 +147,7 @@ def p16_graph(**kwargs):
         https://www.dwavesys.com/sites/default/files/mwj_dwave_qubits2018.pdf
     """
     target_graph = dnx.generators.pegasus_graph(16, **kwargs)
-    target_graph.name = 'P16'
+    target_graph.graph['chip_id'] = 'P16'
     return target_graph
 
 """ ============================== Miscellaneous =========================== """
@@ -172,7 +160,8 @@ def h20k_graph(data=True, coordinates=False):
 
     target_graph = nx.grid_graph(dim=[t, m, n])
 
-    target_graph.name = 'HITACHI 20k'
+    targat_graph.name = 'hitachi_graph(128,80,2)'
+    target_graph.graph['chip_id'] = 'HITACHI 20k'
     construction = (("family", "hitachi"),
                     ("rows", 5), ("columns", 4),
                     ("data", data),
