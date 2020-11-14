@@ -23,12 +23,14 @@ install_requires = ['dimod>=0.8.0,<0.9.0',
                     'scipy>=1.4.0,<2.0.0',
                     ]
 
+with open("README.md", "r", encoding='utf-8') as fh:
+    long_description = fh.read()
+
 setup(name='embera',
-      version='0.0.1',
+      version='0.0.1a',
       description='Embedding Resources and Algorithms',
-      long_description="Collection of minor-embedding methods and utilities "
-      "to map unstructured binary quadratic problems to a structured sampler "
-      "such as a D-Wave system.",
+      long_description=long_description,
+      long_description_content_type='text/markdown',
       author='Jose Pinilla',
       author_email='jpinilla@ece.ubc.ca',
       url='https://github.com/joseppinilla/embera',

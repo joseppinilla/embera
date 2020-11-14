@@ -9,7 +9,7 @@ embera
 
 Why `embera`?
 ------------
-The name `embera` is a nod to the [Emberá](https://minorityrights.org/minorities/embera/) indigineous communities.
+The name `embera` is a nod to the [Emberá](https://minorityrights.org/minorities/embera/) indigeneous communities.
 
 The reason for `embera` as an open-source project lies in the limited  connectivity of practical quantum (or digital) annealing samplers, which means that a straightforward one-to-one mapping, from variables to qubits, is not likely to lead to a valid implementation, and may require the use of qubit _chains_. A _chain_ is an extension of a problem vertex over multiple connected qubits. Finding a good solution to the problem is vital for at
 least two reasons: (a) the capabilities of the mapping algorithm
