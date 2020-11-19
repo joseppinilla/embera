@@ -1,23 +1,3 @@
-""" Generators for architecture graphs.
-
-    All architecture graphs use the same parameters. Additional parameters
-    for the underlying generators are allowed but discouraged.
-
-    Parameters
-    ----------
-    data : bool (optional, default True)
-        If True, each node has a `<family>_index attribute`
-    coordinates : bool (optional, default False)
-        If True, node labels are tuples, equivalent to the <family>_index
-        attribute as above.  In this case, the `data` parameter controls the
-        existence of a `linear_index attribute`, which is an int
-
-    Returns
-    -------
-    G : NetworkX Graph of the chosen architecture.
-        Nodes are labeled by integers.
-
-"""
 import os
 import tarfile
 import requests
@@ -34,7 +14,7 @@ __all__ = ['graph_from_solver','dwave_online',
 """ ========================== D-Wave Solver Solutions ===================== """
 
 def graph_from_solver(solver, **kwargs):
-    """ D-Wave architecture graph from Dimod Structured Solver
+    """ D-Wave architecture graph from dimod Structured Solver
     """
     chip_id = solver.properties['chip_id']
     sampler = dwave.system.DWaveSampler(solver=chip_id)
@@ -99,6 +79,27 @@ def dwave_collection(name=None):
             return next(g for g in graph_list if g.name==name)
         except:
             raise KeyError("Architecture graph name not found in collection")
+
+""" Generators for architecture graphs.
+
+    All architecture graphs use the same parameters. Additional parameters
+    for the underlying generators are allowed but discouraged.
+
+    Parameters
+    ----------
+    data : bool (optional, default True)
+        If True, each node has a `<family>_index attribute`
+    coordinates : bool (optional, default False)
+        If True, node labels are tuples, equivalent to the <family>_index
+        attribute as above.  In this case, the `data` parameter controls the
+        existence of a `linear_index attribute`, which is an int
+
+    Returns
+    -------
+    G : NetworkX Graph of the chosen architecture.
+        Nodes are labeled by integers.
+
+"""
 
 """ =========================== D-Wave Architectures ======================= """
 

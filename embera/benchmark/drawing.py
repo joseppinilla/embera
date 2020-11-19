@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from mpl_toolkits.mplot3d import Axes3D
 
-def plot(plot_method, *plot_args, plot_kwargs={}, subplot_kw={}, savefig=True):
+def plot(plot_method, plot_args, plot_kwargs={}, subplot_kw={}, savefig=True):
     nplots = len(plot_args)
     fig, axs = plt.subplots(1, nplots, squeeze=False, subplot_kw=subplot_kw)
 
@@ -19,11 +19,6 @@ def plot(plot_method, *plot_args, plot_kwargs={}, subplot_kw={}, savefig=True):
     if savefig:
         path = savefig if isinstance(savefig,str) else f"./{plot_method.__name__}.pdf"
         plt.savefig(path)
-
-def plot_yields(solvers, savefig='yield.pdf'):
-    kwargs = {'plot_kwargs':{'node_size':0.2},
-              'subplot_kw':{'aspect':'equal'}}
-    plot(embera.draw_architecture_yield,solvers,savefig=savefig,**kwargs)
 
 def plot_parameters(bqms, savefig=True):
     nplots = len(bqms)

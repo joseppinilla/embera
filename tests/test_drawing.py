@@ -25,12 +25,6 @@ class TestBenchmarkDrawing(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree("./TMP")
 
-    def test_plot_yields(self):
-        T = embera.architectures.generators.dw2000q_graph()
-        T.remove_nodes_from([5,7,19,127])
-        embera.benchmark.plot_yields([T],savefig='./TMP/0.png')
-        self.assertTrue(os.path.exists('./TMP/0.png'))
-
     def test_plot_embeddings(self):
         embeddings = [self.embedding]
         T = nx.Graph(self.target_edgelist)
