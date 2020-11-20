@@ -5,23 +5,13 @@ import dwave.system
 import networkx as nx
 import dwave_networkx as dnx
 
-__all__ = ['graph_from_solver','dwave_online',
+__all__ = ['dwave_online','dwave_collection',
            'rainier_graph', 'vesuvius_graph', 'dw2x_graph', 'dw2000q_graph',
            'p6_graph', 'p16_graph',
            'h20k_graph',
            ]
 
 """ ========================== D-Wave Solver Solutions ===================== """
-
-def graph_from_solver(solver, **kwargs):
-    """ D-Wave architecture graph from dimod Structured Solver
-    """
-    chip_id = solver.properties['chip_id']
-    sampler = dwave.system.DWaveSampler(solver=chip_id)
-    target_graph = sampler.to_networkx_graph()
-    target_graph.graph['chip_id'] = chip_id
-
-    return target_graph
 
 def dwave_online(squeeze=True, **kwargs):
     """ Architecture graphs from D-Wave devices `online`"""
