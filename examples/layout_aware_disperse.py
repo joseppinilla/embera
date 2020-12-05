@@ -3,25 +3,27 @@ target graph with 5% of the nodes removed. This example uses the diffusion place
 without migration to demonstrate the nodes anchored to their candidates.
 """
 
+import embera
 import networkx as nx
 import matplotlib.pyplot as plt
+
+from embera.transform.graph import prune
 from embera.disperse import find_embedding
-from embera.benchmark.topologies import pruned_graph_gen
 from embera.architectures import drawing, generators
 from embera.preprocess.diffusion_placer import find_candidates
 
 # A 2x2 grid problem graph
-p = 2
+p = 4
 Sg = nx.grid_2d_graph(p, p)
 S_edgelist = list(Sg.edges())
 # Layout of the problem graph
 layout = {v:v for v in Sg}
 
 # The corresponding graph of the D-Wave C4 annealer with 0.95 qubit yield
-Tg = pruned_graph_gen(generators.rainier_graph, node_yield=0.95)()
+Tg = prune(embera.architectures.generators.rainier_graph(), node_yield=0.95)
 T_edgelist = list(Tg.edges())
 # Find a global placement for problem graph
-candidates = find_candidates(S_edgelist, Tg, layout=layout, enable_migration=False)
+candidates = find_candidates(S_edgelist, Tg, layout=layout, enable_migration=True)
 
 # Draw candidates as if embedded
 plt.figure(0)

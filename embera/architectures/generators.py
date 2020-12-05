@@ -1,11 +1,13 @@
 import os
+import re
+import json
 import tarfile
 import requests
 import dwave.system
 import networkx as nx
 import dwave_networkx as dnx
 
-__all__ = ['dwave_online','dwave_collection',
+__all__ = ['dwave_collection',
            'rainier_graph', 'vesuvius_graph', 'dw2x_graph', 'dw2000q_graph',
            'p6_graph', 'p16_graph',
            'h20k_graph',
@@ -13,62 +15,82 @@ __all__ = ['dwave_online','dwave_collection',
 
 """ ========================== D-Wave Solver Solutions ===================== """
 
-def dwave_online(squeeze=True, **kwargs):
-    """ Architecture graphs from D-Wave devices `online`"""
-    import dwave.cloud
-    with dwave.cloud.Client.from_config(**kwargs) as client:
-        solvers = client.get_solvers()
-    graphs = [graph_from_solver(s) for s in solvers if s.properties.get('topology')]
-    if squeeze:
-        return graphs[0] if len(graphs)==1 else graphs
-    else:
-        return graphs
+def dwave_collection(chip_id=None, chip_id__regex=None):
+    """ List of architecture graphs from current and legacy D-Wave devices. All
+        graphs use 'int' labels for qubits and couplers.
 
-def dwave_collection(name=None):
-    """ Architecture graphs from current and legacy D-Wave devices
+        Note: The "collection.tar.gz" file isn't provided with `embera` to avoid
+        breaching export control regulations or Copyright. However, the information
+        neccesary to replicate it may be obtained from these public sources:
 
-        |name                 | nodes    | edges  |
-        | ------------------- |:--------:| ------:|
-        |Advantage_system1.1  | 5436     | 37440  |
-        |DW_2000Q_6           | 2041     | 5974   |
-        |DW_2000Q_5           | 2030     | 5909   |
-        |DW_2000Q_2_1         | 2038     | 5955   |
-        |DW_2000Q_QuAIL       | 2031     | 5919   |
-        |DW_2X_LANL           | 1141     | 3298   |
+        [1] D-Wave devices - https://support.dwavesys.com/hc/en-us/articles/360005268633-QPU-Specific-Physical-Properties
+        [2] LANL DW-2000Q - https://arxiv.org/pdf/2009.00111.pdf
+        [3] QuAIL DW-2000Q - https://arxiv.org/pdf/1810.05881.pdf
+        [4] DW2X-SYS - https://www.nature.com/articles/s41598-018-22763-2
+        [5] LANL DW2X - https://link.springer.com/chapter/10.1007/978-3-030-14082-3_2
 
-        Returns list of NetworkX graphs with parameters:
-            >>> G.graph = {'columns': <int>,
-                           'data': bool,
-                           'family': <string>,
-                           'labels': <string>,
-                           'name': <string>,
-                           'rows': <int>,
-                           'tile': <int>}
+        Each device is stored as a `dwave_networkx` graph in a JSON file produced
+        with `networkx.adjacency_data()` with the only addition of the 'chip_id'
+        value. Contact the author if you have any questions.
+
+            | name                   | chip_id             | nodes | edges |
+            | ---------------------- | ------------------- |:-----:| -----:|
+            | pegasus_graph(16)      | Advantage_system1.1 | 5436  | 37440 |
+            | chimera_graph(16,16,4) | DW_2000Q_6          | 2041  | 5974  |
+            | chimera_graph(16,16,4) | DW_2000Q_5          | 2030  | 5909  |
+            | chimera_graph(16,16,4) | DW_2000Q_2_1        | 2038  | 5955  |
+            | chimera_graph(16,16,4) | DW_2000Q_QuAIL      | 2031  | 5919  |
+            | chimera_graph(12,12,4) | DW_2X_LANL          | 1141  | 3298  |
+
+        Optional Arguments:
+            chip_id: (string, default=None)
+                If provided, only devices matching the exact `chip_id` are
+                returned.
+
+            chip_id__regex: (string, default=None)
+                If provided, devices with partial/regex-based matches are
+                returned.
+
+        Returns:
+            graph_list: (iterable of networkx.Graph)
+                Each graph in the list has:
+                    >>> G.graph = {'columns': <int>,
+                                   'data': bool,
+                                   'family': <string>,
+                                   'labels': 'int',
+                                   'name': <string>,
+                                   'rows': <int>,
+                                   'tile': <int>,
+                                   'chip_id': <string>,
+                                   # Only for Pegasus graphs
+                                   'horizontal_offsets': <list>,
+                                   'vertical_offsets': <list>}
     """
     graph_list = []
     path = "./collection.tar.gz"
-    url = "http://www.ece.ubc.ca/~jpinilla/resources/embera/architectures/dwave/collection.tar.gz"
 
-    # Download
     if not os.path.isfile(path):
-        print(f"-> Downloading D-Wave architecture collection to {path}")
-        with open(path, 'wb') as f:
-            response = requests.get(url)
-            f.write(response.content)
+        raise RuntimeError(f"Collection file {path} not found.")
+
+    conditions = []
+    if chip_id is not None:
+        conditions.append(lambda x: x==chip_id)
+    elif chip_id__regex is not None:
+        chip_id_re = re.compile(chip_id__regex)
+        conditions.append(lambda x: chip_id_re.search(x))
+
     # Unzip, untar, unpickle
     with tarfile.open(path) as contents:
         for member in contents.getmembers():
+            # Filenames are <chip_id>.json
+            root, ext = os.path.splitext(member.name)
+            if not all(cond(root) for cond in conditions): continue
+            # Extract and parse
             f = contents.extractfile(member)
-            G = nx.read_gpickle(f)
+            G = nx.adjacency_graph(json.load(f))
             graph_list.append(G)
 
-    if name is None:
-        return graph_list
-    else:
-        try:
-            return next(g for g in graph_list if g.name==name)
-        except:
-            raise KeyError("Architecture graph name not found in collection")
+    return graph_list
 
 """ Generators for architecture graphs.
 
@@ -86,9 +108,8 @@ def dwave_collection(name=None):
 
     Returns
     -------
-    G : NetworkX Graph of the chosen architecture.
-        Nodes are labeled by integers.
-
+    G : NetworkX Graph of the chosen architecture. All graphs use 'int' labels
+    for qubits and couplers.
 """
 
 """ =========================== D-Wave Architectures ======================= """

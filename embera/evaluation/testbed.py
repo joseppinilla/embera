@@ -72,12 +72,21 @@ class StructuredSASampler(StructuredMockSampler,dimod.SimulatedAnnealingSampler)
     def __init__(self, failover=None,**config):
         dimod.SimulatedAnnealingSampler.__init__(self)
         StructuredMockSampler.__init__(self,failover=failover,**config)
+        self.properties['chip_id'] = 'SIM_'+self.properties['chip_id']
+
+    def sample(self, *args, **kwargs):
+        child_kwargs = {k:v for k,v in kwargs.items() if k in self.parameters}
+        return super().sample(*args, **child_kwargs)
 
 class StructuredRandomSampler(StructuredMockSampler,dimod.RandomSampler):
     def __init__(self, failover=None,**config):
         dimod.RandomSampler.__init__(self)
         StructuredMockSampler.__init__(self,failover=failover,**config)
+        self.properties['chip_id'] = 'RND_'+self.properties['chip_id']
 
+    def sample(self, *args, **kwargs):
+        child_kwargs = {k:v for k,v in kwargs.items() if k in self.parameters}
+        return super().sample(*args, **child_kwargs)
 
 def embed_and_report(method, *args, **kwargs):
     report = {}

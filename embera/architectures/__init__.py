@@ -1,3 +1,3 @@
-from .coordinates import *
-from .drawing import *
-from .generators import *
+from embera.coordinates import *
+from embera.drawing import *
+from embera.generators import *

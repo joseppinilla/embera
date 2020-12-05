@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from mpl_toolkits.mplot3d import Axes3D
 
-def plot(plot_method, plot_args, plot_kwargs={}, subplot_kw={}, savefig=True):
+def plot(plot_method, *plot_args, plot_kwargs={}, subplot_kw={}, savefig=True):
     nplots = len(plot_args)
     fig, axs = plt.subplots(1, nplots, squeeze=False, subplot_kw=subplot_kw)
 

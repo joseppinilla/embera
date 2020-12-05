@@ -1,5 +1,5 @@
 """
-Tools to visualize graphs of architectures.
+Architecture-agnostic tools to visualize graphs of D-Wave architectures.
 """
 
 import warnings
