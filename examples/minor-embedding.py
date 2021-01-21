@@ -20,4 +20,4 @@ for G in graph_set:
 for G in graph_set:
    for l in ['A','B']:
       embeddings = db.load_embeddings(G,H,labels=[l]):
-      embera.evaluation.embeddings(embeddings)
+      embera.evaluation.embeddings(embeddings) # embedding_<metric>

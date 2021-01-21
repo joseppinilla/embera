@@ -119,8 +119,9 @@ def read_mapping(mtx_a_name, mtx_b_name, mm_dir=MM_DIR, data=True):
     return embedding
 
 def write_networkx(Gnx, pos=None, mtx_name=None, mm_dir=MM_DIR, data=True, **params):
-    """ Write to a Matrix Market file from a NetworkX Graph
-    with auxiliary attributes.
+    """ Write to a Matrix Market file from a NetworkX Graph with auxiliary
+    attributes.
+
     Args:
         Gnx (Graph): NetworkX Graph recovered from given file with
         or w/o auxiliary data.
@@ -164,28 +165,3 @@ def write_networkx(Gnx, pos=None, mtx_name=None, mm_dir=MM_DIR, data=True, **par
         with open(nodename_filepath, 'w') as fp:
             for nodename in Gnx.nodes:
                 fp.write('%s\n' % str(nodename))
-
-
-
-if __name__ == "__main__":
-    from random import uniform
-    import matplotlib.pyplot as plt
-
-    J_RANGE = [-2.0,2.0]
-    name ='GRID_2D_16X16'
-    mm_dir = './graphs'
-
-    # Write graph to Matrix Market file
-    Gnx = nx.grid_2d_graph(16,16)
-    Gnx.name = name
-    pos = {v:v for v in Gnx}
-    for (u, v, data) in Gnx.edges(data=True):
-        data['weight'] = uniform(*J_RANGE)
-
-    comments = "2D Grid 16x16"
-    write_networkx(Gnx, pos=pos, mtx_name=name, mm_dir=mm_dir, comment=comments)
-
-    # Read Graph from Matrix Market file to visually verify pos
-    G = read_networkx(name, mm_dir=mm_dir)
-    nx.draw(G, pos=G.graph['pos'], with_labels=True)
-    plt.show()
