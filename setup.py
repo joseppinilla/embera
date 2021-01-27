@@ -3,12 +3,12 @@
 from setuptools import setup
 
 packages = ['embera',
+            'embera.algorithms',
             'embera.architectures',
-            'embera.benchmark',
+            'embera.benchmarks',
             'embera.composites',
+            'embera.evaluation',
             'embera.interfaces',
-            'embera.preprocess',
-            'embera.transform',
             'embera.utilities',
             ]
 
