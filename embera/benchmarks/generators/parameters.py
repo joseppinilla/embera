@@ -2,12 +2,11 @@ import dimod
 import numpy as np
 
 """ ======================== BinaryQuadraticModel ========================== """
-
 def init_bm(G, RNG_SEED=None):
     np.random.seed(RNG_SEED)
     """ Simulated Ising parameters of initialization of a Boltzmann Machine. """
     N = len(G.nodes)
-    node_biases = np.random.normal((.0,.25),(.75,.075),(N,1)).reshape(N)
+    node_biases = np.random.normal((.0,.25),(.75,.075),(1,N,1)).reshape(N)
     edge_biases = np.random.uniform(low=-2.0,high=2.0,size=len(G.edges))
     h = {v:b for v,b in zip(G.nodes,node_biases)}
     J = {(u,v):b for (u,v),b in zip(G.edges,edge_biases) if u!=v}
