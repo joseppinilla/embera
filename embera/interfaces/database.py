@@ -3,7 +3,6 @@ import json
 import time
 import dimod
 import numpy
-import pandas as pd
 import networkx as nx
 
 from hashlib import md5
@@ -22,6 +21,14 @@ from dwave.embedding import unembed_sampleset
 
 from networkx.readwrite.json_graph import node_link_data as _serialize_graph
 from networkx.readwrite.json_graph import node_link_graph as _deserialize_graph
+
+try:
+    # Pandas isn't required. But if a pandas dependant command is required
+    # this can identify the issue.
+    import pandas as pd
+    _pandas = True
+except e:
+    _pandas = False
 
 __all__ = ["EmberaDataBase"]
 
@@ -436,8 +443,11 @@ class EmberaDataBase:
                     if not dataframe:
                         reports[metric] = report
                     else:
-                        kwargs = {'columns':list(bqm),'orient':'index'}
-                        reports[metric] = pd.DataFrame.from_dict(report,**kwargs)
+                        if _pandas:
+                            kwargs = {'columns':list(bqm),'orient':'index'}
+                            reports[metric] = pd.DataFrame.from_dict(report,**kwargs)
+                        else:
+                            raise RuntimeError("Module `pandas` not available.")
         return reports
 
     def load_report(self, bqm, target, metric, tags=[], dataframe=False):

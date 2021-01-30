@@ -3,7 +3,7 @@ import minorminer
 import numpy as np
 
 from embera.utilities.decorators import nx_graph
-from embera.preprocess.tiling_parser import DWaveNetworkXTiling
+from embera.architectures.tiling import DWaveNetworkXTiling
 
 __all__ = ['translate','mirror','rotate','spread_out','open_seam',
            'iter_sliding_window', 'greedy_fit','reconnect']

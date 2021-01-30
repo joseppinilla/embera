@@ -1,4 +1,5 @@
-from .drawing import *
-from .parameters import *
-from .testbed import *
-from .topologies import *
+import embera.benchmarks.generators
+from embera.benchmarks.generators import *
+
+from embera.benchmarks.parameters import *
+from embera.benchmarks.topologies import *

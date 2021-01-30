@@ -13,7 +13,7 @@ from embera.architectures import dwave_coordinates
        graph and convert accordingly.
 """
 
-""" =============================== NetworkX ============================= """
+""" =============================== NetworkX =============================== """
 
 def nx_graph(*graph_index):
     """ Decorator to support input graphs as NetworkX Graphs or lists of edges.

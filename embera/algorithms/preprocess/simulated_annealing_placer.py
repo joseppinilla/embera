@@ -1,6 +1,6 @@
 import warnings
 
-from embera.preprocess.tiling_parser import DWaveNetworkXTiling
+from embera.architectures.tiling import DWaveNetworkXTiling
 
 __all__ = ['find_candidates', 'SimulatedAnnealingPlacer']
 
