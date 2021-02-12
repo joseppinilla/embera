@@ -5,7 +5,8 @@ import dimod
 import tarfile
 import requests
 
-def frust_loops_bench(Nq=(0,512), Nsg=(0,3000), s=(0,100)):
+def frust_loops_bench(Nq=(0,512), Nsg=(0,3000), s=(0,100),
+                      with_degeneracy=False):
     """ Frustrated Ising problems with planted solutions used by Marshall et
         al. in [1]. Linear biases are set to 0, and planted solutions are
         created using [2]. All linear biases h=0. Problem sizes are limited to
@@ -13,15 +14,15 @@ def frust_loops_bench(Nq=(0,512), Nsg=(0,3000), s=(0,100)):
 
             Nq<Number of qubits>_Nsg<Number of loops>_s<Instance number>
 
-        Each benchmark is a dimod.BinaryQuadraticModel with added information:
+        Each benchmark is a dimod.BinaryQuadraticModel with additional key:value
+        entries in bqm.info:
 
             'E0' : <float>
                 Ground State if known
             'energy' : list
                 Sorted list of known energies
             'degeneracy' : list
-                Sorted list of known degeneracies
-
+                Sorted list of known degeneracies calculated by [3]
 
         Arguments:
 
@@ -35,7 +36,11 @@ def frust_loops_bench(Nq=(0,512), Nsg=(0,3000), s=(0,100)):
 
             s: (int or tuple(int,int), default=(0,100))
                 If int, returns benchmark parameters instance s, if found.
-                If tuple(a,b), returns benchmark parameters instances a <= s <= b
+                If tuple, returns benchmark parameters instances a <= s <= b
+
+            with_degeneracy: (bool, default=False)
+                If True, only returns instances with degeneracy solutions [3].
+                If False, returns all instances regardless of information.
 
          [1] Marshall, J., Venturelli, D., Hen, I., & Rieffel, E. G. (2019).
          Power of Pausing: Advancing Understanding of Thermalization in
@@ -45,6 +50,9 @@ def frust_loops_bench(Nq=(0,512), Nsg=(0,3000), s=(0,100)):
          D. A. (2015). Probing for quantum speedup in spin-glass problems with
          planted solutions. Physical Review A - Atomic, Molecular, and Optical
          Physics, 92(4). https://doi.org/10.1103/PhysRevA.92.042325
+         [3] Barash, L., Marshall, J., Weigel, M., & Hen, I. (2019). Estimating
+         the density of states of frustrated spin systems. New Journal of
+         Physics, 21(7). https://doi.org/10.1088/1367-2630/ab2e39
     """
     benchmark_set = []
     path = "./frust_loops.tar.gz"
@@ -82,6 +90,10 @@ def frust_loops_bench(Nq=(0,512), Nsg=(0,3000), s=(0,100)):
                         f = contents.extractfile(member)
                         bqm_ser = json.load(f)
                         bqm = dimod.BinaryQuadraticModel.from_serializable(bqm_ser)
-                        benchmark_set.append(bqm)
+                        if with_degeneracy:
+                            if bqm.info['degeneracy']:
+                                benchmark_set.append(bqm)
+                        else:
+                            benchmark_set.append(bqm)
 
     return benchmark_set
