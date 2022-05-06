@@ -20,9 +20,6 @@ P = dnx.pegasus_graph(16,nice_coordinates=True)
 dnx.draw_pegasus(P,node_size=10,crosses=True)
 dnx.draw_pegasus_embedding(P,nice_embedding,node_size=10)
 
-%matplotlib qt
-
-
 
 iter_emb = list(iter_sliding_window(P,nice_embedding))
 

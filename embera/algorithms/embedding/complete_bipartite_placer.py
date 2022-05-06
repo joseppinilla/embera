@@ -12,7 +12,7 @@ embedding due to faulty qubits, these assignments are deemed candidates.
 NOTE 2: This method is only applicable to Chimera graphs.
 """
 import networkx as nx
-from embera.utilities.random import shuffle
+from random import shuffle
 from dwave_networkx.generators.chimera import chimera_coordinates
 
 __all__ = ['find_candidates', 'CompleteBipartitePlacer']

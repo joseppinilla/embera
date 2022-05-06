@@ -41,9 +41,9 @@ class dwave_coordinates:
             raise ValueError("Target graph needs to have family, columns, rows,\
             and tile attributes.")
 
-        if family is 'chimera':
+        if family == 'chimera':
             return chimera_coordinates(m,n,t)
-        elif family is 'pegasus':
+        elif family == 'pegasus':
             return pegasus_coordinates(m)
         else:
             raise ValueError('Graph family not supported')

@@ -1,14 +1,12 @@
 """ Example of a systematic embedding approach for complete bipartite graphs """
 
 import matplotlib.pyplot as plt
-from embera.utilities.random import seed
-from embera.transform.graph import prune
+from embera.algorithms.transform.graph import prune
 from embera.architectures import drawing, generators
-from embera.preprocess.complete_bipartite_placer import find_candidates
+from embera.algorithms.embedding.complete_bipartite_placer import find_candidates
 
-seed(42)
 # Problem dimensions
-p, q = 10, 6
+p, q = 8, 6
 # The corresponding graph of the D-Wave C4 (Rainier) annealer with 0.95 qubit yield
 Tg = prune(generators.rainier_graph(coordinates=True), node_yield=0.95)
 plt.subplot(2, 2, 1)
@@ -23,7 +21,7 @@ plt.subplot(2, 2, 2)
 drawing.draw_architecture_embedding(Tg, candidates, node_size=20, show_labels=True)
 
 """ Example of a transformable embedding for complete bipartite graphs """
-from embera.preprocess.complete_bipartite_placer import CompleteBipartitePlacer
+from embera.algorithms.embedding.complete_bipartite_placer import CompleteBipartitePlacer
 
 # Create placer object from candidates and perform transformations
 placer = CompleteBipartitePlacer.from_candidates((p,q), Tg, candidates)
@@ -36,7 +34,7 @@ placer = CompleteBipartitePlacer((p,q), Tg)
 plt.subplot(2, 2, 3)
 drawing.draw_architecture_embedding(Tg, {**P, **Q}, node_size=20, show_labels=True)
 
-# and performa transformations:
+# and perform transformations:
 placer.rotate()
 placer.shuffle()
 
