@@ -2,7 +2,7 @@ import networkx as nx
 import dwave_networkx  as dnx
 
 from decorator import decorator
-from embera.architectures import dwave_coordinates
+from embera.architectures.coordinates import dwave_coordinates
 
 
 """ ToDo:
@@ -91,30 +91,30 @@ def dnx_graph(*graph_index, nice_coordinates=False):
         labels = G.graph['labels']
         converter = dwave_coordinates.from_graph_dict(G.graph)
         if nice_coordinates:
-            if labels is 'int':
+            if labels == 'int':
                 node_list = converter.iter_linear_to_nice(G.nodes)
                 edge_list = converter.iter_linear_to_nice_pairs(G.edges)
-            elif labels is 'coordinate':
+            elif labels == 'coordinate':
                 node_list = converter.iter_coordinate_to_nice(G.nodes)
                 edge_list = converter.iter_coordinate_to_nice_pairs(G.edges)
-            elif labels is 'nice':
+            elif labels == 'nice':
                 return G
             else:
                 raise ValueError("Label type not supported.")
         else:
-            if labels is 'int':
+            if labels == 'int':
                 node_list = converter.iter_linear_to_coordinate(G.nodes)
                 edge_list = converter.iter_linear_to_coordinate_pairs(G.edges)
-            elif labels is 'nice':
+            elif labels == 'nice':
                 node_list = converter.iter_nice_to_coordinate(G.nodes)
                 edge_list = converter.iter_nice_to_coordinate_pairs(G.edges)
-            elif labels is 'coordinate':
+            elif labels == 'coordinate':
                 return G
             else:
                 raise ValueError("Label type not supported.")
 
         family = G.graph.get('family')
-        if family is 'chimera':
+        if family == 'chimera':
             n = G.graph['columns']
             m = G.graph['rows']
             t = G.graph['tile']

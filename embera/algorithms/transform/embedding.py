@@ -107,10 +107,10 @@ def mirror(T, embedding, axis=0):
     # Define flips
     m,n = tiling.shape
     t = tiling.graph['tile']
-    if axis is 0:
+    if axis == 0:
         new_tile = lambda i,j: (i,n-j-1)
         new_k = lambda k,shore: k if shore else t-k-1
-    elif axis is 1:
+    elif axis == 1:
         new_tile = lambda i,j: (m-i-1,j)
         new_k = lambda k,shore: t-k-1 if shore else k
     else:
@@ -225,7 +225,7 @@ def spread_out(T, embedding, sheer=None):
         raise RuntimeError("Can't spread out")
     # Spread out all qubits by chain
     new_embedding = {}
-    if sheer is None:
+    if sheer == None:
         shift = lambda tile,origin: (tile-origin)*2
     elif sheer == 0:
         shift = lambda tile,origin: (tile-origin)*2+np.flip((tile-origin)%[2,1])
@@ -270,16 +270,16 @@ def open_seam(T, embedding, seam, direction):
     """
     tiling = DWaveNetworkXTiling(T)
 
-    if direction is 'left':
+    if direction == 'left':
         shift = lambda tile: tile[1]<=seam
         offset = np.array([0,-1])
-    elif direction is 'right':
+    elif direction == 'right':
         shift = lambda tile: tile[1]>=seam
         offset = np.array([0,+1])
-    elif direction is 'up':
+    elif direction == 'up':
         shift = lambda tile: tile[0]<=seam
         offset = np.array([-1,0])
-    elif direction is 'down':
+    elif direction == 'down':
         shift = lambda tile: tile[0]>=seam
         offset = np.array([+1,0])
     else:

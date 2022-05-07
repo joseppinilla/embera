@@ -1,3 +1,3 @@
 # Global Placement
-from .diffusion_placer import *
-from .simulated_annealing_placer import *
+import embera.algorithms.preprocess.diffusion_placer
+import embera.algorithms.preprocess.simulated_annealing_placer

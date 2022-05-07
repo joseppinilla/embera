@@ -117,7 +117,7 @@ class EmberaDataBase:
         json_bqm = json.dumps(filtered,sort_keys=True)
         id = self.hash(json_bqm.encode("utf-8"))
 
-        if not alias is None:
+        if not alias == None:
             self.set_bqm_alias(id,alias)
         return id
 
@@ -182,7 +182,7 @@ class EmberaDataBase:
             path = os.path.join(path,dir)
             if not os.path.isdir(path):
                 os.mkdir(path)
-        if filename is not None:
+        if filename != None:
             path = os.path.join(path,filename+'.json')
         return path
 
@@ -262,12 +262,12 @@ class EmberaDataBase:
                         sampleset = _load(fp,cls=DimodDecoder)
                     samplesets.append(sampleset)
 
-        if embedding is "":
+        if embedding == "":
             return samplesets
         elif not isinstance(embedding,(Embedding,dict)):
             raise ValueError("Embedding alias or id cannot be used to unembed")
 
-        if unembed_args is None:
+        if unembed_args == None:
             return samplesets
         else:
             return [unembed_sampleset(s,embedding,bqm,**unembed_args) for s in samplesets]
@@ -302,7 +302,7 @@ class EmberaDataBase:
         if not samplesets:
             return dimod.SampleSet.from_samples([],bqm.vartype,None)
 
-        if index is not None:
+        if index != None:
             return samplesets.pop(index)
 
         try:

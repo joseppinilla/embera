@@ -1,4 +1,4 @@
-from embera.architectures.coordinates import *
-from embera.architectures.drawing import *
-from embera.architectures.generators import *
-from embera.architectures.tiling import *
+import embera.architectures.coordinates
+import embera.architectures.drawing
+import embera.architectures.generators
+import embera.architectures.tiling

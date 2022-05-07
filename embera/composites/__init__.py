@@ -1,2 +1,2 @@
-from embera.composites.checkerboard_transform import *
-from embera.composites.lenient_embedding import *
+import embera.composites.checkerboard_transform
+import embera.composites.lenient_embedding
