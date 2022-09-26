@@ -79,10 +79,9 @@ def plot_embeddings(embeddings, T, savefig=True):
         path = savefig if isinstance(savefig,str) else "./embeddings.pdf"
         plt.savefig(path)
 
-def plot_joint_samplesets(samplesets, info_key=None, gray=False, savefig=True):
+def plot_joint_samplesets(samplesets, shape=None, gray=False, labels=None, savefig=True):
     nplots = len(samplesets)
-    fig = plt.figure(figsize=(nplots*3, 4))
-    grid = plt.GridSpec(5, 5*nplots, hspace=0.0, wspace=0.0)
+    fig = plt.figure()
 
     def gray2bin(n):
         w = len(n)
@@ -93,6 +92,19 @@ def plot_joint_samplesets(samplesets, info_key=None, gray=False, savefig=True):
             n ^= mask
         return format(n,f'0{w}b')
 
+    if shape is None:
+        size = len(samplesets[0].variables)
+        width = size//2
+        height = size-size//2
+    else:
+        size = sum(shape)
+        width,height = shape
+
+    grid = plt.GridSpec(5, 5*nplots, hspace=0.0, wspace=0.0)
+
+    maxX = 2**(width)-1
+    maxY = 2**(height)-1
+
     minE = float('Inf')
     maxE = -float('Inf')
     x = {}; y = {}; E = {}; c = {}
@@ -101,17 +113,13 @@ def plot_joint_samplesets(samplesets, info_key=None, gray=False, savefig=True):
         x[i] = []; y[i] = []; E[i] = []; c[i] = []
         if not sampleset: continue
 
-        size = len(sampleset.variables)
-        width = 2**(size//2)-1
-        height = 2**(size-size//2)-1
-
         # Reverse iteration allows plotting lower (important) samples on top.
         for datum in sampleset.data(sorted_by='energy',reverse=True):
-            value = ''.join(str((1+datum.sample[k])//2) for k in sorted(datum.sample))
-            x_point = gray2bin(value[0:size//2]) if gray else value[0:size//2]
-            y_point = gray2bin(value[size//2:]) if gray else value[size//2:]
-            x[i].append(int(x_point,2)/width)
-            y[i].append(int(y_point,2)/height)
+            value = ''.join(str(int(1+datum.sample[k])//2) for k in sorted(datum.sample))
+            x_point = gray2bin(value[0:width]) if gray else value[0:width]
+            y_point = gray2bin(value[width:]) if gray else value[width:]
+            x[i].append(int(x_point,2)/maxX)
+            y[i].append(int(y_point,2)/maxY)
             c[i].append(datum.num_occurrences)
             E[i].append(datum.energy)
             if datum.energy < minE: minE = datum.energy
@@ -145,8 +153,13 @@ def plot_joint_samplesets(samplesets, info_key=None, gray=False, savefig=True):
                     orientation='horizontal', color='gray')
 
         ims.append(sct)
-        main_ax.set_xlabel(sampleset.info.get(info_key,"N/A"))
-
+        if labels is None:
+            labelX = 'VISIBLE'
+            labelY = 'HIDDEN'
+        else:
+            labelX,labelY = labels
+        main_ax.set_xlabel(labelX)
+        main_ax.set_ylabel(labelY)
 
     # Color Bar
     vmin,vmax = zip(*[im.get_clim() for im in ims])
