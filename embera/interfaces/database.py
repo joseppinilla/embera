@@ -255,7 +255,7 @@ class EmberaDataBase:
                         sampleset = _load(fp,cls=DimodDecoder)
                     samplesets.append(sampleset)
 
-        if embedding is "":
+        if embedding == "":
             return samplesets
         elif not isinstance(embedding,(Embedding,dict)):
             raise ValueError("Embedding alias or id cannot be used to unembed")

@@ -26,13 +26,13 @@ class DWaveNetworkXTiling:
         dim = len(self.shape)
         labels = self.graph['labels']
         converter = embera.dwave_coordinates.from_graph_dict(self.graph)
-        if labels is 'int':
+        if labels == 'int':
             self.to_nice = converter.linear_to_nice
             self.from_nice = converter.nice_to_linear
-        elif labels is 'coordinate':
+        elif labels == 'coordinate':
             self.to_nice = converter.coordinate_to_nice
             self.from_nice = converter.nice_to_coordinate
-        elif labels is 'nice':
+        elif labels == 'nice':
             self.to_nice = lambda n: n
             self.from_nice = lambda n: n
         # Add Tile objects
