@@ -3,18 +3,20 @@ import warnings
 import networkx as nx
 import matplotlib.pyplot as plt
 
-from embera.preprocess.tiling_parser import DWaveNetworkXTiling
+from embera.preprocess.tiling_parser import DWaveNetworkXTiling, Tile
 from embera.architectures.drawing import draw_tiled_graph
+from typing import List, Tuple
 
 __all__ = ['find_candidates']
 
 class DiffusionPlacer(DWaveNetworkXTiling):
     """ Diffusion-based migration of a graph layout
     """
-    def __init__(self, S, Tg, **params):
-        DWNetworkXTiling.__init__(self, Tg)
+    def __init__(self, S, Tg: nx.Graph, **params):
+        DWaveNetworkXTiling.__init__(self, Tg)
 
         self.p_size = len(S)
+        self.t_size = len(list(Tg.edges()))
 
         self.tries = params.pop('tries', 1)
         self.verbose = params.pop('verbose', 0)
@@ -64,15 +66,15 @@ class DiffusionPlacer(DWaveNetworkXTiling):
             if self.vicinity == 1:
                 # Immediate neighbors
                 for tile in [n,s,w,e]:
-                    candidates[s_node].update(self.tiles[tile].qubits)
+                    candidates[s_node] = self.tiles[tile].qubits
             elif self.vicinity == 2:
                 # Extended neighbors
                 for tile in [n, s, w, e, nw, ne, se, sw]:
-                    candidates[s_node].update(self.tiles[tile].qubits)
+                    candidates[s_node] = self.tiles[tile].qubits
             elif self.vicinity == 3:
                 # Directed  = (Single) + 3 tiles closest to the node coordinates
                 x_coord, y_coord = self.layout[s_node]
-                i_index, j_index = s_tile
+                t_index, i_index, j_index = s_tile
                 if x_coord >= j_index+0.5:
                     if y_coord >= i_index+0.5: neighbor_tiles = (e,s,se)
                     else: neighbor_tiles = (e,n,ne)
@@ -81,7 +83,7 @@ class DiffusionPlacer(DWaveNetworkXTiling):
                     else: neighbor_tiles = (w,n,nw)
 
                 for tile in neighbor_tiles:
-                    candidates[s_node].update(self.tiles[tile].qubits)
+                    candidates[s_node] = self.tiles[tile].qubits
             elif self.vicinity!=0:
                 raise ValueError("vicinity %s not valid [0-3]." % self.vicinity)
 
@@ -148,21 +150,23 @@ class DiffusionPlacer(DWaveNetworkXTiling):
 
     def _coords_to_tile(self, x_coord, y_coord):
         """ Tile values are restricted.
-        Horizontallly 0<=i<=n
-        Vertically 0<=j<=m
+        Horizontallly 0<=i<n
+        Vertically 0<=j<m
 
         """
+        t = 0
         j = max(min(math.floor(x_coord), self.n-1), 0)
         i = max(min(math.floor(y_coord), self.m-1), 0)
-        tile = (i,j)
+        tile = (t,i,j)
         return tile
 
 
-    def _get_attractors(self, i, j):
+    def _get_attractors(self, tile: Tile) -> Tuple[Tuple[int,int], Tuple[int,int], Tuple[int,int]]:
         """ Get three neighboring tiles that are in the direction
             of the center of the tile array.
         """
-        n, s, w, e, nw, ne, se, sw = self.tiles[(i,j)].neighbors
+        n, s, w, e, nw, ne, se, sw = tile.neighbors
+        t, i, j = tile.index
         lh = (j >= 0.5*self.n)
         lv = (i >= 0.5*self.m)
 
@@ -171,7 +175,7 @@ class DiffusionPlacer(DWaveNetworkXTiling):
         # else
         return (e, n, ne) if lv else (e, s, se)
 
-    def _get_gradient(self, tile):
+    def _get_gradient(self, tile: Tile):
         """ Get the x and y gradient from the concentration of Nodes
             in neighboring tiles. The gradient is calculated against
             tiles with concentration at limit value d_lim, in order to
@@ -180,12 +184,14 @@ class DiffusionPlacer(DWaveNetworkXTiling):
         d_lim = self.d_lim
         d_ij = tile.concentration
 
-        if d_ij == 0.0 or tile.name == None:
+        if d_ij == 0.0:
             return 0.0, 0.0
-        h, v, hv = self._get_attractors(*tile.name)
+        h, v, hv = self._get_attractors(tile)
         d_h = self.tiles[h].concentration
         d_v = self.tiles[v].concentration
         d_hv = self.tiles[hv].concentration
+
+        # Equation (6)
         gradient_x = - (d_lim - (d_h + 0.5*d_hv)) / (2.0 * d_ij)
         gradient_y = - (d_lim - (d_v + 0.5*d_hv)) / (2.0 * d_ij)
 
@@ -208,7 +214,7 @@ class DiffusionPlacer(DWaveNetworkXTiling):
         # Problem size
         layout = self.layout
 
-        # Diffusivity with expected average occupancy
+        # Diffusivity with expected average occupancy. Equation (4)
         D = 1.0 - min((viscosity*P*exp_occ)/T, 1.0)
 
         # Iterate over tiles
@@ -219,10 +225,14 @@ class DiffusionPlacer(DWaveNetworkXTiling):
             # Iterate over nodes in tile and migrate
             for node in tile.nodes:
                 x, y = layout[node]
+
+                # Equation (7)
                 l_x = (2.0*x/n)-1.0
                 l_y = (2.0*y/m)-1.0
                 v_x = l_x * gradient_x
                 v_y = l_y * gradient_y
+
+                # Equation (8)
                 x_1 = x + D * v_x * delta_t
                 y_1 = y + D * v_y * delta_t
                 layout[node] = (x_1, y_1)
@@ -245,10 +255,6 @@ class DiffusionPlacer(DWaveNetworkXTiling):
             self.tiles[tile].nodes.remove(s_node)
             self.tiles[new_tile].nodes.add(s_node)
             self.mapping[s_node] = new_tile
-
-        for tile in self.tiles.values():
-            if tile.supply:
-                tile.concentration = len(tile.nodes)/tile.supply
 
         if self.verbose==4:
             draw_tiled_graph(self.m, self.n, self.tiles, self.layout)
