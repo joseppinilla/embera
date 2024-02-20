@@ -11,10 +11,11 @@ __all__ = ['find_candidates']
 class DiffusionPlacer(DWaveNetworkXTiling):
     """ Diffusion-based migration of a graph layout
     """
-    def __init__(self, S, Tg, **params):
-        DWNetworkXTiling.__init__(self, Tg)
+    def __init__(self, S, Tg: nx.Graph, **params):
+        DWaveNetworkXTiling.__init__(self, Tg)
 
         self.p_size = len(S)
+        self.t_size = len(list(Tg.edges()))
 
         self.tries = params.pop('tries', 1)
         self.verbose = params.pop('verbose', 0)
@@ -245,10 +246,6 @@ class DiffusionPlacer(DWaveNetworkXTiling):
             self.tiles[tile].nodes.remove(s_node)
             self.tiles[new_tile].nodes.add(s_node)
             self.mapping[s_node] = new_tile
-
-        for tile in self.tiles.values():
-            if tile.supply:
-                tile.concentration = len(tile.nodes)/tile.supply
 
         if self.verbose==4:
             draw_tiled_graph(self.m, self.n, self.tiles, self.layout)

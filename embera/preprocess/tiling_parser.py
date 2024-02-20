@@ -12,14 +12,14 @@ class DWaveNetworkXTiling:
         self.qubits = list(Tg.nodes)
         self.couplers = list(Tg.edges)
         # Graph dimensions
-        m = self.graph["rows"]
-        n = self.graph["columns"]
+        self.m = self.graph["rows"]
+        self.n = self.graph["columns"]
         # Graph type
         family = self.graph['family']
         if family=='chimera':
-            self.shape = (m,n)
+            self.shape = (self.m,self.n)
         elif family=='pegasus':
-            self.shape = (3,m,n)
+            self.shape = (3,self.m,self.n)
         else:
             raise ValueError("Invalid family. {'chimera', 'pegasus'}")
         # Graph cooordinates
@@ -43,6 +43,9 @@ class DWaveNetworkXTiling:
                 self.tiles[tile].qubits.append(q)
             else:
                 self.tiles[tile] = Tile(tile, self.shape, [q])
+        
+        for tile in self.tiles.values():
+            tile.neighbors = self.get_tile_neighbors(tile.index)
 
     def __iter__(self):
         return self.tiles
@@ -103,10 +106,18 @@ class Tile:
     def __init__(self, index, shape, qubits):
         self.index = index
         self.qubits = qubits
+        self.nodes  = set()
+        self.neighbors = []
 
     @property
     def supply(self):
-        return self.qubits
+        return len(self.qubits)
+    
+    @property
+    def concentration(self):
+        if (self.supply):            
+            return len(list(self.nodes)) / self.supply
+        return None
 
     def links(self, tile, edges):
         for q in self.qubits:
