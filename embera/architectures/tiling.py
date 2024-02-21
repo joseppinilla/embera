@@ -25,7 +25,7 @@ class DWaveNetworkXTiling:
         # Graph cooordinates
         dim = len(self.shape)
         labels = self.graph['labels']
-        converter = embera.dwave_coordinates.from_graph_dict(self.graph)
+        converter = embera.architectures.coordinates.dwave_coordinates.from_graph_dict(self.graph)
         if labels == 'int':
             self.to_nice = converter.linear_to_nice
             self.from_nice = converter.nice_to_linear

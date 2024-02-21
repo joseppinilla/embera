@@ -14,7 +14,7 @@ dnx.draw_chimera_embedding(T,embedding,node_size=10)
 
 ################################################################################
 origin = (2,3)
-tra_embedding = embera.transform.embedding.translate(T,embedding,origin)
+tra_embedding = embera.algorithms.transform.embedding.translate(T,embedding,origin)
 _ = plt.figure(figsize=(4,4))
 dnx.draw_chimera_embedding(T,tra_embedding,node_size=10)
 
