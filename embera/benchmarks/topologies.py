@@ -1,5 +1,6 @@
 import os
 import embera
+import pickle
 import tarfile
 import requests
 
@@ -145,7 +146,7 @@ def misc_bench():
     """
     benchmark_set = []
     path = "./misc.tar.gz"
-    url = "http://www.ece.ubc.ca/~jpinilla/resources/embera/misc/misc.tar.gz"
+    url = "http://people.ece.ubc.ca/~jpinilla/resources/embera/misc/misc.tar.gz"
 
     # Download
     if not os.path.isfile(path):
@@ -157,7 +158,7 @@ def misc_bench():
     with tarfile.open(path) as contents:
         for member in contents.getmembers():
             f = contents.extractfile(member)
-            G = nx.read_gpickle(f)
+            G = pickle.load(f)
             benchmark_set.append(G)
 
     # Deep Boltzmann Graph from function
@@ -184,7 +185,7 @@ def qca_bench():
     """
     benchmark_set = []
     path = "./qca.tar.gz"
-    url = "http://www.ece.ubc.ca/~jpinilla/resources/embera/qca/qca.tar.gz"
+    url = "http://people.ece.ubc.ca/~jpinilla/resources/embera/qca/qca.tar.gz"
 
     # Download
     if not os.path.isfile(path):
@@ -196,7 +197,7 @@ def qca_bench():
     with tarfile.open(path) as contents:
         for member in contents.getmembers():
             f = contents.extractfile(member)
-            G = nx.read_gpickle(f)
+            G = pickle.load(f)
             benchmark_set.append(G)
 
     return benchmark_set
