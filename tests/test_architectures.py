@@ -4,12 +4,12 @@ import minorminer
 
 from embera.architectures import generators
 
-GRAPHS = [embera.benchmark.complete_graph(16),
-          embera.benchmark.complete_bipartite_graph(8),
-          embera.benchmark.grid_2d_graph(4),
-          embera.benchmark.grid_3d_graph(4),
-          embera.benchmark.rooks_graph(4),
-          embera.benchmark.hypercube_graph(n=16)
+GRAPHS = [embera.benchmarks.complete_graph(16),
+          embera.benchmarks.complete_bipartite_graph(8),
+          embera.benchmarks.grid_2d_graph(4),
+          embera.benchmarks.grid_3d_graph(4),
+          embera.benchmarks.rooks_graph(4),
+          embera.benchmarks.hypercube_graph(n=16)
           ]
 
 class TestArchitectures(unittest.TestCase):

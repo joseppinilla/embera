@@ -3,7 +3,7 @@ import minorminer
 import numpy as np
 
 from embera.utilities.decorators import nx_graph
-from embera.preprocess.tiling_parser import DWaveNetworkXTiling
+from embera.architectures.tiling import DWaveNetworkXTiling
 
 __all__ = ['translate','mirror','rotate','spread_out','open_seam',
            'iter_sliding_window', 'greedy_fit','reconnect']
@@ -102,6 +102,8 @@ def mirror(T, embedding, axis=0):
             >>> new_embedding = embera.transform.embedding.mirror(T,embedding,axis)
             >>> dnx.draw_chimera_embedding(T,new_embedding,node_size=10)
     """
+    #TODO: not supported for Pegasus yet
+    if T.graph['family']=='pegasus': return {k:[] for k in embedding}
     tiling = DWaveNetworkXTiling(T)
     shape = np.array(tiling.shape)
     # Define flips
@@ -152,6 +154,8 @@ def rotate(T, embedding, theta=90):
             >>> new_embedding = embera.transform.embedding.rotate(T,embedding,theta)
             >>> dnx.draw_chimera_embedding(T,new_embedding,node_size=10)
     """
+    #TODO: not supported for Pegasus yet
+    if T.graph['family']=='pegasus': return {k:[] for k in embedding}
     tiling = DWaveNetworkXTiling(T)
     shape = np.array(tiling.shape)
     # Define rotations
@@ -333,20 +337,26 @@ def iter_sliding_window(T, embedding):
     size = np.array(end) - np.array(origin)
     interactions = lambda u,v,E:((s,t) for s in E[u] for t in E[v])
     is_connected = lambda edges: any(T.has_edge(s,t) for s,t in edges)
-    for x in range(shape[1]-size[1]):
-        for y in range(shape[0]-size[0]):
-            slide = {}
-            offset = np.array([x,y])
-            # Translate all qubits
-            for v,chain in embedding.items():
-                new_chain = []
-                for q in chain:
-                    tile = np.array(tiling.get_tile(q))
-                    new_tile = tuple(tile - np.array(origin) + offset)
-                    new_q = tiling.set_tile(q,new_tile)
-                    new_chain.append(new_q)
-                slide[v] = new_chain
-            yield slide
+
+    dims = list((sh-sz) for sh,sz in zip(shape,size))
+    depth,height,width = np.pad(dims,(3-len(dims),0),constant_values=1)
+
+    for z in range(depth):
+        for y in range(height):
+            for x in range(width):
+                slide = {}
+                offset = np.array([z,y,x])[-len(shape):]
+                # Translate all qubits
+                for v,chain in embedding.items():
+                    new_chain = []
+                    for q in chain:
+                        tile = np.array(tiling.get_tile(q))
+                        new_tile = tuple(tile - np.array(origin) + offset)
+                        new_q = tiling.set_tile(q,new_tile)
+                        new_chain.append(new_q)
+                    slide[v] = new_chain
+                yield slide
+
 
 """ ########################### Optimize Embedding #########################
     Transformation methods to try and find a valid embedding from an invalid one
@@ -423,11 +433,10 @@ def greedy_fit(S, T, embedding):
             return e270
     return {}
 
-def reconnect(S, T, embedding, return_overlap=False):
+def reconnect(S, T, embedding, **miner_params):
     """ Perform a short run of minorminer to find a valid embedding """
     # Assign current embedding to suspend_chains to preserve the layout
-    suspend_chains = {k:[[q] for q in chain if q in T] for k,chain in embedding.items()}
+    suspend_chains = {k:[q for q in chain if q in T] for k,chain in embedding.items()}
     # Run minorminer as a short run without chainlength optimization
-    miner_params = {'suspend_chains':suspend_chains,
-                    'return_overlap':return_overlap}
+    miner_params['suspend_chains'] = suspend_chains
     return minorminer.find_embedding(S,T,**miner_params)

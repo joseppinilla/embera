@@ -1,7 +1,7 @@
 import unittest
 import dwave_networkx as dnx
 
-from embera.preprocess.tiling_parser import DWaveNetworkXTiling
+from embera.architectures.tiling import DWaveNetworkXTiling
 
 
 class TestTilingParser(unittest.TestCase):

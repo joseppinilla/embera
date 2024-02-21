@@ -2,12 +2,28 @@ import networkx as nx
 import dwave_networkx  as dnx
 
 from decorator import decorator
-from embera.architectures import dwave_coordinates
+from embera.architectures.coordinates import dwave_coordinates
 
-""" =============================== NetworkX ============================= """
+
+""" ToDo:
+     - Graph inputs could also be adjacency matrices, or dictionaries
+     - Chimera coordinates can also be turned into `nice_coordinates` by
+       appending a 0 on the 3r tile dimension.
+     - Embedding label conversions could identify the label type of the target
+       graph and convert accordingly.
+"""
+
+""" =============================== NetworkX =============================== """
 
 def nx_graph(*graph_index):
-    """ Supports multiple graph arguments but return NetworkX
+    """ Decorator to support input graphs as NetworkX Graphs or lists of edges.
+        Chosen arguments are parsed into NetworkX Graphs.
+
+        Args:
+            graph_index (iter):
+                One or more numbers representing where in the argument list of
+                the wrapped function is the `networkx.Graph` object or list.
+
     """
     def _parse_graph(G):
         if isinstance(G, nx.Graph):
@@ -27,18 +43,48 @@ def nx_graph(*graph_index):
         return func(*new_args, **kwargs)
     return _graph_argument
 
-""" =========================== D-Wave NetworkX ============================ """
+def edgelist_graph(*graph_index):
+    """ Decorator to support input graphs as NetworkX Graphs or lists of edges.
+        Chosen arguments are parsed into graph edgelists.
 
-def dnx_graph(*graph_index, nice_coordinates=False):
-    """ Parse D-Wave NetworkX graph arguments and return with coordinates
         Args:
             graph_index (iter):
                 One or more numbers representing where in the argument list of
-                the warpped function is the `dwave_networkx` graph.
+                the wrapped function is the `networkx.Graph` object or list.
+
+    """
+    def _parse_graph(G):
+        if isinstance(G, nx.Graph):
+            H = list(G.edges)
+        elif isinstance(G, list):
+            H = G
+        else:
+            raise TypeError("Unsupported type of graph.")
+        return H
+
+    @decorator
+    def _graph_argument(func, *args, **kwargs):
+        new_args = list(args)
+        for i in graph_index:
+            new_args[i] =  _parse_graph(new_args[i])
+        return func(*new_args, **kwargs)
+    return _graph_argument
+
+""" =========================== D-Wave NetworkX ============================ """
+
+def dnx_graph(*graph_index, nice_coordinates=False):
+    """ Decorator to support input graphs as D-Wave NetworkX Graphs with
+        different types of labels.
+
+        Args:
+            graph_index (iter):
+                One or more numbers representing where in the argument list of
+                the wrapped function is a `dwave_networkx` graph.
 
             nice_coordinates (bool):
                 Wether or not to return nice_coordinates. Only applies to
                 Pegasus architectures. Chimera coordinates are `nice`.
+                # TODO: Adding a 5th label to Chimera coordinates
     """
 
     def _parse_graph(G):
@@ -91,7 +137,17 @@ def dnx_graph(*graph_index, nice_coordinates=False):
 """ ===================== D-Wave NetworkX w/ Embedding ===================== """
 
 def dnx_graph_embedding(dnx_graph_index, *embedding_index):
-    """ Given one D-Wave NetworkX and at least one embedding
+    """ Decorator to transform embeddings from `int` labels into `coordinate`
+        labels.
+
+        Args:
+            dnx_graph_index (int):
+                Integer representing where in the argument list of the wrapped
+                function is the dwave_networkx Graph of the target coordinates.
+            embedding_index (iter):
+                One or more numbers representing where in the argument list of
+                the wrapped function is an embedding object, i.e. dict.
+
     """
     def _translate_labels(embedding, dnx_coords):
         if all([isinstance(q,int) for chain in embedding.values() for q in chain]):

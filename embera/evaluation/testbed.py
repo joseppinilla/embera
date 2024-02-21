@@ -6,50 +6,83 @@ import dwave.cloud
 import dwave.embedding
 
 import numpy as np
+import dwave_networkx as dnx
 
 from collections import OrderedDict
 
-class StructuredSASampler(dimod.SimulatedAnnealingSampler,dimod.Structured):
-    nodelist = None
-    edgelist = None
+class StructuredMockSampler(dimod.Structured):
+
     def __init__(self, failover=None,**config):
-        super(StructuredSASampler, self).__init__()
+        super(StructuredMockSampler, self).__init__()
         self.client = dwave.cloud.Client.from_config(**config)
         solver = self.client.get_solver()
 
         self.properties.update(solver.properties)
         self.properties['category'] = 'software'
-        self.properties['chip_id'] = "SIM_"+solver.name
 
-        G = embera.architectures.graph_from_solver(solver)
-        self.nodelist = list(G.nodes())
-        self.edgelist = list(G.edges())
+        self._nodelist = self.properties['qubits']
+        self._edgelist = self.properties['couplers']
+
+    @property
+    def edgelist(self):
+        # Assumption: cloud client nodes are always integer-labelled
+        try:
+            edgelist = self._edgelist
+        except AttributeError:
+            self._edgelist = edgelist = sorted(set((u, v) if u < v else (v, u)
+                                                   for u, v in self.solver.edges))
+        return edgelist
+
+    @property
+    def nodelist(self):
+        # Assumption: cloud client nodes are always integer-labelled
+        try:
+            nodelist = self._nodelist
+        except AttributeError:
+            self._nodelist = nodelist = sorted(self.solver.nodes)
+        return nodelist
+
+    def to_networkx_graph(self):
+        """Converts DWaveSampler's structure to a Chimera or Pegasus NetworkX graph.
+
+        Returns:
+            :class:`networkx.Graph`:
+                Either an (m, n, t) Chimera lattice or a Pegasus lattice of size m.
+
+        """
+        topology_type = self.properties['topology']['type']
+        shape = self.properties['topology']['shape']
+
+        if topology_type == 'chimera':
+            G = dnx.chimera_graph(*shape,
+                                  node_list=self.nodelist,
+                                  edge_list=self.edgelist)
+
+        elif topology_type == 'pegasus':
+            G = dnx.pegasus_graph(shape[0],
+                                  node_list=self.nodelist,
+                                  edge_list=self.edgelist)
+
+        return G
 
     def validate_anneal_schedule(self,arg):
         pass
+
+class StructuredSASampler(StructuredMockSampler,dimod.SimulatedAnnealingSampler):
+    def __init__(self, failover=None,**config):
+        dimod.SimulatedAnnealingSampler.__init__(self)
+        StructuredMockSampler.__init__(self,failover=failover,**config)
+        self.properties['chip_id'] = 'SIM_'+self.properties['chip_id']
 
     def sample(self, *args, **kwargs):
         child_kwargs = {k:v for k,v in kwargs.items() if k in self.parameters}
         return super().sample(*args, **child_kwargs)
 
-class StructuredRandomSampler(dimod.RandomSampler,dimod.Structured):
-    nodelist = None
-    edgelist = None
+class StructuredRandomSampler(StructuredMockSampler,dimod.RandomSampler):
     def __init__(self, failover=None,**config):
-        super(StructuredRandomSampler, self).__init__()
-        self.client = dwave.cloud.Client.from_config(**config)
-        self.solver = self.client.get_solver()
-
-        self.properties.update(self.solver.properties)
-        self.properties['category'] = 'software'
-        self.properties['chip_id'] = "RND_"+self.solver.name
-
-        G = embera.architectures.graph_from_solver(self.solver)
-        self.nodelist = list(G.nodes())
-        self.edgelist = list(G.edges())
-
-    def validate_anneal_schedule(self,arg):
-        pass
+        dimod.RandomSampler.__init__(self)
+        StructuredMockSampler.__init__(self,failover=failover,**config)
+        self.properties['chip_id'] = 'RND_'+self.properties['chip_id']
 
     def sample(self, *args, **kwargs):
         child_kwargs = {k:v for k,v in kwargs.items() if k in self.parameters}

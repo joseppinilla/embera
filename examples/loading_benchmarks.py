@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 bench_graph_list = embera.benchmark.topologies.embera_bench()
 
 nrows = 7
-ncols = len(bench_graph_list)//nrows + bool(len(bench_graph_list)%nrows)
+ncols = 4
 fig, axs = plt.subplots(nrows, ncols, subplot_kw={'aspect':'equal'})
 fig.set_size_inches(ncols , nrows)
 for i, ax in enumerate(axs.flat):
@@ -17,3 +17,4 @@ for i, ax in enumerate(axs.flat):
 plt.subplots_adjust(left=0, right=1, bottom=0, top=1, wspace=0, hspace=0)
 
 plt.show()
+    

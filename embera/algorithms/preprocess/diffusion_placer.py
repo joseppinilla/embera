@@ -1,10 +1,8 @@
 import math
 import warnings
 import networkx as nx
-import matplotlib.pyplot as plt
 
-from embera.preprocess.tiling_parser import DWaveNetworkXTiling
-from embera.architectures.drawing import draw_tiled_graph
+from embera.architectures.tiling import DWaveNetworkXTiling
 
 __all__ = ['find_candidates']
 
@@ -12,16 +10,10 @@ class DiffusionPlacer(DWaveNetworkXTiling):
     """ Diffusion-based migration of a graph layout
     """
     def __init__(self, S, Tg, **params):
-        DWNetworkXTiling.__init__(self, Tg)
+        DWaveNetworkXTiling.__init__(self, Tg)
 
         self.p_size = len(S)
-
-        self.tries = params.pop('tries', 1)
-        self.verbose = params.pop('verbose', 0)
-
-        # Choice of vicinity (Default: Directed). See _assign_candidates()
-        self.vicinity = params.pop('vicinity', 3)
-
+        self.t_size = len(Tg)
         # Source graph layout
         self.layout = params.pop('layout', None)
         if self.layout is None:
@@ -55,35 +47,9 @@ class DiffusionPlacer(DWaveNetworkXTiling):
         """
 
         candidates = {}
-
+        # Single tile
         for s_node, s_tile in self.mapping.items():
-            # Single tile
             candidates[s_node] = self.tiles[s_tile].qubits
-            # Neighbouring tiles
-            n, s, w, e, nw, ne, se, sw = self.tiles[s_tile].neighbors
-            if self.vicinity == 1:
-                # Immediate neighbors
-                for tile in [n,s,w,e]:
-                    candidates[s_node].update(self.tiles[tile].qubits)
-            elif self.vicinity == 2:
-                # Extended neighbors
-                for tile in [n, s, w, e, nw, ne, se, sw]:
-                    candidates[s_node].update(self.tiles[tile].qubits)
-            elif self.vicinity == 3:
-                # Directed  = (Single) + 3 tiles closest to the node coordinates
-                x_coord, y_coord = self.layout[s_node]
-                i_index, j_index = s_tile
-                if x_coord >= j_index+0.5:
-                    if y_coord >= i_index+0.5: neighbor_tiles = (e,s,se)
-                    else: neighbor_tiles = (e,n,ne)
-                else:
-                    if y_coord >= i_index+0.5: neighbor_tiles = (w,s,sw)
-                    else: neighbor_tiles = (w,n,nw)
-
-                for tile in neighbor_tiles:
-                    candidates[s_node].update(self.tiles[tile].qubits)
-            elif self.vicinity!=0:
-                raise ValueError("vicinity %s not valid [0-3]." % self.vicinity)
 
         return candidates
 
@@ -91,12 +57,12 @@ class DiffusionPlacer(DWaveNetworkXTiling):
         """ Assign node locations to in-scale values of the dimension of Tg """
         P = self.p_size
         T = self.t_size
-        n = self.n
-        m = self.m
+        m = self.graph["rows"]
+        n = self.graph["columns"]
         # Downscale according to size of problem P/T and expected occupancy
         exp_occ = self.expected_occupancy
-        t_width = n if not self.downscale else min(2 + (n*(P*exp_occ/T)), n)
-        t_height = m if not self.downscale else min(2 + (m*(P*exp_occ/T)), m)
+        t_width = n-1 if not self.downscale else min(2 + ((n-1)*(P*exp_occ/T)), n-1)
+        t_height = m-1 if not self.downscale else min(2 + ((m-1)*(P*exp_occ/T)), m-1)
         # Find dimensions of source graph S
         Sx_min = Sy_min = float("inf")
         Sx_max = Sy_max = 0.0
@@ -112,7 +78,7 @@ class DiffusionPlacer(DWaveNetworkXTiling):
         # Define scaling factor
         scale_x = (t_width) / s_width
         scale_y = (t_height) / s_height
-
+        print(scale_x, scale_y)
 
         if self.keep_ratio:
             keep_ratio = 0.0 if (self.keep_ratio is True) else self.keep_ratio
@@ -123,11 +89,11 @@ class DiffusionPlacer(DWaveNetworkXTiling):
                 scale_x = scale_y + (scale_x - scale_y ) * keep_ratio
                 t_width = s_width*scale_x
 
-        offset_x = ((n-t_width)/2.0) + 0.5
-        offset_y = ((m-t_height)/2.0) + 0.5
+        offset_x = ((n-1-t_width)/2.0) + 0.5
+        offset_y = ((m-1-t_height)/2.0) + 0.5
         # Normalize, scale and accumulate initial distances
         dist_accum = 0.0
-        t_center_x, t_center_y = n/2.0, m/2.0
+        t_center_x, t_center_y = (n-1)/2.0, (m-1)/2.0
         for s_node, s_coords in self.layout.items():
             (sx, sy) = s_coords
             scaled_x = offset_x + ((sx-Sx_min) * scale_x)
@@ -142,9 +108,7 @@ class DiffusionPlacer(DWaveNetworkXTiling):
         dispersion = dist_accum/P
         self.dispersion_accum = [dispersion] * 3
 
-        if self.verbose==4:
-            draw_tiled_graph(m, n, self.tiles, self.layout)
-            plt.show()
+        print(self.layout)
 
     def _coords_to_tile(self, x_coord, y_coord):
         """ Tile values are restricted.
@@ -152,8 +116,10 @@ class DiffusionPlacer(DWaveNetworkXTiling):
         Vertically 0<=j<=m
 
         """
-        j = max(min(math.floor(x_coord), self.n-1), 0)
-        i = max(min(math.floor(y_coord), self.m-1), 0)
+        m = self.graph["rows"]
+        n = self.graph["columns"]
+        j = max(min(math.floor(x_coord), n-1), 0)
+        i = max(min(math.floor(y_coord), m-1), 0)
         tile = (i,j)
         return tile
 
@@ -162,7 +128,7 @@ class DiffusionPlacer(DWaveNetworkXTiling):
         """ Get three neighboring tiles that are in the direction
             of the center of the tile array.
         """
-        n, s, w, e, nw, ne, se, sw = self.tiles[(i,j)].neighbors
+        n, s, w, e, nw, ne, se, sw = self.get_tile_neighbors(self.tiles[(i,j)])
         lh = (j >= 0.5*self.n)
         lv = (i >= 0.5*self.m)
 
@@ -180,7 +146,7 @@ class DiffusionPlacer(DWaveNetworkXTiling):
         d_lim = self.d_lim
         d_ij = tile.concentration
 
-        if d_ij == 0.0 or tile.name == None:
+        if d_ij == 0.0 or tile == None:
             return 0.0, 0.0
         h, v, hv = self._get_attractors(*tile.name)
         d_h = self.tiles[h].concentration
@@ -196,8 +162,8 @@ class DiffusionPlacer(DWaveNetworkXTiling):
         """ Discrete Diffusion Step
         """
         # Target graph dimensions
-        m = self.m
-        n = self.n
+        m = self.graph["rows"]
+        n = self.graph["columns"]
         T = self.t_size
         P = self.p_size
         # Migration hyperparameters
@@ -235,8 +201,6 @@ class DiffusionPlacer(DWaveNetworkXTiling):
         """ Use source nodes layout to determine tile mapping.
             Then use new populations of tiles to calculate tile
             concentrations.
-            Using verbose==4, a call to draw_tiled_graph() plots
-            source nodes over a tile grid.
         """
 
         for s_node, s_coords in self.layout.items():
@@ -246,13 +210,9 @@ class DiffusionPlacer(DWaveNetworkXTiling):
             self.tiles[new_tile].nodes.add(s_node)
             self.mapping[s_node] = new_tile
 
-        for tile in self.tiles.values():
-            if tile.supply:
-                tile.concentration = len(tile.nodes)/tile.supply
-
-        if self.verbose==4:
-            draw_tiled_graph(self.m, self.n, self.tiles, self.layout)
-            plt.show()
+        # for tile in self.tiles.values():
+        #     if tile.supply:
+        #         tile.concentration = len(tile.nodes)/len(tile.supply)
 
     def _condition(self, dispersion):
         """ The algorithm iterates until the dispersion, or average distance of
@@ -318,27 +278,15 @@ def find_candidates(S, Tg, **params):
 
         Optional parameters:
 
-            tries (int, default=1):
-
-            verbose (int, default=0): Verbosity level
-                0: Quiet mode
-                1: Print statements
-                4: Tile drawings with concentration
-
             layout ({<node>:(<x>,<y>),...}, default=None):
                 Dict of 2D positions assigned to the source graph nodes.
 
-            vicinity (int, default=3): Granularity of the candidate assignment.
-                0: Single tile
-                1: Immediate neighbors = (north, south, east, west)
-                2: Extended neighbors = (Immediate) + diagonals
-                3: Directed  = (Single) + 3 tiles closest to the node coordinates
-
-            viscosity (float, default=0.00):
+            viscosity (float, default=0.00): Scaling of the density in a tile
+                to slow down migration.
 
             delta_t (float, default=0.20): Time delta for every diffusion step.
 
-            d_lim (float<=1.0, default=0.75): Density limity for each tile.
+            d_lim (float<=1.0, default=0.75): Density limit for each tile.
 
             downscale (bool, default=False): Scale of initial overlay is calculated
                 from the problem/target size ratio, and expected occupancy _a

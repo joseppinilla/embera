@@ -3,24 +3,25 @@
 from setuptools import setup
 
 packages = ['embera',
+            'embera.algorithms',
             'embera.architectures',
-            'embera.benchmark',
+            'embera.benchmarks',
             'embera.composites',
+            'embera.evaluation',
             'embera.interfaces',
-            'embera.preprocess',
-            'embera.transform',
             'embera.utilities',
             ]
 
-install_requires = ['dimod>=0.12.14',
-                    'dwave_networkx>=0.8.14',
-                    'dwave-system>=1.23.0',
-                    'matplotlib>=3.8.2',
-                    'minorminer>=0.2.13',
-                    'networkx>=3.2.1',
-                    'numpy>=1.26.4',
-                    'pulp>=2.8.0',
-                    'scipy>=1.12.0']
+install_requires = ['dimod>=0.8.0,<0.9.0',
+                    'dwave_networkx>=0.8.0,<0.9.0',
+                    'dwave-system>=0.8.0,<0.9.0',
+                    'matplotlib>=3.1.0,<4.0.0',
+                    'minorminer>=0.1.5,<0.2.0',
+                    'networkx>=2.0,<3.0',
+                    'numpy>=1.15.2,<2.00',
+                    'pulp>=1.6.0,<2.0.0',
+                    'scipy>=1.4.0,<2.0.0',
+                    ]
 
 with open("README.md", "r", encoding='utf-8') as fh:
     long_description = fh.read()

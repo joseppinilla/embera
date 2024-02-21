@@ -3,7 +3,6 @@ import json
 import time
 import dimod
 import numpy
-import pandas as pd
 import networkx as nx
 
 from hashlib import md5
@@ -22,6 +21,14 @@ from dwave.embedding import unembed_sampleset
 
 from networkx.readwrite.json_graph import node_link_data as _serialize_graph
 from networkx.readwrite.json_graph import node_link_graph as _deserialize_graph
+
+try:
+    # Pandas isn't required. But if a pandas dependant command is required
+    # this can identify the issue.
+    import pandas as pd
+    _pandas = True
+except e:
+    _pandas = False
 
 __all__ = ["EmberaDataBase"]
 
@@ -110,7 +117,7 @@ class EmberaDataBase:
         json_bqm = json.dumps(filtered,sort_keys=True)
         id = self.hash(json_bqm.encode("utf-8"))
 
-        if not alias is None:
+        if not alias == None:
             self.set_bqm_alias(id,alias)
         return id
 
@@ -175,7 +182,7 @@ class EmberaDataBase:
             path = os.path.join(path,dir)
             if not os.path.isdir(path):
                 os.mkdir(path)
-        if filename is not None:
+        if filename != None:
             path = os.path.join(path,filename+'.json')
         return path
 
@@ -260,7 +267,7 @@ class EmberaDataBase:
         elif not isinstance(embedding,(Embedding,dict)):
             raise ValueError("Embedding alias or id cannot be used to unembed")
 
-        if unembed_args is None:
+        if unembed_args == None:
             return samplesets
         else:
             return [unembed_sampleset(s,embedding,bqm,**unembed_args) for s in samplesets]
@@ -295,7 +302,7 @@ class EmberaDataBase:
         if not samplesets:
             return dimod.SampleSet.from_samples([],bqm.vartype,None)
 
-        if index is not None:
+        if index != None:
             return samplesets.pop(index)
 
         try:
@@ -436,8 +443,11 @@ class EmberaDataBase:
                     if not dataframe:
                         reports[metric] = report
                     else:
-                        kwargs = {'columns':list(bqm),'orient':'index'}
-                        reports[metric] = pd.DataFrame.from_dict(report,**kwargs)
+                        if _pandas:
+                            kwargs = {'columns':list(bqm),'orient':'index'}
+                            reports[metric] = pd.DataFrame.from_dict(report,**kwargs)
+                        else:
+                            raise RuntimeError("Module `pandas` not available.")
         return reports
 
     def load_report(self, bqm, target, metric, tags=[], dataframe=False):

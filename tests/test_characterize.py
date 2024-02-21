@@ -14,8 +14,8 @@ import networkx as nx
 import dwave_networkx as dnx
 
 from embera.architectures import generators
-from embera.composites.embedding import EmbeddingComposite
 
+from dwave.system import EmbeddingComposite
 from dimod.reference.samplers.exact_solver import ExactSolver
 from dimod.reference.samplers.random_sampler import RandomSampler
 from dimod.reference.composites.structure import StructureComposite
@@ -153,13 +153,13 @@ class CharacterizeArchitecture(CharacterizeEmbedding):
 
     def setUp(self):
         self.tries = tries
-        self.method = minorminer
+        self.method = minorminer.find_embedding
 
     def all_graphs(self):
         gen = generators.__dict__[self.target]
         T = gen()
         self.structsampler = StructureComposite(SimulatedAnnealingSampler(), T.nodes, T.edges)
-        self.sampler = EmbeddingComposite(self.structsampler, self.method)
+        self.sampler = EmbeddingComposite(self.structsampler, find_embedding=self.method)
         self.grid()
         self.bipartite()
         self.complete()
@@ -172,7 +172,7 @@ class CharacterizeArchitecture(CharacterizeEmbedding):
                 self.target = name
                 T = gen()
                 self.structsampler = StructureComposite(SimulatedAnnealingSampler(), T.nodes, T.edges)
-                self.sampler = EmbeddingComposite(self.structsampler, self.method)
+                self.sampler = EmbeddingComposite(self.structsampler, find_embedding=self.method)
                 self.graph()
 
     @unittest.skip("Exhaustive test. Not run if not characterizing a new method")

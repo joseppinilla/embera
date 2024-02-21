@@ -25,28 +25,22 @@ class TestBenchmarkDrawing(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree("./TMP")
 
-    def test_plot_yields(self):
-        T = embera.architectures.generators.dw2000q_graph()
-        T.remove_nodes_from([5,7,19,127])
-        embera.benchmark.plot_yields([T],savefig='./TMP/0.png')
-        self.assertTrue(os.path.exists('./TMP/0.png'))
-
     def test_plot_embeddings(self):
         embeddings = [self.embedding]
         T = nx.Graph(self.target_edgelist)
-        embera.benchmark.plot_embeddings(embeddings,T,savefig='./TMP/1.png')
+        embera.evaluation.plot_embeddings(embeddings,T,savefig='./TMP/1.png')
         self.assertTrue(os.path.exists('./TMP/1.png'))
 
     def test_plot_joint_sampleset(self):
         samplesets = [self.sampleset]
-        embera.benchmark.plot_joint_samplesets(samplesets,savefig='./TMP/2.png')
+        embera.evaluation.plot_joint_samplesets(samplesets,savefig='./TMP/2.png')
         self.assertTrue(os.path.exists('./TMP/2.png'))
-        embera.benchmark.plot_joint_samplesets(samplesets,gray=True,savefig='./TMP/3.png')
+        embera.evaluation.plot_joint_samplesets(samplesets,gray=True,savefig='./TMP/3.png')
         self.assertTrue(os.path.exists('./TMP/3.png'))
 
     def test_plot_chain_metrics(self):
         embeddings = [self.embedding]
         S = nx.Graph(self.source_edgelist)
         T = nx.Graph(self.target_edgelist)
-        embera.benchmark.plot_chain_metrics(embeddings,S,T,savefig='./TMP/4.png')
+        embera.evaluation.plot_chain_metrics(embeddings,S,T,savefig='./TMP/4.png')
         self.assertTrue(os.path.exists('./TMP/4.png'))

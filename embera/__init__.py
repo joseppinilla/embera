@@ -1,10 +1,20 @@
-from .architectures import *
-from .benchmark import *
-from .benchmark.testbed import *
-from .benchmark.topologies import *
+import embera.algorithms
+from embera.algorithms import *
 
-from .composites import *
-from .interfaces import *
-from .preprocess import *
-from .transform import *
-from .utilities import *
+import embera.architectures
+from embera.architectures import *
+
+import embera.benchmarks
+from embera.benchmarks import *
+
+import embera.composites
+from embera.composites import *
+
+import embera.evaluation
+from embera.evaluation import *
+
+import embera.interfaces
+from embera.interfaces import *
+
+import embera.utilities
+from embera.utilities import *

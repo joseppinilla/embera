@@ -42,7 +42,7 @@ class DWaveNetworkXTiling:
             if tile in self.tiles:
                 self.tiles[tile].qubits.append(q)
             else:
-                self.tiles[tile] = Tile(tile, self.shape, [q])
+                self.tiles[tile] = Tile(tile, [q])
 
     def __iter__(self):
         return self.tiles
@@ -81,8 +81,8 @@ class DWaveNetworkXTiling:
         return self.from_nice((t,i,j,u,k))
 
     def get_qubits(self, tile, shore=None, k=None):
-        shores = (0,1) if shore is None else (shore,)
-        indices = range(self.graph['tile']) if k is None else (k,)
+        shores = (0,1) if shore == None else (shore,)
+        indices = range(self.graph['tile']) if k == None else (k,)
         nice_tile = (0,)+tile if len(tile)==2 else tile
         for u in shores:
             for k in indices:
@@ -96,13 +96,18 @@ class DWaveNetworkXTiling:
             neighbors.add(neg)
             pos = tile[0:i] + (d+1,) + tile[i+1:]
             neighbors.add(pos)
-        return [tile for tile in neighbors if tile in self.tiles]
+        return [tile if tile in self.tiles else None for tile in neighbors]
 
 class Tile:
     """ Tile Class """
-    def __init__(self, index, shape, qubits):
+    def __init__(self, index, qubits):
         self.index = index
         self.qubits = qubits
+        self.nodes = set()
+
+    @property
+    def concentration(self):
+        return len(self.nodes)/len(self.qubits)
 
     @property
     def supply(self):
